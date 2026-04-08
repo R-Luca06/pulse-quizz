@@ -248,7 +248,7 @@ export default function QuizContainer({ onFinished, onQuit, gameMode, difficulty
         )}
 
         {(phase === 'playing' || phase === 'feedback') && currentQuestion && (
-          <div className="flex w-full max-w-2xl flex-col gap-2">
+          <div className="flex w-full max-w-2xl flex-col gap-2 lg:max-w-3xl">
             <QuestionCard
               question={currentQuestion}
               currentIndex={currentIndex}
