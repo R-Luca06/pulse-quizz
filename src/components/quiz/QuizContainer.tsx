@@ -109,15 +109,16 @@ export default function QuizContainer({ onFinished }: Props) {
               opacity: ball.opacity,
             }}
             animate={{
-              backgroundColor: isUrgent
-                ? '#EF4444'
-                : timeLeft <= 6
-                ? '#F97316'
+              backgroundColor:
+                answerState === 'correct' ? '#22C55E'
+                : answerState === 'wrong' || answerState === 'timeout' ? '#EF4444'
+                : isUrgent ? '#EF4444'
+                : timeLeft <= 6 ? '#F97316'
                 : '#8B5CF6',
               y: [0, -ball.floatY, 0],
             }}
             transition={{
-              backgroundColor: { duration: 1.0 },
+              backgroundColor: { duration: 0.4 },
               y: { duration: ball.duration, delay: ball.delay, repeat: Infinity, ease: 'easeInOut' },
             }}
           />
