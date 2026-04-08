@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { fetchQuestions } from '../utils/trivia'
+import { playCorrect, playWrong, playTimeout } from '../utils/sounds'
 import type { TriviaQuestion, AnswerState, QuizPhase, QuestionResult } from '../types/quiz'
 
 const FEEDBACK_DURATION = 1500
@@ -78,6 +79,7 @@ export function useQuiz(
       setSelectedAnswer(answer)
       setAnswerState(isCorrect ? 'correct' : 'wrong')
       setPhase('feedback')
+      if (isCorrect) playCorrect(); else playWrong()
 
       const newScore = isCorrect ? score + 1 : score
       if (isCorrect) {
@@ -106,6 +108,7 @@ export function useQuiz(
     setAnswerState('timeout')
     setPhase('feedback')
     setStreak(0)
+    playTimeout()
 
     feedbackTimer.current = setTimeout(() => advance(currentIndex + 1, score), FEEDBACK_DURATION)
   }, [answerState, questions, currentIndex, score, advance])

@@ -140,7 +140,7 @@ export default function FloatingCardsBackground({ launchPhase }: Props) {
             animate={animateTarget}
             transition={transition}
           >
-            <div className="w-52 rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm p-4 shadow-lg">
+            <div className="w-40 rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm p-3 shadow-lg sm:w-48 sm:p-4 md:w-52">
               <div className="mb-2 text-xs font-semibold uppercase tracking-widest text-neon-violet/70">
                 Question
               </div>

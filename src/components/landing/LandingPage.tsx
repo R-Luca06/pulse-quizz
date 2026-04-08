@@ -69,7 +69,7 @@ export default function LandingPage({ onStart, onExplosion, screen }: Props) {
 
       {/* Hero content — fades out on launch */}
       <motion.div
-        className="relative z-10 flex flex-col items-center gap-10 text-center"
+        className="relative z-10 flex flex-col items-center gap-6 text-center sm:gap-8 md:gap-10"
         animate={
           isLaunching
             ? { opacity: 0, scale: 0.85, transition: { duration: 0.25 } }
@@ -92,7 +92,7 @@ export default function LandingPage({ onStart, onExplosion, screen }: Props) {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7, delay: 0.3 }}
         >
-          <h1 className="text-7xl font-black tracking-tight text-white sm:text-8xl">
+          <h1 className="text-4xl font-black tracking-tight text-white sm:text-6xl md:text-7xl lg:text-8xl">
             Pulse
             <span className="bg-gradient-to-r from-neon-violet to-neon-blue bg-clip-text text-transparent">
               {' '}Quizz

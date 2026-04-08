@@ -1,6 +1,8 @@
+import { useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useQuiz } from '../../hooks/useQuiz'
 import { useTimer } from '../../hooks/useTimer'
+import { playTick } from '../../utils/sounds'
 import QuestionCard from './QuestionCard'
 import TimerBar from './TimerBar'
 import StreakIndicator from './StreakIndicator'
@@ -38,6 +40,10 @@ export default function QuizContainer({ onFinished }: Props) {
 
   const isUrgent = timeLeft <= 3 && timeLeft > 0 && phase === 'playing'
   const showFeedback = answerState === 'correct' || answerState === 'wrong'
+
+  useEffect(() => {
+    if (isUrgent) playTick()
+  }, [timeLeft, isUrgent])
 
   return (
     <motion.div

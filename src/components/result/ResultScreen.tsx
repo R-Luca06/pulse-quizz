@@ -38,11 +38,11 @@ export default function ResultScreen({ score, results, onReplay }: Props) {
   }, [score])
 
   return (
-    <div className="relative flex min-h-screen flex-col items-center overflow-y-auto bg-game-bg px-4 py-10">
+    <div className="relative flex min-h-screen flex-col items-center overflow-y-auto bg-game-bg px-4 py-6 sm:py-10">
       {/* Background blob */}
       <div className="pointer-events-none fixed inset-0">
         <div
-          className="absolute left-1/2 top-1/3 h-[500px] w-[500px] -translate-x-1/2 -translate-y-1/2 rounded-full blur-3xl"
+          className="absolute left-1/2 top-1/3 h-[250px] w-[250px] -translate-x-1/2 -translate-y-1/2 rounded-full blur-3xl sm:h-[400px] sm:w-[400px] md:h-[500px] md:w-[500px]"
           style={{ background: `${tier.color}15` }}
         />
       </div>
@@ -55,10 +55,10 @@ export default function ResultScreen({ score, results, onReplay }: Props) {
       >
         {/* Score */}
         <motion.div variants={fadeUp} className="flex items-end gap-2 text-center">
-          <span className="text-8xl font-black leading-none tabular-nums sm:text-9xl" style={{ color: tier.color }}>
+          <span className="text-5xl font-black leading-none tabular-nums sm:text-7xl md:text-8xl" style={{ color: tier.color }}>
             {displayed}
           </span>
-          <span className="mb-2 text-4xl font-black text-white/20 sm:text-5xl">/10</span>
+          <span className="mb-2 text-2xl font-black text-white/20 sm:text-3xl md:text-4xl">/10</span>
         </motion.div>
 
         {/* Score dots */}
@@ -77,7 +77,7 @@ export default function ResultScreen({ score, results, onReplay }: Props) {
 
         {/* Performance label */}
         <motion.div variants={fadeUp} className="flex flex-col items-center gap-1 text-center">
-          <p className="text-2xl font-bold text-white">{tier.label}</p>
+          <p className="text-xl font-bold text-white sm:text-2xl">{tier.label}</p>
           <p className="text-sm text-white/30">
             {score === 10
               ? 'Tu as répondu juste à toutes les questions !'
