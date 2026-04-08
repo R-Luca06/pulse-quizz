@@ -82,6 +82,44 @@ export default function QuizContainer({ onFinished }: Props) {
       }
       className="flex min-h-screen flex-col bg-game-bg"
     >
+      {/* Ambient background blobs — color shifts with timer */}
+      <div className="pointer-events-none fixed inset-0 overflow-hidden">
+        <motion.div
+          className="absolute left-1/4 top-1/3 h-[480px] w-[480px] -translate-x-1/2 -translate-y-1/2 rounded-full blur-3xl"
+          animate={{
+            background: isUrgent
+              ? 'rgba(239,68,68,0.13)'
+              : timeLeft <= 6
+              ? 'rgba(249,115,22,0.09)'
+              : 'rgba(139,92,246,0.09)',
+            x: [0, 24, -16, 0],
+            y: [0, -18, 12, 0],
+          }}
+          transition={{
+            background: { duration: 1.2 },
+            x: { duration: 18, repeat: Infinity, ease: 'easeInOut' },
+            y: { duration: 14, repeat: Infinity, ease: 'easeInOut' },
+          }}
+        />
+        <motion.div
+          className="absolute right-1/4 top-2/3 h-[360px] w-[360px] translate-x-1/2 -translate-y-1/2 rounded-full blur-3xl"
+          animate={{
+            background: isUrgent
+              ? 'rgba(220,38,38,0.10)'
+              : timeLeft <= 6
+              ? 'rgba(234,179,8,0.07)'
+              : 'rgba(59,130,246,0.08)',
+            x: [0, -20, 14, 0],
+            y: [0, 14, -20, 0],
+          }}
+          transition={{
+            background: { duration: 1.2 },
+            x: { duration: 22, repeat: Infinity, ease: 'easeInOut' },
+            y: { duration: 17, repeat: Infinity, ease: 'easeInOut' },
+          }}
+        />
+      </div>
+
       {/* Answer feedback vignette */}
       <AnimatePresence>
         {showFeedback && (
