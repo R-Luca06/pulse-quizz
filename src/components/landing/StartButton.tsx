@@ -1,10 +1,15 @@
 import { motion } from 'framer-motion'
+import { unlockAudio } from '../../utils/sounds'
 
 interface Props {
   onClick: () => void
 }
 
 export default function StartButton({ onClick }: Props) {
+  function handleClick() {
+    unlockAudio()
+    onClick()
+  }
   return (
     <div className="relative flex items-center justify-center">
       {/* Outer pulse ring */}
@@ -22,7 +27,7 @@ export default function StartButton({ onClick }: Props) {
 
       {/* Button */}
       <motion.button
-        onClick={onClick}
+        onClick={handleClick}
         className="relative z-10 h-16 w-16 rounded-full bg-gradient-to-br from-neon-violet to-neon-blue font-bold text-base tracking-widest text-white uppercase shadow-neon-violet sm:h-20 sm:w-20 sm:text-lg"
         whileHover={{
           scale: 1.1,
