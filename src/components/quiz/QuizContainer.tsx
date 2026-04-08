@@ -44,10 +44,11 @@ export default function QuizContainer({ onFinished }: Props) {
   const isUrgent = timeLeft <= 3 && timeLeft > 0 && phase === 'playing'
   const showFeedback = answerState === 'correct' || answerState === 'wrong'
 
-  // Tick on each urgent second
+  // Tick once per second during the urgent zone (Math.ceil changes only at each integer boundary)
+  const urgentSecond = isUrgent ? Math.ceil(timeLeft) : 0
   useEffect(() => {
-    if (isUrgent) playTick()
-  }, [timeLeft, isUrgent])
+    if (urgentSecond > 0) playTick()
+  }, [urgentSecond])
 
   // Combo overlay at milestone streaks
   const [comboVisible, setComboVisible] = useState(false)
