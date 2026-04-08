@@ -53,7 +53,7 @@ export default function AnswerButton({
         'flex items-center gap-3 font-medium',
         // idle
         isIdle &&
-          'border-game-border bg-game-card text-white hover:border-neon-violet/50 hover:bg-neon-violet/10',
+          'border-game-border bg-game-card text-white hover:border-neon-violet/60 hover:bg-neon-violet/10 hover:shadow-[0_0_18px_rgba(139,92,246,0.25)]',
         // correct highlight (the right answer, always shown after feedback)
         showCorrect &&
           'border-game-success bg-game-success/15 text-game-success shadow-neon-green',

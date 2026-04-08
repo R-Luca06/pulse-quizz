@@ -127,7 +127,7 @@ export default function ResultScreen({ score, results, onReplay }: Props) {
 
                     <div className="min-w-0 flex-1">
                       {/* Question */}
-                      <p className="text-xs leading-snug text-white/50">{r.question}</p>
+                      <p className="line-clamp-2 text-xs leading-snug text-white/50">{r.question}</p>
 
                       {/* User answer */}
                       <p className={`mt-1 text-sm font-medium ${r.isCorrect ? 'text-game-success' : 'text-game-danger'}`}>

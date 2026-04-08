@@ -26,7 +26,8 @@ export async function fetchQuestions(): Promise<TriviaQuestion[]> {
   const res = await fetch('https://opentdb.com/api.php?amount=10&type=multiple')
   if (!res.ok) throw new Error('Failed to fetch questions')
   const data = await res.json()
-  if (data.response_code !== 0) throw new Error('OpenTDB error: ' + data.response_code)
+  if (data.response_code === 5) throw new Error('rate_limit')
+  if (data.response_code !== 0) throw new Error('api_error')
 
   return data.results.map((q: RawTriviaResult) => {
     const question = decodeHtml(q.question)

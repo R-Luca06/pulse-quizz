@@ -8,7 +8,7 @@ export interface TriviaQuestion {
 }
 
 export type AnswerState = 'idle' | 'correct' | 'wrong' | 'timeout'
-export type QuizPhase = 'loading' | 'playing' | 'feedback' | 'finished'
+export type QuizPhase = 'loading' | 'playing' | 'feedback' | 'finished' | 'error'
 
 export interface QuestionResult {
   question: string

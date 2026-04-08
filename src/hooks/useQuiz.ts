@@ -15,6 +15,7 @@ interface UseQuizReturn {
   answerState: AnswerState
   handleAnswer: (answer: string) => void
   handleTimeout: () => void
+  retry: () => void
 }
 
 export function useQuiz(
@@ -33,14 +34,23 @@ export function useQuiz(
   const loadQuestions = useCallback(async () => {
     setPhase('loading')
     resultsRef.current = []
-    const qs = await fetchQuestions()
-    setQuestions(qs)
-    setCurrentIndex(0)
-    setScore(0)
-    setStreak(0)
-    setSelectedAnswer(null)
-    setAnswerState('idle')
-    setPhase('playing')
+    try {
+      const qs = await fetchQuestions()
+      setQuestions(qs)
+      setCurrentIndex(0)
+      setScore(0)
+      setStreak(0)
+      setSelectedAnswer(null)
+      setAnswerState('idle')
+      setPhase('playing')
+    } catch (err) {
+      if (err instanceof Error && err.message === 'rate_limit') {
+        // OTD rate limit: wait 5s then retry automatically
+        setTimeout(loadQuestions, 5000)
+      } else {
+        setPhase('error')
+      }
+    }
   }, [])
 
   useEffect(() => {
@@ -123,5 +133,6 @@ export function useQuiz(
     answerState,
     handleAnswer,
     handleTimeout,
+    retry: loadQuestions,
   }
 }

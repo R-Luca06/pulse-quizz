@@ -32,7 +32,12 @@ function CardContent({ question, answerState, selectedAnswer, onAnswer }: CardCo
         </div>
 
         {/* Question text */}
-        <p className="mb-6 text-base font-bold leading-snug text-white sm:mb-8 sm:text-xl md:text-2xl">
+        <p className={[
+          'mb-6 font-bold leading-snug text-white sm:mb-8',
+          question.question.length > 180 ? 'text-sm sm:text-base' :
+          question.question.length > 120 ? 'text-base sm:text-lg md:text-xl' :
+          'text-base sm:text-xl md:text-2xl',
+        ].join(' ')}>
           {question.question}
         </p>
 
