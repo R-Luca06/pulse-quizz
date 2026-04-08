@@ -44,16 +44,22 @@ function CardContent({ question, answerState, selectedAnswer, onAnswer }: CardCo
         {/* Answers grid */}
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 sm:gap-3">
           {question.shuffledAnswers.map((answer, i) => (
-            <AnswerButton
+            <motion.div
               key={answer}
-              label={answer}
-              letter={LETTERS[i]}
-              answerState={answerState}
-              isSelected={selectedAnswer === answer}
-              isCorrect={answer === question.correct_answer}
-              disabled={answerState !== 'idle'}
-              onClick={() => onAnswer(answer)}
-            />
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.15 + i * 0.07, duration: 0.2, ease: [0.25, 0, 0, 1] }}
+            >
+              <AnswerButton
+                label={answer}
+                letter={LETTERS[i]}
+                answerState={answerState}
+                isSelected={selectedAnswer === answer}
+                isCorrect={answer === question.correct_answer}
+                disabled={answerState !== 'idle'}
+                onClick={() => onAnswer(answer)}
+              />
+            </motion.div>
           ))}
         </div>
       </div>

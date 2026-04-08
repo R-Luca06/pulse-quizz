@@ -136,7 +136,15 @@ export default function QuizContainer({ onFinished }: Props) {
         </div>
         <StreakIndicator streak={streak} />
         <div className="text-sm font-semibold">
-          <span className="text-neon-violet">{score}</span>
+          <motion.span
+            key={score}
+            className="inline-block text-neon-violet"
+            initial={{ scale: 1.6, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ type: 'spring', stiffness: 500, damping: 22 }}
+          >
+            {score}
+          </motion.span>
           <span className="text-white/40"> pts</span>
         </div>
       </div>
@@ -178,7 +186,7 @@ export default function QuizContainer({ onFinished }: Props) {
         )}
 
         {(phase === 'playing' || phase === 'feedback') && currentQuestion && (
-          <div className="w-full max-w-2xl">
+          <div className="flex w-full max-w-2xl flex-col gap-2">
             <QuestionCard
               question={currentQuestion}
               currentIndex={currentIndex}
@@ -186,6 +194,21 @@ export default function QuizContainer({ onFinished }: Props) {
               selectedAnswer={selectedAnswer}
               onAnswer={handleAnswer}
             />
+            {/* Next-question progress bar during feedback */}
+            <div className="h-0.5 w-full overflow-hidden rounded-full bg-white/5">
+              <AnimatePresence>
+                {phase === 'feedback' && (
+                  <motion.div
+                    key={`progress-${currentIndex}`}
+                    className={`h-full rounded-full ${answerState === 'correct' ? 'bg-game-success' : 'bg-game-danger'}`}
+                    initial={{ width: '0%' }}
+                    animate={{ width: '100%' }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 1.45, ease: 'linear' }}
+                  />
+                )}
+              </AnimatePresence>
+            </div>
           </div>
         )}
       </div>

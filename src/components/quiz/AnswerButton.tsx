@@ -21,6 +21,11 @@ const POP = {
   transition: { duration: 0.3, ease: 'easeOut' },
 }
 
+const PULSE_CORRECT = {
+  scale: [1, 1.04, 1],
+  transition: { delay: 0.15, duration: 0.35, ease: 'easeOut' },
+}
+
 export default function AnswerButton({
   label,
   letter,
@@ -36,9 +41,13 @@ export default function AnswerButton({
   const showCorrect = isCorrect && !isIdle
   const showWrong = isSelected && answerState === 'wrong'
 
+  // Correct answer that was NOT selected: pulse to draw the eye after a wrong/timeout
+  const showCorrectUnselected = showCorrect && !isSelected
+
   const animate =
     showWrong ? SHAKE
     : showCorrect && isSelected ? POP
+    : showCorrectUnselected ? PULSE_CORRECT
     : {}
 
   return (
