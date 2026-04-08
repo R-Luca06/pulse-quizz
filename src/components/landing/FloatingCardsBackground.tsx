@@ -30,10 +30,23 @@ interface CardConfig {
 
 function generateCards(): CardConfig[] {
   const positions = [
-    { x: -38, y: -30 }, { x: 75, y: -35 }, { x: -42, y: 60 },
-    { x: 78, y: 55 }, { x: -10, y: -42 }, { x: 60, y: 15 },
-    { x: -35, y: 20 }, { x: 40, y: -15 }, { x: 15, y: 65 },
-    { x: -15, y: 40 },
+    // top-left
+    { x: -35, y: -38 },
+    // top-center
+    { x:  -2, y: -42 },
+    // top-right
+    { x:  28, y: -38 },
+    // left-middle
+    { x: -40, y:   5 },
+    // right-middle
+    { x:  33, y:  -5 },
+    // bottom-left
+    { x: -38, y:  28 },
+    { x: -14, y:  36 },
+    // bottom-right (3 cards)
+    { x:  18, y:  30 },
+    { x:  35, y:  22 },
+    { x:  28, y:  38 },
   ]
 
   return SAMPLE_QUESTIONS.map((q, i) => ({
@@ -43,17 +56,17 @@ function generateCards(): CardConfig[] {
     initialX: positions[i].x,
     initialY: positions[i].y,
     rotation: (Math.random() - 0.5) * 24,
-    floatY: 8 + Math.random() * 14,
-    floatRotation: (Math.random() - 0.5) * 8,
-    duration: 5 + Math.random() * 5,
-    delay: Math.random() * -8,
+    floatY: 4 + Math.random() * 7,
+    floatRotation: (Math.random() - 0.5) * 4,
+    duration: 7 + Math.random() * 5,
+    delay: Math.random() * -10,
     scale: 0.75 + Math.random() * 0.3,
   }))
 }
 
 interface Props {
   isLaunching: boolean
-  cardRefs?: React.MutableRefObject<(HTMLDivElement | null)[]>
+  cardRefs?: React.RefObject<(HTMLDivElement | null)[]>
 }
 
 export default function FloatingCardsBackground({ isLaunching, cardRefs }: Props) {
