@@ -24,7 +24,7 @@ const container = {
 
 const fadeUp = {
   hidden: { opacity: 0, y: 24 },
-  show:   { opacity: 1, y: 0, transition: { duration: 0.5, ease: [0.25, 0, 0, 1] } },
+  show:   { opacity: 1, y: 0 },
 }
 
 export default function ResultScreen({ score, onReplay }: Props) {
@@ -63,6 +63,7 @@ export default function ResultScreen({ score, onReplay }: Props) {
         variants={container}
         initial="hidden"
         animate="show"
+        transition={{ staggerChildren: 0.1, delayChildren: 0.2 }}
         className="relative z-10 flex flex-col items-center gap-6 text-center"
       >
         {/* Emoji */}
