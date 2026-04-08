@@ -14,10 +14,10 @@ interface CardContentProps {
 function CardContent({ question, answerState, selectedAnswer, onAnswer }: CardContentProps) {
   return (
     <motion.div
-      initial={{ x: 60, opacity: 0, scale: 0.97 }}
-      animate={{ x: 0, opacity: 1, scale: 1 }}
-      exit={{ x: -60, opacity: 0, scale: 0.97 }}
-      transition={{ duration: 0.28, ease: [0.25, 0, 0, 1] }}
+      initial={{ opacity: 0, y: 14, scale: 0.98 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: -10, scale: 0.98 }}
+      transition={{ duration: 0.2, ease: [0.25, 0, 0, 1] }}
       className="w-full"
     >
       <div className="rounded-3xl border border-game-border bg-game-card p-6 shadow-2xl sm:p-8">
@@ -67,8 +67,8 @@ interface Props {
 export default function QuestionCard(props: Props) {
   return (
     // overflow-hidden so the entering/exiting cards don't bleed outside the container
-    <div className="overflow-hidden">
-      <AnimatePresence mode="sync" initial={false}>
+    <div>
+      <AnimatePresence mode="wait" initial={false}>
         <CardContent
           key={props.currentIndex}
           question={props.question}
