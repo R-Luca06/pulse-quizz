@@ -20,6 +20,19 @@ const FEEDBACK_COLORS = {
 
 const COMBO_MILESTONES = [3, 5, 7, 10]
 
+interface BallConfig { id: number; top: number; left: number; size: number; opacity: number; floatY: number; duration: number; delay: number }
+
+const BALLS: BallConfig[] = Array.from({ length: 18 }, (_, i) => ({
+  id: i,
+  top:      Math.floor(Math.random() * 90 + 5),
+  left:     Math.floor(Math.random() * 92 + 4),
+  size:     Math.floor(6 + Math.random() * 10),
+  opacity:  parseFloat((0.1 + Math.random() * 0.22).toFixed(2)),
+  floatY:   Math.floor(6 + Math.random() * 10),
+  duration: parseFloat((5 + Math.random() * 7).toFixed(1)),
+  delay:    parseFloat((-8 + Math.random() * 8).toFixed(1)),
+}))
+
 export default function QuizContainer({ onFinished }: Props) {
   const {
     phase,
@@ -82,42 +95,33 @@ export default function QuizContainer({ onFinished }: Props) {
       }
       className="flex min-h-screen flex-col bg-game-bg"
     >
-      {/* Ambient background blobs — color shifts with timer */}
+      {/* Ambient balls — scattered, float slowly, color shifts with timer */}
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
-        <motion.div
-          className="absolute left-1/4 top-1/3 h-[480px] w-[480px] -translate-x-1/2 -translate-y-1/2 rounded-full blur-3xl"
-          animate={{
-            background: isUrgent
-              ? 'rgba(239,68,68,0.13)'
-              : timeLeft <= 6
-              ? 'rgba(249,115,22,0.09)'
-              : 'rgba(139,92,246,0.09)',
-            x: [0, 24, -16, 0],
-            y: [0, -18, 12, 0],
-          }}
-          transition={{
-            background: { duration: 1.2 },
-            x: { duration: 18, repeat: Infinity, ease: 'easeInOut' },
-            y: { duration: 14, repeat: Infinity, ease: 'easeInOut' },
-          }}
-        />
-        <motion.div
-          className="absolute right-1/4 top-2/3 h-[360px] w-[360px] translate-x-1/2 -translate-y-1/2 rounded-full blur-3xl"
-          animate={{
-            background: isUrgent
-              ? 'rgba(220,38,38,0.10)'
-              : timeLeft <= 6
-              ? 'rgba(234,179,8,0.07)'
-              : 'rgba(59,130,246,0.08)',
-            x: [0, -20, 14, 0],
-            y: [0, 14, -20, 0],
-          }}
-          transition={{
-            background: { duration: 1.2 },
-            x: { duration: 22, repeat: Infinity, ease: 'easeInOut' },
-            y: { duration: 17, repeat: Infinity, ease: 'easeInOut' },
-          }}
-        />
+        {BALLS.map((ball) => (
+          <motion.div
+            key={ball.id}
+            className="absolute rounded-full"
+            style={{
+              top: `${ball.top}%`,
+              left: `${ball.left}%`,
+              width: ball.size,
+              height: ball.size,
+              opacity: ball.opacity,
+            }}
+            animate={{
+              backgroundColor: isUrgent
+                ? '#EF4444'
+                : timeLeft <= 6
+                ? '#F97316'
+                : '#8B5CF6',
+              y: [0, -ball.floatY, 0],
+            }}
+            transition={{
+              backgroundColor: { duration: 1.0 },
+              y: { duration: ball.duration, delay: ball.delay, repeat: Infinity, ease: 'easeInOut' },
+            }}
+          />
+        ))}
       </div>
 
       {/* Answer feedback vignette */}
