@@ -11,6 +11,8 @@ export type AnswerState = 'idle' | 'correct' | 'wrong' | 'timeout'
 export type QuizPhase = 'loading' | 'playing' | 'feedback' | 'finished' | 'error'
 export type GameMode   = 'normal' | 'survie'
 export type Difficulty = 'mixed' | 'easy' | 'medium' | 'hard'
+export type Language   = 'en' | 'fr'
+export type Category   = number | 'all'
 
 export interface QuestionResult {
   question: string

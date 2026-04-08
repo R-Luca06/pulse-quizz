@@ -6,6 +6,8 @@ interface Props {
   score: number
   results: QuestionResult[]
   onReplay: () => void
+  bestScore: number
+  isNewBest: boolean
 }
 
 const TIERS = [
@@ -21,7 +23,7 @@ function getTier(score: number) {
 
 const fadeUp = { hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0 } }
 
-export default function ResultScreen({ score, results, onReplay }: Props) {
+export default function ResultScreen({ score, results, onReplay, bestScore, isNewBest }: Props) {
   const [displayed, setDisplayed] = useState(0)
   const tier = getTier(score)
 
@@ -54,11 +56,27 @@ export default function ResultScreen({ score, results, onReplay }: Props) {
         className="relative z-10 flex w-full max-w-lg flex-col items-center gap-6"
       >
         {/* Score */}
-        <motion.div variants={fadeUp} className="flex items-end gap-2 text-center">
-          <span className="text-5xl font-black leading-none tabular-nums sm:text-7xl md:text-8xl" style={{ color: tier.color }}>
-            {displayed}
-          </span>
-          <span className="mb-2 text-2xl font-black text-white/20 sm:text-3xl md:text-4xl">/10</span>
+        <motion.div variants={fadeUp} className="flex flex-col items-center gap-2 text-center">
+          <div className="flex items-end gap-2">
+            <span className="text-5xl font-black leading-none tabular-nums sm:text-7xl md:text-8xl" style={{ color: tier.color }}>
+              {displayed}
+            </span>
+            <span className="mb-2 text-2xl font-black text-white/20 sm:text-3xl md:text-4xl">/10</span>
+          </div>
+          {isNewBest ? (
+            <motion.span
+              initial={{ scale: 0.6, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ type: 'spring', stiffness: 400, damping: 20, delay: 0.4 }}
+              className="rounded-full bg-yellow-400/15 px-3 py-1 text-xs font-bold uppercase tracking-widest text-yellow-400"
+            >
+              Nouveau record !
+            </motion.span>
+          ) : bestScore > 0 ? (
+            <span className="text-xs text-white/25">
+              Record : {bestScore}/10
+            </span>
+          ) : null}
         </motion.div>
 
         {/* Score dots */}

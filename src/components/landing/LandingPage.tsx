@@ -1,14 +1,15 @@
 import { useEffect, useState } from 'react'
-import { motion, useAnimationControls } from 'framer-motion'
+import { motion, useAnimationControls, AnimatePresence } from 'framer-motion'
 import FloatingCardsBackground from './FloatingCardsBackground'
 import StartButton from './StartButton'
+import { getMuted, setMuted } from '../../utils/sounds'
 import type { AppScreen } from '../../App'
-import type { GameMode, Difficulty } from '../../types/quiz'
+import type { GameMode, Difficulty, Language, Category } from '../../types/quiz'
 
 export type LaunchPhase = 'idle' | 'converging' | 'shaking' | 'exploding'
 
 interface Props {
-  onStart: (mode: GameMode, difficulty: Difficulty) => void
+  onStart: (mode: GameMode, difficulty: Difficulty, language: Language, category: Category) => void
   onExplosion: () => void
   screen: AppScreen
 }
@@ -19,25 +20,55 @@ const DIFFICULTIES: { value: Difficulty; label: string }[] = [
   { value: 'hard',   label: 'Difficile' },
 ]
 
+const LANGUAGES: { value: Language; label: string }[] = [
+  { value: 'fr', label: 'Français' },
+  { value: 'en', label: 'English' },
+]
+
+const MODES: { value: GameMode; label: string; desc: string }[] = [
+  { value: 'normal', label: 'Normal', desc: '10 questions' },
+  { value: 'survie', label: 'Survie', desc: 'Soyez irréprochable' },
+]
+
+const CATEGORIES: { value: Category; label: string }[] = [
+  { value: 'all',  label: 'Toutes catégories' },
+  { value: 9,      label: 'Culture générale' },
+  { value: 11,     label: 'Cinéma' },
+  { value: 12,     label: 'Musique' },
+  { value: 14,     label: 'Télévision' },
+  { value: 15,     label: 'Jeux vidéo' },
+  { value: 17,     label: 'Sciences & Nature' },
+  { value: 18,     label: 'Informatique' },
+  { value: 19,     label: 'Mathématiques' },
+  { value: 21,     label: 'Sports' },
+  { value: 22,     label: 'Géographie' },
+  { value: 23,     label: 'Histoire' },
+  { value: 27,     label: 'Animaux' },
+]
+
+const btnBase = 'flex-1 rounded-xl border px-3 py-2.5 text-sm font-semibold transition-colors duration-150 text-center'
+const btnSelected = 'border-neon-violet bg-neon-violet/15 text-white'
+const btnIdle = 'border-white/10 bg-white/5 text-white/45 hover:border-white/20 hover:text-white/70'
+
 export default function LandingPage({ onStart, onExplosion, screen }: Props) {
   const isLaunching = screen === 'launching'
   const [launchPhase, setLaunchPhase] = useState<LaunchPhase>('idle')
   const shakeControls = useAnimationControls()
 
-  const [mode, setMode] = useState<GameMode>('normal')
+  const [mode, setMode]           = useState<GameMode>('normal')
   const [difficulty, setDifficulty] = useState<Difficulty>('easy')
+  const [language, setLanguage]   = useState<Language>('en')
+  const [category, setCategory]   = useState<Category>('all')
+  const [openSettings, setOpenSettings] = useState(false)
+  const [muted, setMutedState]    = useState(getMuted)
 
   useEffect(() => {
     if (!isLaunching) {
       setLaunchPhase('idle')
       return
     }
-
-    let t1: ReturnType<typeof setTimeout>
-
     setLaunchPhase('converging')
-
-    t1 = setTimeout(async () => {
+    const t = setTimeout(async () => {
       setLaunchPhase('shaking')
       await shakeControls.start({
         x: [0, -18, 18, -14, 14, -9, 9, -5, 5, 0],
@@ -46,21 +77,23 @@ export default function LandingPage({ onStart, onExplosion, screen }: Props) {
       setLaunchPhase('exploding')
       onExplosion()
     }, 380)
-
-    return () => { clearTimeout(t1) }
+    return () => clearTimeout(t)
   }, [isLaunching]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  function handlePlay() {
-    onStart(mode, difficulty)
+  function handleMuteToggle() {
+    const next = !muted
+    setMuted(next)
+    setMutedState(next)
   }
 
-  const selectBase = 'cursor-pointer rounded-xl border px-4 py-2.5 text-sm font-semibold transition-colors duration-150'
-  const selectActive = 'border-neon-violet bg-neon-violet/10 text-white'
-  const selectInactive = 'border-white/10 bg-white/5 text-white/40 hover:border-white/20 hover:text-white/60'
+  function handleLaunch() {
+    setOpenSettings(false)
+    onStart(mode, difficulty, language, category)
+  }
 
   return (
     <div className="relative flex min-h-screen w-full flex-col items-center justify-center overflow-hidden bg-game-bg">
-      {/* Background gradient blobs */}
+      {/* Background blobs */}
       <div className="pointer-events-none absolute inset-0">
         <div className="absolute left-1/4 top-1/4 h-96 w-96 -translate-x-1/2 -translate-y-1/2 rounded-full bg-neon-violet/10 blur-3xl" />
         <div className="absolute right-1/4 bottom-1/4 h-96 w-96 translate-x-1/2 translate-y-1/2 rounded-full bg-neon-blue/10 blur-3xl" />
@@ -71,7 +104,7 @@ export default function LandingPage({ onStart, onExplosion, screen }: Props) {
         <FloatingCardsBackground launchPhase={launchPhase} />
       </motion.div>
 
-      {/* White flash at explosion moment */}
+      {/* Flash */}
       {launchPhase === 'exploding' && (
         <motion.div
           className="pointer-events-none absolute inset-0 z-20 bg-white"
@@ -81,9 +114,9 @@ export default function LandingPage({ onStart, onExplosion, screen }: Props) {
         />
       )}
 
-      {/* Hero content */}
+      {/* Hero */}
       <motion.div
-        className="relative z-10 flex flex-col items-center gap-6 text-center sm:gap-8 md:gap-10"
+        className="relative z-10 flex flex-col items-center gap-8 text-center"
         animate={
           isLaunching
             ? { opacity: 0, scale: 0.85, transition: { duration: 0.25 } }
@@ -97,7 +130,7 @@ export default function LandingPage({ onStart, onExplosion, screen }: Props) {
           transition={{ duration: 0.6, delay: 0.2 }}
           className="rounded-full border border-neon-violet/30 bg-neon-violet/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-widest text-neon-violet"
         >
-          Test your knowledge · Feel the rush
+          Teste tes connaissances · Ressens l'adrénaline
         </motion.div>
 
         {/* Title */}
@@ -114,63 +147,180 @@ export default function LandingPage({ onStart, onExplosion, screen }: Props) {
           </h1>
         </motion.div>
 
-        {/* Mode selector */}
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.45 }}
-          className="flex w-full max-w-xs flex-col items-center gap-2"
-        >
-          <p className="text-xs font-semibold uppercase tracking-widest text-white/30">Mode</p>
-          <div className="flex w-full gap-2">
-            <button
-              onClick={() => setMode('normal')}
-              className={[selectBase, 'flex flex-1 flex-col items-start gap-1 p-4', mode === 'normal' ? selectActive : selectInactive].join(' ')}
-            >
-              <span className="text-sm font-bold">Normal</span>
-              <span className="text-xs opacity-60">10 questions</span>
-            </button>
-            <button
-              onClick={() => setMode('survie')}
-              className={[selectBase, 'flex flex-1 flex-col items-start gap-1 p-4', mode === 'survie' ? selectActive : selectInactive].join(' ')}
-            >
-              <span className="text-sm font-bold">Survie</span>
-              <span className="text-xs opacity-60">1 erreur = fin</span>
-            </button>
-          </div>
-        </motion.div>
-
-        {/* Difficulty selector */}
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.55 }}
-          className="flex flex-col items-center gap-2"
-        >
-          <p className="text-xs font-semibold uppercase tracking-widest text-white/30">Difficulté</p>
-          <div className="flex gap-2">
-            {DIFFICULTIES.map((d) => (
-              <button
-                key={d.value}
-                onClick={() => setDifficulty(d.value)}
-                className={[selectBase, difficulty === d.value ? selectActive : selectInactive].join(' ')}
-              >
-                {d.label}
-              </button>
-            ))}
-          </div>
-        </motion.div>
-
         {/* Play button */}
         <motion.div
           initial={{ opacity: 0, scale: 0.8 }}
           animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.5, delay: 0.65, type: 'spring', stiffness: 200 }}
+          transition={{ duration: 0.5, delay: 0.5, type: 'spring', stiffness: 200 }}
         >
-          <StartButton onClick={handlePlay} />
+          <StartButton onClick={() => setOpenSettings(true)} />
         </motion.div>
-
       </motion.div>
+
+      {/* Settings popup */}
+      <AnimatePresence>
+        {openSettings && (
+          <>
+            {/* Backdrop */}
+            <motion.div
+              key="backdrop"
+              className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              onClick={() => setOpenSettings(false)}
+            />
+
+            {/* Modal */}
+            <motion.div
+              key="modal"
+              className="fixed inset-0 z-50 flex items-center justify-center px-4"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+            >
+              <motion.div
+                className="relative w-full max-w-sm rounded-2xl border border-white/10 bg-[#0d0d18] p-6 shadow-2xl"
+                initial={{ scale: 0.92, y: 16 }}
+                animate={{ scale: 1, y: 0 }}
+                exit={{ scale: 0.95, y: 8 }}
+                transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* Mute button */}
+                <button
+                  onClick={handleMuteToggle}
+                  title={muted ? 'Activer le son' : 'Couper le son'}
+                  className="absolute left-4 top-4 flex h-7 w-7 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/40 transition-colors hover:border-white/20 hover:text-white/70"
+                >
+                  {muted ? (
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+                      <line x1="23" y1="9" x2="17" y2="15"/>
+                      <line x1="17" y1="9" x2="23" y2="15"/>
+                    </svg>
+                  ) : (
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+                      <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
+                      <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
+                    </svg>
+                  )}
+                </button>
+
+                {/* Close button */}
+                <button
+                  onClick={() => setOpenSettings(false)}
+                  className="absolute right-4 top-4 flex h-7 w-7 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/40 transition-colors hover:border-white/20 hover:text-white/70"
+                >
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                    <path d="M1 1l10 10M11 1L1 11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                  </svg>
+                </button>
+
+                <p className="mb-5 text-[10px] font-bold uppercase tracking-widest text-white/30">Paramètres</p>
+
+                <div className="flex flex-col gap-5">
+                  {/* Mode */}
+                  <div className="flex flex-col gap-2">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-white/30">Mode</p>
+                    <div className="flex gap-2">
+                      {MODES.map(m => (
+                        <button
+                          key={m.value}
+                          onClick={() => setMode(m.value)}
+                          className={[btnBase, 'flex flex-col items-start gap-0.5 px-4 py-3', mode === m.value ? btnSelected : btnIdle].join(' ')}
+                        >
+                          <span className="font-bold">{m.label}</span>
+                          <span className="text-xs opacity-60">{m.desc}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Niveau */}
+                  <div className="flex flex-col gap-2">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-white/30">Niveau</p>
+                    <div className="flex gap-2">
+                      {DIFFICULTIES.map(d => (
+                        <button
+                          key={d.value}
+                          onClick={() => setDifficulty(d.value)}
+                          className={[btnBase, difficulty === d.value ? btnSelected : btnIdle].join(' ')}
+                        >
+                          {d.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Catégorie */}
+                  <div className="flex flex-col gap-2">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-white/30">Catégorie</p>
+                    <select
+                      value={String(category)}
+                      onChange={(e) => {
+                        const v = e.target.value
+                        setCategory(v === 'all' ? 'all' : Number(v) as Category)
+                      }}
+                      className="w-full rounded-xl border border-white/10 bg-[#0d0d18] px-3 py-2.5 text-sm text-white focus:border-neon-violet/60 focus:outline-none"
+                    >
+                      {CATEGORIES.map(c => (
+                        <option key={String(c.value)} value={String(c.value)}>
+                          {c.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Langue */}
+                  <div className="flex flex-col gap-2">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-white/30">Langue</p>
+                    <div className="flex gap-2">
+                      {LANGUAGES.map(l => {
+                        const disabled = l.value === 'fr'
+                        return (
+                          <button
+                            key={l.value}
+                            onClick={() => !disabled && setLanguage(l.value)}
+                            disabled={disabled}
+                            className={[
+                              btnBase,
+                              'relative',
+                              disabled
+                                ? 'cursor-not-allowed border-white/5 bg-white/3 text-white/20 opacity-50'
+                                : language === l.value ? btnSelected : btnIdle,
+                            ].join(' ')}
+                          >
+                            {l.label}
+                            {disabled && (
+                              <span className="absolute -right-1 -top-2 rounded-full bg-white/10 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider text-white/30">
+                                bientôt
+                              </span>
+                            )}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Launch */}
+                <motion.button
+                  onClick={handleLaunch}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.97 }}
+                  className="mt-6 w-full rounded-xl bg-gradient-to-r from-neon-violet to-neon-blue py-3 text-sm font-bold tracking-wide text-white shadow-neon-violet"
+                >
+                  Lancer
+                </motion.button>
+              </motion.div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </div>
   )
 }

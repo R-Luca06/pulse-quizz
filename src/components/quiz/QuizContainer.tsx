@@ -7,12 +7,15 @@ import QuestionCard from './QuestionCard'
 import TimerBar from './TimerBar'
 import StreakIndicator from './StreakIndicator'
 
-import type { QuestionResult, GameMode, Difficulty } from '../../types/quiz'
+import type { QuestionResult, GameMode, Difficulty, Language, Category } from '../../types/quiz'
 
 interface Props {
   onFinished: (score: number, results: QuestionResult[]) => void
+  onQuit: () => void
   gameMode: GameMode
   difficulty: Difficulty
+  language: Language
+  category: Category
 }
 
 const FEEDBACK_COLORS = {
@@ -35,7 +38,7 @@ const BALLS: BallConfig[] = Array.from({ length: 40 }, (_, i) => ({
   delay:    parseFloat((-8 + Math.random() * 8).toFixed(1)),
 }))
 
-export default function QuizContainer({ onFinished, gameMode, difficulty }: Props) {
+export default function QuizContainer({ onFinished, onQuit, gameMode, difficulty, language, category }: Props) {
   const {
     phase,
     isRetrying,
@@ -48,7 +51,7 @@ export default function QuizContainer({ onFinished, gameMode, difficulty }: Prop
     handleAnswer,
     handleTimeout,
     retry,
-  } = useQuiz(onFinished, { gameMode, difficulty })
+  } = useQuiz(onFinished, { gameMode, difficulty, language, category })
 
   const { timeLeft, progress } = useTimer(
     10,
@@ -177,9 +180,19 @@ export default function QuizContainer({ onFinished, gameMode, difficulty }: Prop
 
       {/* Header */}
       <div className="flex items-center justify-between px-3 py-2 sm:px-6 sm:py-3">
-        <div className="text-sm font-semibold text-white/40">
-          <span className="text-white">{currentIndex + 1}</span>
-          <span> / 10</span>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={onQuit}
+            className="flex h-7 w-7 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/30 transition-colors hover:border-white/20 hover:text-white/60"
+          >
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+              <path d="M1 1l8 8M9 1L1 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+            </svg>
+          </button>
+          <div className="text-sm font-semibold text-white/40">
+            <span className="text-white">{currentIndex + 1}</span>
+            {gameMode === 'normal' && <span> / 10</span>}
+          </div>
         </div>
         <StreakIndicator streak={streak} />
         <div className="text-sm font-semibold">

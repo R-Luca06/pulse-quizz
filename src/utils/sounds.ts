@@ -1,4 +1,8 @@
 let ctx: AudioContext | null = null
+let muted = false
+
+export function setMuted(v: boolean) { muted = v }
+export function getMuted(): boolean { return muted }
 
 function getCtx(): AudioContext | null {
   try {
@@ -20,6 +24,7 @@ function beep(
   type: OscillatorType = 'sine',
   volume = 0.18,
 ) {
+  if (muted) return
   const context = getCtx()
   if (!context) return
   try {
@@ -54,4 +59,3 @@ export function playTimeout() {
 export function playTick() {
   beep(900, 0.04, 'square', 0.06)
 }
-

@@ -1,4 +1,4 @@
-import type { TriviaQuestion, Difficulty } from '../types/quiz'
+import type { TriviaQuestion, Difficulty, Language, Category } from '../types/quiz'
 
 interface RawTriviaResult {
   question: string
@@ -22,9 +22,11 @@ function shuffle<T>(arr: T[]): T[] {
   return a
 }
 
-export async function fetchQuestions(difficulty: Difficulty = 'mixed'): Promise<TriviaQuestion[]> {
+export async function fetchQuestions(difficulty: Difficulty = 'mixed', language: Language = 'en', category: Category = 'all'): Promise<TriviaQuestion[]> {
   const params = new URLSearchParams({ amount: '10', type: 'multiple' })
   if (difficulty !== 'mixed') params.set('difficulty', difficulty)
+  if (language !== 'en') params.set('lang', language)
+  if (category !== 'all') params.set('category', String(category))
   const res = await fetch(`https://opentdb.com/api.php?${params}`)
   if (res.status === 429) throw new Error('rate_limit')
   if (!res.ok) throw new Error('api_error')

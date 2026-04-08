@@ -1,11 +1,13 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { fetchQuestions } from '../utils/trivia'
 import { playCorrect, playWrong, playTimeout } from '../utils/sounds'
-import type { TriviaQuestion, AnswerState, QuizPhase, QuestionResult, GameMode, Difficulty } from '../types/quiz'
+import type { TriviaQuestion, AnswerState, QuizPhase, QuestionResult, GameMode, Difficulty, Language, Category } from '../types/quiz'
 
 interface QuizSettings {
   gameMode: GameMode
   difficulty: Difficulty
+  language: Language
+  category: Category
 }
 
 const FEEDBACK_DURATION = 1500
@@ -26,7 +28,7 @@ interface UseQuizReturn {
 
 export function useQuiz(
   onFinished: (score: number, results: QuestionResult[]) => void,
-  settings: QuizSettings = { gameMode: 'normal', difficulty: 'mixed' },
+  settings: QuizSettings = { gameMode: 'normal', difficulty: 'mixed', language: 'en', category: 'all' },
 ): UseQuizReturn {
   const [phase, setPhase] = useState<QuizPhase>('loading')
   const [isRetrying, setIsRetrying] = useState(false)
@@ -43,7 +45,7 @@ export function useQuiz(
     setPhase('loading')
     resultsRef.current = []
     try {
-      const qs = await fetchQuestions(settings.difficulty)
+      const qs = await fetchQuestions(settings.difficulty, settings.language, settings.category)
       setQuestions(qs)
       setCurrentIndex(0)
       setScore(0)
@@ -107,7 +109,14 @@ export function useQuiz(
         setStreak(0)
       }
 
-      feedbackTimer.current = setTimeout(() => advance(currentIndex + 1, newScore), FEEDBACK_DURATION)
+      if (!isCorrect && settings.gameMode === 'survie') {
+        feedbackTimer.current = setTimeout(() => {
+          setPhase('finished')
+          onFinished(newScore, resultsRef.current)
+        }, FEEDBACK_DURATION)
+      } else {
+        feedbackTimer.current = setTimeout(() => advance(currentIndex + 1, newScore), FEEDBACK_DURATION)
+      }
     },
     [answerState, questions, currentIndex, score, advance],
   )
@@ -128,7 +137,14 @@ export function useQuiz(
     setStreak(0)
     playTimeout()
 
-    feedbackTimer.current = setTimeout(() => advance(currentIndex + 1, score), FEEDBACK_DURATION)
+    if (settings.gameMode === 'survie') {
+      feedbackTimer.current = setTimeout(() => {
+        setPhase('finished')
+        onFinished(score, resultsRef.current)
+      }, FEEDBACK_DURATION)
+    } else {
+      feedbackTimer.current = setTimeout(() => advance(currentIndex + 1, score), FEEDBACK_DURATION)
+    }
   }, [answerState, questions, currentIndex, score, advance])
 
   return {
