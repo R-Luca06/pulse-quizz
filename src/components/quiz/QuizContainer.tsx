@@ -183,6 +183,7 @@ export default function QuizContainer({ onFinished, onQuit, gameMode, difficulty
         <div className="flex items-center gap-3">
           <button
             onClick={onQuit}
+            aria-label="Quitter la partie"
             className="flex h-7 w-7 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/30 transition-colors hover:border-white/20 hover:text-white/60"
           >
             <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
