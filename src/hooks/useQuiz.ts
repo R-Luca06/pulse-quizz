@@ -1,12 +1,11 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { fetchQuestions } from '../utils/trivia'
-import type { TriviaQuestion, AnswerState, QuizPhase } from '../types/quiz'
+import type { TriviaQuestion, AnswerState, QuizPhase, QuestionResult } from '../types/quiz'
 
 const FEEDBACK_DURATION = 1500
 
 interface UseQuizReturn {
   phase: QuizPhase
-  questions: TriviaQuestion[]
   currentQuestion: TriviaQuestion | null
   currentIndex: number
   score: number
@@ -15,10 +14,11 @@ interface UseQuizReturn {
   answerState: AnswerState
   handleAnswer: (answer: string) => void
   handleTimeout: () => void
-  reset: () => Promise<void>
 }
 
-export function useQuiz(onFinished: (score: number) => void): UseQuizReturn {
+export function useQuiz(
+  onFinished: (score: number, results: QuestionResult[]) => void,
+): UseQuizReturn {
   const [phase, setPhase] = useState<QuizPhase>('loading')
   const [questions, setQuestions] = useState<TriviaQuestion[]>([])
   const [currentIndex, setCurrentIndex] = useState(0)
@@ -27,9 +27,11 @@ export function useQuiz(onFinished: (score: number) => void): UseQuizReturn {
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null)
   const [answerState, setAnswerState] = useState<AnswerState>('idle')
   const feedbackTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const resultsRef = useRef<QuestionResult[]>([])
 
   const loadQuestions = useCallback(async () => {
     setPhase('loading')
+    resultsRef.current = []
     const qs = await fetchQuestions()
     setQuestions(qs)
     setCurrentIndex(0)
@@ -42,16 +44,14 @@ export function useQuiz(onFinished: (score: number) => void): UseQuizReturn {
 
   useEffect(() => {
     loadQuestions()
-    return () => {
-      if (feedbackTimer.current) clearTimeout(feedbackTimer.current)
-    }
+    return () => { if (feedbackTimer.current) clearTimeout(feedbackTimer.current) }
   }, [loadQuestions])
 
   const advance = useCallback(
     (nextIndex: number, currentScore: number) => {
       if (nextIndex >= 10) {
         setPhase('finished')
-        onFinished(currentScore)
+        onFinished(currentScore, resultsRef.current)
       } else {
         setCurrentIndex(nextIndex)
         setSelectedAnswer(null)
@@ -68,6 +68,13 @@ export function useQuiz(onFinished: (score: number) => void): UseQuizReturn {
       const correct = questions[currentIndex].correct_answer
       const isCorrect = answer === correct
 
+      resultsRef.current.push({
+        question: questions[currentIndex].question,
+        correctAnswer: correct,
+        userAnswer: answer,
+        isCorrect,
+      })
+
       setSelectedAnswer(answer)
       setAnswerState(isCorrect ? 'correct' : 'wrong')
       setPhase('feedback')
@@ -80,28 +87,31 @@ export function useQuiz(onFinished: (score: number) => void): UseQuizReturn {
         setStreak(0)
       }
 
-      feedbackTimer.current = setTimeout(() => {
-        advance(currentIndex + 1, newScore)
-      }, FEEDBACK_DURATION)
+      feedbackTimer.current = setTimeout(() => advance(currentIndex + 1, newScore), FEEDBACK_DURATION)
     },
     [answerState, questions, currentIndex, score, advance],
   )
 
   const handleTimeout = useCallback(() => {
     if (answerState !== 'idle' || !questions[currentIndex]) return
+
+    resultsRef.current.push({
+      question: questions[currentIndex].question,
+      correctAnswer: questions[currentIndex].correct_answer,
+      userAnswer: null,
+      isCorrect: false,
+    })
+
     setSelectedAnswer(null)
     setAnswerState('timeout')
     setPhase('feedback')
     setStreak(0)
 
-    feedbackTimer.current = setTimeout(() => {
-      advance(currentIndex + 1, score)
-    }, FEEDBACK_DURATION)
+    feedbackTimer.current = setTimeout(() => advance(currentIndex + 1, score), FEEDBACK_DURATION)
   }, [answerState, questions, currentIndex, score, advance])
 
   return {
     phase,
-    questions,
     currentQuestion: questions[currentIndex] ?? null,
     currentIndex,
     score,
@@ -110,6 +120,5 @@ export function useQuiz(onFinished: (score: number) => void): UseQuizReturn {
     answerState,
     handleAnswer,
     handleTimeout,
-    reset: loadQuestions,
   }
 }

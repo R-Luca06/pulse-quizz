@@ -5,8 +5,10 @@ import QuestionCard from './QuestionCard'
 import TimerBar from './TimerBar'
 import StreakIndicator from './StreakIndicator'
 
+import type { QuestionResult } from '../../types/quiz'
+
 interface Props {
-  onFinished: (score: number) => void
+  onFinished: (score: number, results: QuestionResult[]) => void
 }
 
 const FEEDBACK_COLORS = {

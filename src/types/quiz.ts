@@ -9,3 +9,10 @@ export interface TriviaQuestion {
 
 export type AnswerState = 'idle' | 'correct' | 'wrong' | 'timeout'
 export type QuizPhase = 'loading' | 'playing' | 'feedback' | 'finished'
+
+export interface QuestionResult {
+  question: string
+  correctAnswer: string
+  userAnswer: string | null  // null = timeout
+  isCorrect: boolean
+}

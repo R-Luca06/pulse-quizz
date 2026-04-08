@@ -3,33 +3,28 @@ import { AnimatePresence, motion } from 'framer-motion'
 import LandingPage from './components/landing/LandingPage'
 import QuizContainer from './components/quiz/QuizContainer'
 import ResultScreen from './components/result/ResultScreen'
+import type { QuestionResult } from './types/quiz'
 
 export type AppScreen = 'landing' | 'launching' | 'quiz' | 'result'
 
 export default function App() {
   const [screen, setScreen] = useState<AppScreen>('landing')
   const [finalScore, setFinalScore] = useState(0)
+  const [finalResults, setFinalResults] = useState<QuestionResult[]>([])
 
-  function handleStart() {
-    setScreen('launching')
-  }
+  function handleStart() { setScreen('launching') }
+  function handleExplosion() { setScreen('quiz') }
 
-  function handleExplosion() {
-    setScreen('quiz')
-  }
-
-  function handleFinished(score: number) {
+  function handleFinished(score: number, results: QuestionResult[]) {
     setFinalScore(score)
+    setFinalResults(results)
     setScreen('result')
   }
 
-  function handleReplay() {
-    setScreen('quiz')
-  }
+  function handleReplay() { setScreen('quiz') }
 
   return (
     <div className="min-h-screen bg-game-bg font-game">
-      {/* mode="sync": quiz fades in while landing fades out — no frozen gap */}
       <AnimatePresence mode="sync">
         {(screen === 'landing' || screen === 'launching') && (
           <motion.div
@@ -61,7 +56,7 @@ export default function App() {
             exit={{ opacity: 0 }}
             className="absolute inset-0"
           >
-            <ResultScreen score={finalScore} onReplay={handleReplay} />
+            <ResultScreen score={finalScore} results={finalResults} onReplay={handleReplay} />
           </motion.div>
         )}
       </AnimatePresence>
