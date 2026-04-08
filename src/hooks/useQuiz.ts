@@ -1,0 +1,115 @@
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { fetchQuestions } from '../utils/trivia'
+import type { TriviaQuestion, AnswerState, QuizPhase } from '../types/quiz'
+
+const FEEDBACK_DURATION = 1500
+
+interface UseQuizReturn {
+  phase: QuizPhase
+  questions: TriviaQuestion[]
+  currentQuestion: TriviaQuestion | null
+  currentIndex: number
+  score: number
+  streak: number
+  selectedAnswer: string | null
+  answerState: AnswerState
+  handleAnswer: (answer: string) => void
+  handleTimeout: () => void
+  reset: () => Promise<void>
+}
+
+export function useQuiz(onFinished: (score: number) => void): UseQuizReturn {
+  const [phase, setPhase] = useState<QuizPhase>('loading')
+  const [questions, setQuestions] = useState<TriviaQuestion[]>([])
+  const [currentIndex, setCurrentIndex] = useState(0)
+  const [score, setScore] = useState(0)
+  const [streak, setStreak] = useState(0)
+  const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null)
+  const [answerState, setAnswerState] = useState<AnswerState>('idle')
+  const feedbackTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const loadQuestions = useCallback(async () => {
+    setPhase('loading')
+    const qs = await fetchQuestions()
+    setQuestions(qs)
+    setCurrentIndex(0)
+    setScore(0)
+    setStreak(0)
+    setSelectedAnswer(null)
+    setAnswerState('idle')
+    setPhase('playing')
+  }, [])
+
+  useEffect(() => {
+    loadQuestions()
+    return () => {
+      if (feedbackTimer.current) clearTimeout(feedbackTimer.current)
+    }
+  }, [loadQuestions])
+
+  const advance = useCallback(
+    (nextIndex: number, currentScore: number) => {
+      if (nextIndex >= 10) {
+        setPhase('finished')
+        onFinished(currentScore)
+      } else {
+        setCurrentIndex(nextIndex)
+        setSelectedAnswer(null)
+        setAnswerState('idle')
+        setPhase('playing')
+      }
+    },
+    [onFinished],
+  )
+
+  const handleAnswer = useCallback(
+    (answer: string) => {
+      if (answerState !== 'idle' || !questions[currentIndex]) return
+      const correct = questions[currentIndex].correct_answer
+      const isCorrect = answer === correct
+
+      setSelectedAnswer(answer)
+      setAnswerState(isCorrect ? 'correct' : 'wrong')
+      setPhase('feedback')
+
+      const newScore = isCorrect ? score + 1 : score
+      if (isCorrect) {
+        setScore(newScore)
+        setStreak((s) => s + 1)
+      } else {
+        setStreak(0)
+      }
+
+      feedbackTimer.current = setTimeout(() => {
+        advance(currentIndex + 1, newScore)
+      }, FEEDBACK_DURATION)
+    },
+    [answerState, questions, currentIndex, score, advance],
+  )
+
+  const handleTimeout = useCallback(() => {
+    if (answerState !== 'idle' || !questions[currentIndex]) return
+    setSelectedAnswer(null)
+    setAnswerState('timeout')
+    setPhase('feedback')
+    setStreak(0)
+
+    feedbackTimer.current = setTimeout(() => {
+      advance(currentIndex + 1, score)
+    }, FEEDBACK_DURATION)
+  }, [answerState, questions, currentIndex, score, advance])
+
+  return {
+    phase,
+    questions,
+    currentQuestion: questions[currentIndex] ?? null,
+    currentIndex,
+    score,
+    streak,
+    selectedAnswer,
+    answerState,
+    handleAnswer,
+    handleTimeout,
+    reset: loadQuestions,
+  }
+}
