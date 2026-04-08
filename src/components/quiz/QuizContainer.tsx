@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useQuiz } from '../../hooks/useQuiz'
 import { useTimer } from '../../hooks/useTimer'
-import { playTick, startAmbient, stopAmbient, setAmbientVolume } from '../../utils/sounds'
+import { playTick } from '../../utils/sounds'
 import QuestionCard from './QuestionCard'
 import TimerBar from './TimerBar'
 import StreakIndicator from './StreakIndicator'
@@ -64,19 +64,6 @@ export default function QuizContainer({ onFinished }: Props) {
     if (urgentSecond > 0) playTick()
   }, [urgentSecond])
 
-  // Ambient music: start when playing, stop on finish/error, cleanup on unmount
-  useEffect(() => {
-    if (phase === 'playing') startAmbient()
-    else if (phase === 'finished' || phase === 'error') stopAmbient()
-  }, [phase])
-
-  useEffect(() => () => stopAmbient(), [])
-
-  // Ambient volume: fade out during feedback and urgency
-  useEffect(() => {
-    if (phase === 'feedback') setAmbientVolume(0, 0.15)
-    else if (phase === 'playing') setAmbientVolume(isUrgent ? 0 : 0.06, isUrgent ? 0.5 : 0.4)
-  }, [phase, isUrgent])
 
   // Combo overlay at milestone streaks
   const [comboVisible, setComboVisible] = useState(false)
