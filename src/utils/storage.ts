@@ -1,9 +1,10 @@
-const key = (mode: string, difficulty: string) => `pulse_best_${mode}_${difficulty}`
+const key = (mode: string, difficulty: string, category: string | number) =>
+  `pulse_best_${mode}_${difficulty}_${category}`
 
-export function getBestScore(mode: string, difficulty: string): number {
-  return Number(localStorage.getItem(key(mode, difficulty)) ?? 0)
+export function getBestScore(mode: string, difficulty: string, category: string | number): number {
+  return Number(localStorage.getItem(key(mode, difficulty, category)) ?? 0)
 }
 
-export function saveBestScore(mode: string, difficulty: string, score: number): void {
-  localStorage.setItem(key(mode, difficulty), String(score))
+export function saveBestScore(mode: string, difficulty: string, category: string | number, score: number): void {
+  localStorage.setItem(key(mode, difficulty, category), String(score))
 }

@@ -18,6 +18,7 @@ export default function App() {
   const [category, setCategory] = useState<Category>('all')
   const [bestScore, setBestScore] = useState(0)
   const [isNewBest, setIsNewBest] = useState(false)
+  const [returnToSettings, setReturnToSettings] = useState(false)
 
   function handleStart(mode: GameMode, diff: Difficulty, lang: Language, cat: Category) {
     setGameMode(mode)
@@ -30,9 +31,9 @@ export default function App() {
   function handleExplosion() { setScreen('quiz') }
 
   function handleFinished(score: number, results: QuestionResult[]) {
-    const prev = getBestScore(gameMode, difficulty)
+    const prev = getBestScore(gameMode, difficulty, category)
     const newBest = score > prev
-    if (newBest) saveBestScore(gameMode, difficulty, score)
+    if (newBest) saveBestScore(gameMode, difficulty, category, score)
     setBestScore(newBest ? score : prev)
     setIsNewBest(newBest)
     setFinalScore(score)
@@ -40,7 +41,9 @@ export default function App() {
     setScreen('result')
   }
 
-  function handleQuit() { setScreen('landing') }
+  function handleQuit() { setReturnToSettings(false); setScreen('landing') }
+
+  function handleBack() { setReturnToSettings(true); setScreen('landing') }
 
   function handleReplay() { setScreen('quiz') }
 
@@ -53,7 +56,7 @@ export default function App() {
             exit={{ opacity: 0, transition: { duration: 0.35 } }}
             className="absolute inset-0"
           >
-            <LandingPage onStart={handleStart} onExplosion={handleExplosion} screen={screen} />
+            <LandingPage onStart={handleStart} onExplosion={handleExplosion} screen={screen} autoOpenSettings={returnToSettings} />
           </motion.div>
         )}
 
@@ -62,7 +65,7 @@ export default function App() {
             key="quiz"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1, transition: { duration: 0.4 } }}
-            exit={{ opacity: 0, transition: { duration: 0.2 } }}
+            exit={{ opacity: 0, scale: 0.96, y: -16, transition: { duration: 0.3, ease: 'easeIn' } }}
             className="absolute inset-0"
           >
             <QuizContainer
@@ -79,17 +82,21 @@ export default function App() {
         {screen === 'result' && (
           <motion.div
             key="result"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+            initial={{ opacity: 0, y: 40 }}
+            animate={{ opacity: 1, y: 0, transition: { duration: 0.5, delay: 0.1, ease: 'easeOut' } }}
+            exit={{ opacity: 0, transition: { duration: 0.25 } }}
             className="absolute inset-0"
           >
             <ResultScreen
               score={finalScore}
               results={finalResults}
               onReplay={handleReplay}
+              onBack={handleBack}
               bestScore={bestScore}
               isNewBest={isNewBest}
+              gameMode={gameMode}
+              difficulty={difficulty}
+              category={category}
             />
           </motion.div>
         )}

@@ -19,4 +19,5 @@ export interface QuestionResult {
   correctAnswer: string
   userAnswer: string | null  // null = timeout
   isCorrect: boolean
+  timeSpent: number          // secondes, arrondi à 1 décimale
 }

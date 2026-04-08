@@ -40,6 +40,7 @@ export function useQuiz(
   const [answerState, setAnswerState] = useState<AnswerState>('idle')
   const feedbackTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const resultsRef = useRef<QuestionResult[]>([])
+  const questionStartTime = useRef<number>(Date.now())
 
   const loadQuestions = useCallback(async () => {
     setPhase('loading')
@@ -52,6 +53,7 @@ export function useQuiz(
       setStreak(0)
       setSelectedAnswer(null)
       setAnswerState('idle')
+      questionStartTime.current = Date.now()
       setPhase('playing')
     } catch (err) {
       if (err instanceof Error && err.message === 'rate_limit') {
@@ -67,6 +69,13 @@ export function useQuiz(
     loadQuestions()
     return () => { if (feedbackTimer.current) clearTimeout(feedbackTimer.current) }
   }, [loadQuestions])
+
+  // Reset start time whenever a new question begins
+  useEffect(() => {
+    if (phase === 'playing') {
+      questionStartTime.current = Date.now()
+    }
+  }, [currentIndex, phase])
 
   const advance = useCallback(
     (nextIndex: number, currentScore: number) => {
@@ -88,12 +97,14 @@ export function useQuiz(
       if (answerState !== 'idle' || !questions[currentIndex]) return
       const correct = questions[currentIndex].correct_answer
       const isCorrect = answer === correct
+      const timeSpent = Math.round((Date.now() - questionStartTime.current) / 100) / 10
 
       resultsRef.current.push({
         question: questions[currentIndex].question,
         correctAnswer: correct,
         userAnswer: answer,
         isCorrect,
+        timeSpent,
       })
 
       setSelectedAnswer(answer)
@@ -123,12 +134,14 @@ export function useQuiz(
 
   const handleTimeout = useCallback(() => {
     if (answerState !== 'idle' || !questions[currentIndex]) return
+    const timeSpent = Math.round((Date.now() - questionStartTime.current) / 100) / 10
 
     resultsRef.current.push({
       question: questions[currentIndex].question,
       correctAnswer: questions[currentIndex].correct_answer,
       userAnswer: null,
       isCorrect: false,
+      timeSpent,
     })
 
     setSelectedAnswer(null)
