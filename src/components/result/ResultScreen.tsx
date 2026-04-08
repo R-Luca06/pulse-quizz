@@ -88,8 +88,7 @@ export default function ResultScreen({ score, results, onReplay, onBack, onShowS
         />
       </div>
 
-      {/* Container — max-w-lg mobile, max-w-4xl desktop */}
-      <div className="relative z-10 flex w-full max-w-lg flex-col gap-6 lg:max-w-4xl">
+      <div className="relative z-10 flex w-full max-w-lg flex-col gap-6">
 
         {/* Header — toujours pleine largeur */}
         <div className="flex w-full items-center justify-between">
@@ -129,16 +128,12 @@ export default function ResultScreen({ score, results, onReplay, onBack, onShowS
           </motion.button>
         </div>
 
-        {/* Contenu — 1 colonne mobile, 2 colonnes lg */}
-        <div className="flex flex-col gap-6 lg:grid lg:grid-cols-2 lg:items-start lg:gap-10">
-
-          {/* Colonne gauche — Score + performance + pills */}
-          <motion.div
-            variants={{ hidden: {}, show: { transition: { staggerChildren: 0.1, delayChildren: 0.2 } } }}
-            initial="hidden"
-            animate="show"
-            className="flex flex-col items-center gap-6 lg:sticky lg:top-6"
-          >
+        <motion.div
+          variants={{ hidden: {}, show: { transition: { staggerChildren: 0.1, delayChildren: 0.2 } } }}
+          initial="hidden"
+          animate="show"
+          className="flex w-full flex-col items-center gap-6"
+        >
             {/* Score */}
             <motion.div variants={fadeUp} className="flex flex-col items-center gap-2 text-center">
               <div className="flex items-end gap-2">
@@ -195,15 +190,6 @@ export default function ResultScreen({ score, results, onReplay, onBack, onShowS
                 </span>
               ))}
             </motion.div>
-          </motion.div>
-
-          {/* Colonne droite — Stats + Récapitulatif */}
-          <motion.div
-            variants={{ hidden: {}, show: { transition: { staggerChildren: 0.1, delayChildren: 0.25 } } }}
-            initial="hidden"
-            animate="show"
-            className="flex flex-col gap-6 pb-4"
-          >
             {/* Stats */}
             {total > 0 && (
               <motion.div variants={fadeUp} className="w-full">
@@ -334,8 +320,7 @@ export default function ResultScreen({ score, results, onReplay, onBack, onShowS
                 </AnimatePresence>
               </motion.div>
             )}
-          </motion.div>
-        </div>
+        </motion.div>
       </div>
     </div>
   )
