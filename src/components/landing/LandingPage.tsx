@@ -14,7 +14,6 @@ interface Props {
 }
 
 const DIFFICULTIES: { value: Difficulty; label: string }[] = [
-  { value: 'mixed',  label: 'Mixte' },
   { value: 'easy',   label: 'Facile' },
   { value: 'medium', label: 'Moyen' },
   { value: 'hard',   label: 'Difficile' },
@@ -26,7 +25,7 @@ export default function LandingPage({ onStart, onExplosion, screen }: Props) {
   const shakeControls = useAnimationControls()
 
   const [mode, setMode] = useState<GameMode>('normal')
-  const [difficulty, setDifficulty] = useState<Difficulty>('mixed')
+  const [difficulty, setDifficulty] = useState<Difficulty>('easy')
 
   useEffect(() => {
     if (!isLaunching) {
@@ -55,7 +54,7 @@ export default function LandingPage({ onStart, onExplosion, screen }: Props) {
     onStart(mode, difficulty)
   }
 
-  const selectBase = 'cursor-pointer rounded-xl border px-3 py-1.5 text-xs font-semibold transition-colors duration-150'
+  const selectBase = 'cursor-pointer rounded-xl border px-4 py-2.5 text-sm font-semibold transition-colors duration-150'
   const selectActive = 'border-neon-violet bg-neon-violet/10 text-white'
   const selectInactive = 'border-white/10 bg-white/5 text-white/40 hover:border-white/20 hover:text-white/60'
 
@@ -98,7 +97,7 @@ export default function LandingPage({ onStart, onExplosion, screen }: Props) {
           transition={{ duration: 0.6, delay: 0.2 }}
           className="rounded-full border border-neon-violet/30 bg-neon-violet/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-widest text-neon-violet"
         >
-          10 questions · Beat the clock
+          Test your knowledge · Feel the rush
         </motion.div>
 
         {/* Title */}
@@ -113,9 +112,6 @@ export default function LandingPage({ onStart, onExplosion, screen }: Props) {
               {' '}Quizz
             </span>
           </h1>
-          <p className="mt-4 text-lg font-light tracking-wide text-white/40">
-            Test your knowledge. Feel the rush.
-          </p>
         </motion.div>
 
         {/* Mode selector */}
@@ -129,17 +125,17 @@ export default function LandingPage({ onStart, onExplosion, screen }: Props) {
           <div className="flex w-full gap-2">
             <button
               onClick={() => setMode('normal')}
-              className={[selectBase, 'flex flex-1 flex-col items-start gap-0.5 p-3', mode === 'normal' ? selectActive : selectInactive].join(' ')}
+              className={[selectBase, 'flex flex-1 flex-col items-start gap-1 p-4', mode === 'normal' ? selectActive : selectInactive].join(' ')}
             >
-              <span className="font-bold">Normal</span>
-              <span className="text-[10px] opacity-60">10 questions</span>
+              <span className="text-sm font-bold">Normal</span>
+              <span className="text-xs opacity-60">10 questions</span>
             </button>
             <button
               onClick={() => setMode('survie')}
-              className={[selectBase, 'flex flex-1 flex-col items-start gap-0.5 p-3', mode === 'survie' ? selectActive : selectInactive].join(' ')}
+              className={[selectBase, 'flex flex-1 flex-col items-start gap-1 p-4', mode === 'survie' ? selectActive : selectInactive].join(' ')}
             >
-              <span className="font-bold">Survie</span>
-              <span className="text-[10px] opacity-60">1 erreur = fin</span>
+              <span className="text-sm font-bold">Survie</span>
+              <span className="text-xs opacity-60">1 erreur = fin</span>
             </button>
           </div>
         </motion.div>
@@ -174,15 +170,6 @@ export default function LandingPage({ onStart, onExplosion, screen }: Props) {
           <StartButton onClick={handlePlay} />
         </motion.div>
 
-        {/* Footer hint */}
-        <motion.p
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.5, delay: 1 }}
-          className="text-xs uppercase tracking-widest text-white/20"
-        >
-          10s per question · general knowledge
-        </motion.p>
       </motion.div>
     </div>
   )
