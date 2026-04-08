@@ -1,24 +1,56 @@
 import { motion } from 'framer-motion'
 import { useQuiz } from '../../hooks/useQuiz'
+import { useTimer } from '../../hooks/useTimer'
 import QuestionCard from './QuestionCard'
+import TimerBar from './TimerBar'
+import StreakIndicator from './StreakIndicator'
 
 interface Props {
   onFinished: (score: number) => void
 }
 
 export default function QuizContainer({ onFinished }: Props) {
-  const { phase, currentQuestion, currentIndex, score, streak, selectedAnswer, answerState, handleAnswer } =
-    useQuiz(onFinished)
+  const {
+    phase,
+    currentQuestion,
+    currentIndex,
+    score,
+    streak,
+    selectedAnswer,
+    answerState,
+    handleAnswer,
+    handleTimeout,
+  } = useQuiz(onFinished)
+
+  const { timeLeft, progress } = useTimer(
+    10,
+    phase === 'playing',
+    currentIndex,
+    handleTimeout,
+  )
+
+  const isUrgent = timeLeft <= 3 && timeLeft > 0 && phase === 'playing'
 
   return (
     <motion.div
       initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
+      animate={{
+        opacity: 1,
+        scale: isUrgent ? [1, 1.004, 1] : 1,
+      }}
       exit={{ opacity: 0 }}
+      transition={
+        isUrgent
+          ? { scale: { duration: 0.7, repeat: Infinity, ease: 'easeInOut' } }
+          : undefined
+      }
       className="flex min-h-screen flex-col bg-game-bg"
     >
+      {/* Timer bar + urgency vignette */}
+      <TimerBar progress={progress} timeLeft={phase === 'playing' ? timeLeft : 10} />
+
       {/* Header */}
-      <div className="flex items-center justify-between px-6 py-4">
+      <div className="flex items-center justify-between px-6 py-3">
         {/* Question progress */}
         <div className="text-sm font-semibold text-white/40">
           <span className="text-white">{currentIndex + 1}</span>
@@ -26,16 +58,7 @@ export default function QuizContainer({ onFinished }: Props) {
         </div>
 
         {/* Streak */}
-        {streak >= 2 && (
-          <motion.div
-            key={streak}
-            initial={{ scale: 0.7, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            className="flex items-center gap-1.5 rounded-full border border-yellow-500/30 bg-yellow-500/10 px-3 py-1 text-sm font-bold text-yellow-400"
-          >
-            🔥 {streak} streak
-          </motion.div>
-        )}
+        <StreakIndicator streak={streak} />
 
         {/* Score */}
         <div className="text-sm font-semibold">
@@ -44,17 +67,8 @@ export default function QuizContainer({ onFinished }: Props) {
         </div>
       </div>
 
-      {/* Progress bar (placeholder — Phase 5 adds the timer) */}
-      <div className="h-1 w-full bg-white/5">
-        <motion.div
-          className="h-full bg-gradient-to-r from-neon-violet to-neon-blue"
-          animate={{ width: `${((currentIndex) / 10) * 100}%` }}
-          transition={{ duration: 0.4 }}
-        />
-      </div>
-
       {/* Main content */}
-      <div className="flex flex-1 items-center justify-center px-4 py-8">
+      <div className="flex flex-1 items-center justify-center px-4 py-6">
         {phase === 'loading' && (
           <motion.div
             initial={{ opacity: 0 }}
@@ -66,7 +80,7 @@ export default function QuizContainer({ onFinished }: Props) {
               animate={{ rotate: 360 }}
               transition={{ duration: 0.8, repeat: Infinity, ease: 'linear' }}
             />
-            <p className="text-white/40 text-sm tracking-widest uppercase">Loading questions…</p>
+            <p className="text-sm uppercase tracking-widest text-white/40">Loading questions…</p>
           </motion.div>
         )}
 
