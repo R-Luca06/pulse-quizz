@@ -13,14 +13,19 @@ export function useTimer(
   questionKey: number,
   onTimeout: () => void,
 ): UseTimerReturn {
-  const [elapsed, setElapsed] = useState(0) // ms
+  const [elapsed, setElapsed] = useState(0)
+  const [trackedKey, setTrackedKey] = useState(questionKey)
   const onTimeoutRef = useRef(onTimeout)
   onTimeoutRef.current = onTimeout
 
-  // Reset whenever the question changes
-  useEffect(() => {
+  // Synchronous reset: detect key change DURING render so there is no
+  // one-frame flash of stale elapsed when the next question starts
+  let effectiveElapsed = elapsed
+  if (trackedKey !== questionKey) {
+    setTrackedKey(questionKey)
     setElapsed(0)
-  }, [questionKey])
+    effectiveElapsed = 0
+  }
 
   useEffect(() => {
     if (!active) return
@@ -38,9 +43,9 @@ export function useTimer(
     }, TICK)
 
     return () => clearInterval(id)
-  }, [active, questionKey, duration]) // questionKey restarts the interval too
+  }, [active, questionKey, duration])
 
-  const timeLeft = Math.max(0, duration - elapsed / 1000)
+  const timeLeft = Math.max(0, duration - effectiveElapsed / 1000)
   const progress = timeLeft / duration
 
   return { timeLeft, progress }

@@ -1,4 +1,4 @@
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import { useQuiz } from '../../hooks/useQuiz'
 import { useTimer } from '../../hooks/useTimer'
 import QuestionCard from './QuestionCard'
@@ -7,6 +7,11 @@ import StreakIndicator from './StreakIndicator'
 
 interface Props {
   onFinished: (score: number) => void
+}
+
+const FEEDBACK_COLORS = {
+  correct: 'inset 0 0 160px rgba(34, 197, 94, 0.38)',
+  wrong:   'inset 0 0 160px rgba(239, 68, 68, 0.38)',
 }
 
 export default function QuizContainer({ onFinished }: Props) {
@@ -30,6 +35,7 @@ export default function QuizContainer({ onFinished }: Props) {
   )
 
   const isUrgent = timeLeft <= 3 && timeLeft > 0 && phase === 'playing'
+  const showFeedback = answerState === 'correct' || answerState === 'wrong'
 
   return (
     <motion.div
@@ -46,21 +52,31 @@ export default function QuizContainer({ onFinished }: Props) {
       }
       className="flex min-h-screen flex-col bg-game-bg"
     >
+      {/* Answer feedback vignette — brief green/red flash on answer */}
+      <AnimatePresence>
+        {showFeedback && (
+          <motion.div
+            key={`feedback-${currentIndex}-${answerState}`}
+            className="pointer-events-none fixed inset-0 z-40"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: [0, 1, 0] }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.55, ease: 'easeOut', times: [0, 0.2, 1] }}
+            style={{ boxShadow: FEEDBACK_COLORS[answerState as 'correct' | 'wrong'] }}
+          />
+        )}
+      </AnimatePresence>
+
       {/* Timer bar + urgency vignette */}
       <TimerBar progress={progress} timeLeft={phase === 'playing' ? timeLeft : 10} />
 
       {/* Header */}
       <div className="flex items-center justify-between px-6 py-3">
-        {/* Question progress */}
         <div className="text-sm font-semibold text-white/40">
           <span className="text-white">{currentIndex + 1}</span>
           <span> / 10</span>
         </div>
-
-        {/* Streak */}
         <StreakIndicator streak={streak} />
-
-        {/* Score */}
         <div className="text-sm font-semibold">
           <span className="text-neon-violet">{score}</span>
           <span className="text-white/40"> pts</span>
