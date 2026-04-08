@@ -23,6 +23,7 @@ const COMBO_MILESTONES = [3, 5, 7, 10]
 export default function QuizContainer({ onFinished }: Props) {
   const {
     phase,
+    isRetrying,
     currentQuestion,
     currentIndex,
     score,
@@ -162,7 +163,9 @@ export default function QuizContainer({ onFinished }: Props) {
               animate={{ rotate: 360 }}
               transition={{ duration: 0.8, repeat: Infinity, ease: 'linear' }}
             />
-            <p className="text-sm uppercase tracking-widest text-white/40">Chargement…</p>
+            <p className="text-sm uppercase tracking-widest text-white/40">
+            {isRetrying ? 'Trop de requêtes — nouvel essai dans 5s…' : 'Chargement…'}
+          </p>
           </motion.div>
         )}
 

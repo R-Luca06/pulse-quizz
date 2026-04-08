@@ -24,7 +24,8 @@ function shuffle<T>(arr: T[]): T[] {
 
 export async function fetchQuestions(): Promise<TriviaQuestion[]> {
   const res = await fetch('https://opentdb.com/api.php?amount=10&type=multiple')
-  if (!res.ok) throw new Error('Failed to fetch questions')
+  if (res.status === 429) throw new Error('rate_limit')
+  if (!res.ok) throw new Error('api_error')
   const data = await res.json()
   if (data.response_code === 5) throw new Error('rate_limit')
   if (data.response_code !== 0) throw new Error('api_error')

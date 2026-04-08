@@ -7,6 +7,7 @@ const FEEDBACK_DURATION = 1500
 
 interface UseQuizReturn {
   phase: QuizPhase
+  isRetrying: boolean
   currentQuestion: TriviaQuestion | null
   currentIndex: number
   score: number
@@ -22,6 +23,7 @@ export function useQuiz(
   onFinished: (score: number, results: QuestionResult[]) => void,
 ): UseQuizReturn {
   const [phase, setPhase] = useState<QuizPhase>('loading')
+  const [isRetrying, setIsRetrying] = useState(false)
   const [questions, setQuestions] = useState<TriviaQuestion[]>([])
   const [currentIndex, setCurrentIndex] = useState(0)
   const [score, setScore] = useState(0)
@@ -45,8 +47,8 @@ export function useQuiz(
       setPhase('playing')
     } catch (err) {
       if (err instanceof Error && err.message === 'rate_limit') {
-        // OTD rate limit: wait 5s then retry automatically
-        setTimeout(loadQuestions, 5000)
+        setIsRetrying(true)
+        setTimeout(() => { setIsRetrying(false); loadQuestions() }, 5000)
       } else {
         setPhase('error')
       }
@@ -125,6 +127,7 @@ export function useQuiz(
 
   return {
     phase,
+    isRetrying,
     currentQuestion: questions[currentIndex] ?? null,
     currentIndex,
     score,
