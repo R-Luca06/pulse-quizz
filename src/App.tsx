@@ -11,8 +11,10 @@ export default function App() {
 
   function handleStart() {
     setScreen('launching')
-    // Cards converge in 0.5s → switch to quiz at 0.5s so the fade-out overlaps cleanly
-    setTimeout(() => setScreen('quiz'), 500)
+  }
+
+  function handleExplosion() {
+    setScreen('quiz')
   }
 
   function handleFinished(score: number) {
@@ -34,7 +36,7 @@ export default function App() {
             exit={{ opacity: 0, transition: { duration: 0.35 } }}
             className="absolute inset-0"
           >
-            <LandingPage onStart={handleStart} screen={screen} />
+            <LandingPage onStart={handleStart} onExplosion={handleExplosion} screen={screen} />
           </motion.div>
         )}
 
