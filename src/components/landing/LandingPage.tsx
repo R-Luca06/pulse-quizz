@@ -13,6 +13,7 @@ interface Props {
   onExplosion: () => void
   screen: AppScreen
   autoOpenSettings?: boolean
+  onShowStats: () => void
 }
 
 const DIFFICULTIES: { value: Difficulty; label: string }[] = [
@@ -51,7 +52,7 @@ const btnBase = 'flex-1 rounded-xl border px-3 py-2.5 text-sm font-semibold tran
 const btnSelected = 'border-neon-violet bg-neon-violet/15 text-white'
 const btnIdle = 'border-white/10 bg-white/5 text-white/45 hover:border-white/20 hover:text-white/70'
 
-export default function LandingPage({ onStart, onExplosion, screen, autoOpenSettings }: Props) {
+export default function LandingPage({ onStart, onExplosion, screen, autoOpenSettings, onShowStats }: Props) {
   const isLaunching = screen === 'launching'
   const [launchPhase, setLaunchPhase] = useState<LaunchPhase>('idle')
   const shakeControls = useAnimationControls()
@@ -114,6 +115,22 @@ export default function LandingPage({ onStart, onExplosion, screen, autoOpenSett
           transition={{ duration: 0.45 }}
         />
       )}
+
+      {/* Stats button */}
+      <motion.button
+        onClick={onShowStats}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.6, delay: 0.4 }}
+        title="Statistiques"
+        className="absolute right-4 top-4 z-10 flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/30 transition-colors hover:border-white/20 hover:text-white/60"
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="18" y="3" width="4" height="18" rx="1"/>
+          <rect x="10" y="8" width="4" height="13" rx="1"/>
+          <rect x="2" y="13" width="4" height="8" rx="1"/>
+        </svg>
+      </motion.button>
 
       {/* Hero */}
       <motion.div

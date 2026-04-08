@@ -7,6 +7,7 @@ interface Props {
   results: QuestionResult[]
   onReplay: () => void
   onBack: () => void
+  onShowStats: () => void
   bestScore: number
   isNewBest: boolean
   gameMode: GameMode
@@ -48,7 +49,7 @@ function getBestStreak(results: QuestionResult[]): number {
 
 const fadeUp = { hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0 } }
 
-export default function ResultScreen({ score, results, onReplay, onBack, bestScore, isNewBest, gameMode, difficulty, category }: Props) {
+export default function ResultScreen({ score, results, onReplay, onBack, onShowStats, bestScore, isNewBest, gameMode, difficulty, category }: Props) {
   const [displayed, setDisplayed] = useState(0)
   const [recapOpen, setRecapOpen] = useState(false)
   const tier = getTier(score)
@@ -89,7 +90,7 @@ export default function ResultScreen({ score, results, onReplay, onBack, bestSco
 
       <div className="relative z-10 flex w-full max-w-lg flex-col items-center gap-6">
 
-        {/* Header — Paramètres / Rejouer */}
+        {/* Header — Paramètres / Stats / Rejouer */}
         <div className="flex w-full items-center justify-between">
           <motion.button
             onClick={onBack}
@@ -99,6 +100,20 @@ export default function ResultScreen({ score, results, onReplay, onBack, bestSco
             className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white/40 transition-colors hover:border-white/20 hover:text-white/70"
           >
             ← Paramètres
+          </motion.button>
+          <motion.button
+            onClick={onShowStats}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.35, delay: 0.15 }}
+            title="Statistiques"
+            className="flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/30 transition-colors hover:border-white/20 hover:text-white/60"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="18" y="3" width="4" height="18" rx="1"/>
+              <rect x="10" y="8" width="4" height="13" rx="1"/>
+              <rect x="2" y="13" width="4" height="8" rx="1"/>
+            </svg>
           </motion.button>
           <motion.button
             onClick={onReplay}

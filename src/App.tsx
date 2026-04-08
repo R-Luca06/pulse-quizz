@@ -3,10 +3,12 @@ import { AnimatePresence, motion } from 'framer-motion'
 import LandingPage from './components/landing/LandingPage'
 import QuizContainer from './components/quiz/QuizContainer'
 import ResultScreen from './components/result/ResultScreen'
+import StatsPage from './components/stats/StatsPage'
 import { getBestScore, saveBestScore } from './utils/storage'
+import { updateStats } from './utils/statsStorage'
 import type { QuestionResult, GameMode, Difficulty, Language, Category } from './types/quiz'
 
-export type AppScreen = 'landing' | 'launching' | 'quiz' | 'result'
+export type AppScreen = 'landing' | 'launching' | 'quiz' | 'result' | 'stats'
 
 export default function App() {
   const [screen, setScreen] = useState<AppScreen>('landing')
@@ -19,6 +21,7 @@ export default function App() {
   const [bestScore, setBestScore] = useState(0)
   const [isNewBest, setIsNewBest] = useState(false)
   const [returnToSettings, setReturnToSettings] = useState(false)
+  const [statsOrigin, setStatsOrigin] = useState<'landing' | 'result'>('landing')
 
   function handleStart(mode: GameMode, diff: Difficulty, lang: Language, cat: Category) {
     setGameMode(mode)
@@ -38,6 +41,7 @@ export default function App() {
     setIsNewBest(newBest)
     setFinalScore(score)
     setFinalResults(results)
+    updateStats(gameMode, difficulty, category, score, results)
     setScreen('result')
   }
 
@@ -46,6 +50,13 @@ export default function App() {
   function handleBack() { setReturnToSettings(true); setScreen('landing') }
 
   function handleReplay() { setScreen('quiz') }
+
+  function handleShowStats(from: 'landing' | 'result') {
+    setStatsOrigin(from)
+    setScreen('stats')
+  }
+
+  function handleBackFromStats() { setScreen(statsOrigin) }
 
   return (
     <div className="min-h-screen bg-game-bg font-game">
@@ -56,7 +67,13 @@ export default function App() {
             exit={{ opacity: 0, transition: { duration: 0.35 } }}
             className="absolute inset-0"
           >
-            <LandingPage onStart={handleStart} onExplosion={handleExplosion} screen={screen} autoOpenSettings={returnToSettings} />
+            <LandingPage
+              onStart={handleStart}
+              onExplosion={handleExplosion}
+              screen={screen}
+              autoOpenSettings={returnToSettings}
+              onShowStats={() => handleShowStats('landing')}
+            />
           </motion.div>
         )}
 
@@ -92,12 +109,25 @@ export default function App() {
               results={finalResults}
               onReplay={handleReplay}
               onBack={handleBack}
+              onShowStats={() => handleShowStats('result')}
               bestScore={bestScore}
               isNewBest={isNewBest}
               gameMode={gameMode}
               difficulty={difficulty}
               category={category}
             />
+          </motion.div>
+        )}
+
+        {screen === 'stats' && (
+          <motion.div
+            key="stats"
+            initial={{ opacity: 0, y: 40 }}
+            animate={{ opacity: 1, y: 0, transition: { duration: 0.5, delay: 0.1, ease: 'easeOut' } }}
+            exit={{ opacity: 0, transition: { duration: 0.25 } }}
+            className="absolute inset-0"
+          >
+            <StatsPage onBack={handleBackFromStats} />
           </motion.div>
         )}
       </AnimatePresence>
