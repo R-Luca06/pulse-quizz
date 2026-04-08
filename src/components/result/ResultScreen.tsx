@@ -87,9 +87,21 @@ export default function ResultScreen({ score, results, onReplay }: Props) {
           </p>
         </motion.div>
 
+        {/* Replay button */}
+        <motion.div variants={fadeUp} className="pb-4">
+          <motion.button
+            onClick={onReplay}
+            whileHover={{ scale: 1.06 }}
+            whileTap={{ scale: 0.96 }}
+            className="rounded-full bg-gradient-to-r from-neon-violet to-neon-blue px-10 py-4 text-base font-bold tracking-wide text-white shadow-neon-violet"
+          >
+            Rejouer
+          </motion.button>
+        </motion.div>
+
         {/* Recap */}
         {results.length > 0 && (
-          <motion.div variants={fadeUp} className="w-full">
+          <motion.div variants={fadeUp} className="w-full pb-4">
             <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-white/30">
               Récapitulatif
             </p>
@@ -135,18 +147,6 @@ export default function ResultScreen({ score, results, onReplay }: Props) {
             </div>
           </motion.div>
         )}
-
-        {/* Replay button */}
-        <motion.div variants={fadeUp} className="pb-4">
-          <motion.button
-            onClick={onReplay}
-            whileHover={{ scale: 1.06 }}
-            whileTap={{ scale: 0.96 }}
-            className="rounded-full bg-gradient-to-r from-neon-violet to-neon-blue px-10 py-4 text-base font-bold tracking-wide text-white shadow-neon-violet"
-          >
-            Rejouer
-          </motion.button>
-        </motion.div>
       </motion.div>
     </div>
   )
