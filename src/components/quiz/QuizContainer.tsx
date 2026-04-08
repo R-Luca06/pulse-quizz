@@ -22,7 +22,7 @@ const COMBO_MILESTONES = [3, 5, 7, 10]
 
 interface BallConfig { id: number; top: number; left: number; size: number; opacity: number; floatY: number; duration: number; delay: number }
 
-const BALLS: BallConfig[] = Array.from({ length: 18 }, (_, i) => ({
+const BALLS: BallConfig[] = Array.from({ length: 40 }, (_, i) => ({
   id: i,
   top:      Math.floor(Math.random() * 90 + 5),
   left:     Math.floor(Math.random() * 92 + 4),
