@@ -3,7 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import LandingPage from './components/landing/LandingPage'
 import QuizContainer from './components/quiz/QuizContainer'
 import ResultScreen from './components/result/ResultScreen'
-import type { QuestionResult } from './types/quiz'
+import type { QuestionResult, GameMode, Difficulty } from './types/quiz'
 
 export type AppScreen = 'landing' | 'launching' | 'quiz' | 'result'
 
@@ -11,8 +11,15 @@ export default function App() {
   const [screen, setScreen] = useState<AppScreen>('landing')
   const [finalScore, setFinalScore] = useState(0)
   const [finalResults, setFinalResults] = useState<QuestionResult[]>([])
+  const [gameMode, setGameMode] = useState<GameMode>('normal')
+  const [difficulty, setDifficulty] = useState<Difficulty>('mixed')
 
-  function handleStart() { setScreen('launching') }
+  function handleStart(mode: GameMode, diff: Difficulty) {
+    setGameMode(mode)
+    setDifficulty(diff)
+    setScreen('launching')
+  }
+
   function handleExplosion() { setScreen('quiz') }
 
   function handleFinished(score: number, results: QuestionResult[]) {
@@ -44,7 +51,11 @@ export default function App() {
             exit={{ opacity: 0, transition: { duration: 0.2 } }}
             className="absolute inset-0"
           >
-            <QuizContainer onFinished={handleFinished} />
+            <QuizContainer
+              onFinished={handleFinished}
+              gameMode={gameMode}
+              difficulty={difficulty}
+            />
           </motion.div>
         )}
 

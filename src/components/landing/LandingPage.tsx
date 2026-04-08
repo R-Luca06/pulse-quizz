@@ -3,19 +3,30 @@ import { motion, useAnimationControls } from 'framer-motion'
 import FloatingCardsBackground from './FloatingCardsBackground'
 import StartButton from './StartButton'
 import type { AppScreen } from '../../App'
+import type { GameMode, Difficulty } from '../../types/quiz'
 
 export type LaunchPhase = 'idle' | 'converging' | 'shaking' | 'exploding'
 
 interface Props {
-  onStart: () => void
+  onStart: (mode: GameMode, difficulty: Difficulty) => void
   onExplosion: () => void
   screen: AppScreen
 }
+
+const DIFFICULTIES: { value: Difficulty; label: string }[] = [
+  { value: 'mixed',  label: 'Mixte' },
+  { value: 'easy',   label: 'Facile' },
+  { value: 'medium', label: 'Moyen' },
+  { value: 'hard',   label: 'Difficile' },
+]
 
 export default function LandingPage({ onStart, onExplosion, screen }: Props) {
   const isLaunching = screen === 'launching'
   const [launchPhase, setLaunchPhase] = useState<LaunchPhase>('idle')
   const shakeControls = useAnimationControls()
+
+  const [mode, setMode] = useState<GameMode>('normal')
+  const [difficulty, setDifficulty] = useState<Difficulty>('mixed')
 
   useEffect(() => {
     if (!isLaunching) {
@@ -27,22 +38,26 @@ export default function LandingPage({ onStart, onExplosion, screen }: Props) {
 
     setLaunchPhase('converging')
 
-    // After cards have converged → shake
     t1 = setTimeout(async () => {
       setLaunchPhase('shaking')
       await shakeControls.start({
         x: [0, -18, 18, -14, 14, -9, 9, -5, 5, 0],
         transition: { duration: 0.32, ease: 'linear' },
       })
-      // Shake done → explode and signal App to mount quiz
       setLaunchPhase('exploding')
       onExplosion()
     }, 380)
 
-    return () => {
-      clearTimeout(t1)
-    }
+    return () => { clearTimeout(t1) }
   }, [isLaunching]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  function handlePlay() {
+    onStart(mode, difficulty)
+  }
+
+  const selectBase = 'cursor-pointer rounded-xl border px-3 py-1.5 text-xs font-semibold transition-colors duration-150'
+  const selectActive = 'border-neon-violet bg-neon-violet/10 text-white'
+  const selectInactive = 'border-white/10 bg-white/5 text-white/40 hover:border-white/20 hover:text-white/60'
 
   return (
     <div className="relative flex min-h-screen w-full flex-col items-center justify-center overflow-hidden bg-game-bg">
@@ -67,7 +82,7 @@ export default function LandingPage({ onStart, onExplosion, screen }: Props) {
         />
       )}
 
-      {/* Hero content — fades out on launch */}
+      {/* Hero content */}
       <motion.div
         className="relative z-10 flex flex-col items-center gap-6 text-center sm:gap-8 md:gap-10"
         animate={
@@ -103,13 +118,60 @@ export default function LandingPage({ onStart, onExplosion, screen }: Props) {
           </p>
         </motion.div>
 
+        {/* Mode selector */}
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.45 }}
+          className="flex w-full max-w-xs flex-col items-center gap-2"
+        >
+          <p className="text-xs font-semibold uppercase tracking-widest text-white/30">Mode</p>
+          <div className="flex w-full gap-2">
+            <button
+              onClick={() => setMode('normal')}
+              className={[selectBase, 'flex flex-1 flex-col items-start gap-0.5 p-3', mode === 'normal' ? selectActive : selectInactive].join(' ')}
+            >
+              <span className="font-bold">Normal</span>
+              <span className="text-[10px] opacity-60">10 questions</span>
+            </button>
+            <button
+              onClick={() => setMode('survie')}
+              className={[selectBase, 'flex flex-1 flex-col items-start gap-0.5 p-3', mode === 'survie' ? selectActive : selectInactive].join(' ')}
+            >
+              <span className="font-bold">Survie</span>
+              <span className="text-[10px] opacity-60">1 erreur = fin</span>
+            </button>
+          </div>
+        </motion.div>
+
+        {/* Difficulty selector */}
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.55 }}
+          className="flex flex-col items-center gap-2"
+        >
+          <p className="text-xs font-semibold uppercase tracking-widest text-white/30">Difficulté</p>
+          <div className="flex gap-2">
+            {DIFFICULTIES.map((d) => (
+              <button
+                key={d.value}
+                onClick={() => setDifficulty(d.value)}
+                className={[selectBase, difficulty === d.value ? selectActive : selectInactive].join(' ')}
+              >
+                {d.label}
+              </button>
+            ))}
+          </div>
+        </motion.div>
+
         {/* Play button */}
         <motion.div
           initial={{ opacity: 0, scale: 0.8 }}
           animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.5, delay: 0.6, type: 'spring', stiffness: 200 }}
+          transition={{ duration: 0.5, delay: 0.65, type: 'spring', stiffness: 200 }}
         >
-          <StartButton onClick={onStart} />
+          <StartButton onClick={handlePlay} />
         </motion.div>
 
         {/* Footer hint */}

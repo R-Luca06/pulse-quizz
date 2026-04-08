@@ -7,10 +7,12 @@ import QuestionCard from './QuestionCard'
 import TimerBar from './TimerBar'
 import StreakIndicator from './StreakIndicator'
 
-import type { QuestionResult } from '../../types/quiz'
+import type { QuestionResult, GameMode, Difficulty } from '../../types/quiz'
 
 interface Props {
   onFinished: (score: number, results: QuestionResult[]) => void
+  gameMode: GameMode
+  difficulty: Difficulty
 }
 
 const FEEDBACK_COLORS = {
@@ -33,7 +35,7 @@ const BALLS: BallConfig[] = Array.from({ length: 40 }, (_, i) => ({
   delay:    parseFloat((-8 + Math.random() * 8).toFixed(1)),
 }))
 
-export default function QuizContainer({ onFinished }: Props) {
+export default function QuizContainer({ onFinished, gameMode, difficulty }: Props) {
   const {
     phase,
     isRetrying,
@@ -46,7 +48,7 @@ export default function QuizContainer({ onFinished }: Props) {
     handleAnswer,
     handleTimeout,
     retry,
-  } = useQuiz(onFinished)
+  } = useQuiz(onFinished, { gameMode, difficulty })
 
   const { timeLeft, progress } = useTimer(
     10,

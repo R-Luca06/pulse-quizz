@@ -1,7 +1,12 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { fetchQuestions } from '../utils/trivia'
 import { playCorrect, playWrong, playTimeout } from '../utils/sounds'
-import type { TriviaQuestion, AnswerState, QuizPhase, QuestionResult } from '../types/quiz'
+import type { TriviaQuestion, AnswerState, QuizPhase, QuestionResult, GameMode, Difficulty } from '../types/quiz'
+
+interface QuizSettings {
+  gameMode: GameMode
+  difficulty: Difficulty
+}
 
 const FEEDBACK_DURATION = 1500
 
@@ -21,6 +26,7 @@ interface UseQuizReturn {
 
 export function useQuiz(
   onFinished: (score: number, results: QuestionResult[]) => void,
+  settings: QuizSettings = { gameMode: 'normal', difficulty: 'mixed' },
 ): UseQuizReturn {
   const [phase, setPhase] = useState<QuizPhase>('loading')
   const [isRetrying, setIsRetrying] = useState(false)
@@ -37,7 +43,7 @@ export function useQuiz(
     setPhase('loading')
     resultsRef.current = []
     try {
-      const qs = await fetchQuestions()
+      const qs = await fetchQuestions(settings.difficulty)
       setQuestions(qs)
       setCurrentIndex(0)
       setScore(0)

@@ -9,6 +9,8 @@ export interface TriviaQuestion {
 
 export type AnswerState = 'idle' | 'correct' | 'wrong' | 'timeout'
 export type QuizPhase = 'loading' | 'playing' | 'feedback' | 'finished' | 'error'
+export type GameMode   = 'normal' | 'survie'
+export type Difficulty = 'mixed' | 'easy' | 'medium' | 'hard'
 
 export interface QuestionResult {
   question: string
