@@ -1,0 +1,38 @@
+/**
+ * Couche d'abstraction API — point d'entrée unique pour les données du jeu.
+ *
+ * Aujourd'hui : OpenTDB
+ * Plus tard   : remplacer les implémentations ici pour pointer vers le backend,
+ *               sans toucher aux hooks ni aux composants.
+ */
+
+import { fetchQuestions as fetchFromOpenTDB } from '../utils/trivia'
+import type { TriviaQuestion, Difficulty, Language, Category } from '../types/quiz'
+
+export interface QuizParams {
+  difficulty: Difficulty
+  language: Language
+  category: Category
+}
+
+export class ApiError extends Error {
+  constructor(
+    public readonly code: 'rate_limit' | 'api_error' | 'network_error',
+    message?: string,
+  ) {
+    super(message ?? code)
+    this.name = 'ApiError'
+  }
+}
+
+export async function fetchQuestions(params: QuizParams): Promise<TriviaQuestion[]> {
+  try {
+    return await fetchFromOpenTDB(params.difficulty, params.language, params.category)
+  } catch (err) {
+    if (err instanceof Error) {
+      if (err.message === 'rate_limit') throw new ApiError('rate_limit')
+      if (err.message === 'api_error')  throw new ApiError('api_error')
+    }
+    throw new ApiError('network_error')
+  }
+}

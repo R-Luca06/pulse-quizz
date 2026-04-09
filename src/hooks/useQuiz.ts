@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { fetchQuestions } from '../utils/trivia'
+import { fetchQuestions, ApiError } from '../services/api'
 import { playCorrect, playWrong, playTimeout } from '../utils/sounds'
 import { FEEDBACK_DURATION, NORMAL_MODE_QUESTIONS } from '../constants/game'
 import type { TriviaQuestion, AnswerState, QuizPhase, QuestionResult, GameMode, Difficulty, Language, Category } from '../types/quiz'
@@ -45,7 +45,11 @@ export function useQuiz(
     setPhase('loading')
     resultsRef.current = []
     try {
-      const qs = await fetchQuestions(settings.difficulty, settings.language, settings.category)
+      const qs = await fetchQuestions({
+        difficulty: settings.difficulty,
+        language: settings.language,
+        category: settings.category,
+      })
       setQuestions(qs)
       setCurrentIndex(0)
       setScore(0)
@@ -55,7 +59,7 @@ export function useQuiz(
       questionStartTime.current = Date.now()
       setPhase('playing')
     } catch (err) {
-      if (err instanceof Error && err.message === 'rate_limit') {
+      if (err instanceof ApiError && err.code === 'rate_limit') {
         setIsRetrying(true)
         setTimeout(() => { setIsRetrying(false); loadQuestions() }, 5000)
       } else {
