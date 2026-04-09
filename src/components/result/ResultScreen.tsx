@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { CATEGORY_LABELS, DIFFICULTY_LABELS, MODE_LABELS } from '../../constants/quiz'
+import { computeBestStreak } from '../../utils/statsStorage'
 import type { QuestionResult, GameMode, Difficulty, Category } from '../../types/quiz'
 
 interface Props {
@@ -22,29 +24,8 @@ const TIERS = [
   { min: 0,  label: 'Retente ta chance', color: '#6B7280' },
 ]
 
-const DIFFICULTY_LABELS: Record<string, string> = {
-  easy: 'Facile', medium: 'Moyen', hard: 'Difficile', mixed: 'Mixte',
-}
-const CATEGORY_LABELS: Record<string, string> = {
-  all: 'Toutes catégories', '9': 'Culture générale', '11': 'Cinéma',
-  '12': 'Musique', '14': 'Télévision', '15': 'Jeux vidéo', '17': 'Sciences & Nature',
-  '18': 'Informatique', '19': 'Mathématiques', '21': 'Sports',
-  '22': 'Géographie', '23': 'Histoire', '27': 'Animaux',
-}
-const MODE_LABELS: Record<string, string> = { normal: 'Normal', survie: 'Survie' }
-
 function getTier(score: number) {
   return TIERS.find((t) => score >= t.min)!
-}
-
-function getBestStreak(results: QuestionResult[]): number {
-  let best = 0
-  let current = 0
-  for (const r of results) {
-    if (r.isCorrect) { current++; best = Math.max(best, current) }
-    else current = 0
-  }
-  return best
 }
 
 const fadeUp = { hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0 } }
@@ -70,7 +51,7 @@ export default function ResultScreen({ score, results, onReplay, onBack, onShowS
   const correct = results.filter(r => r.isCorrect).length
   const timeout = results.filter(r => r.userAnswer === null).length
   const wrong = total - correct - timeout
-  const bestStreak = getBestStreak(results)
+  const bestStreak = computeBestStreak(results)
 
   const contextPills = [
     MODE_LABELS[gameMode],

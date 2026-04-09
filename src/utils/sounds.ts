@@ -6,8 +6,11 @@ export function getMuted(): boolean { return muted }
 
 function getCtx(): AudioContext | null {
   try {
-    if (!ctx) ctx = new AudioContext()
-    if (ctx.state === 'suspended') ctx.resume()
+    if (!ctx) {
+      const AudioCtx = window.AudioContext ?? (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
+      if (!AudioCtx) return null
+      ctx = new AudioCtx()
+    }
     return ctx
   } catch {
     return null
@@ -15,18 +18,13 @@ function getCtx(): AudioContext | null {
 }
 
 export function unlockAudio() {
-  getCtx()
+  const context = getCtx()
+  if (context && context.state === 'suspended') {
+    context.resume().catch(() => {})
+  }
 }
 
-function beep(
-  freq: number,
-  duration: number,
-  type: OscillatorType = 'sine',
-  volume = 0.18,
-) {
-  if (muted) return
-  const context = getCtx()
-  if (!context) return
+function playNode(context: AudioContext, freq: number, duration: number, type: OscillatorType, volume: number) {
   try {
     const osc = context.createOscillator()
     const gain = context.createGain()
@@ -40,6 +38,22 @@ function beep(
     osc.stop(context.currentTime + duration)
   } catch {
     // ignore
+  }
+}
+
+function beep(
+  freq: number,
+  duration: number,
+  type: OscillatorType = 'sine',
+  volume = 0.18,
+) {
+  if (muted) return
+  const context = getCtx()
+  if (!context) return
+  if (context.state === 'suspended') {
+    context.resume().then(() => playNode(context, freq, duration, type, volume)).catch(() => {})
+  } else {
+    playNode(context, freq, duration, type, volume)
   }
 }
 

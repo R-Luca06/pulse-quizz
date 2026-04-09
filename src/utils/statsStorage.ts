@@ -56,7 +56,7 @@ export function getGlobalStats(): GlobalStats {
   }
 }
 
-function computeBestStreak(results: QuestionResult[]): number {
+export function computeBestStreak(results: QuestionResult[]): number {
   let best = 0
   let current = 0
   for (const r of results) {

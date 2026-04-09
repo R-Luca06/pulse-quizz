@@ -1,39 +1,14 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { getCategoryStats, getGlobalStats } from '../../utils/statsStorage'
-import type { GameMode, Difficulty, Category } from '../../types/quiz'
+import { CATEGORIES, MODES, DIFFICULTIES } from '../../constants/quiz'
+import type { GameMode, Difficulty } from '../../types/quiz'
 
 interface Props {
   onBack: () => void
 }
 
-const CATEGORIES: { value: Category; label: string }[] = [
-  { value: 'all', label: 'Toutes catégories' },
-  { value: 9,     label: 'Culture générale' },
-  { value: 11,    label: 'Cinéma' },
-  { value: 12,    label: 'Musique' },
-  { value: 14,    label: 'Télévision' },
-  { value: 15,    label: 'Jeux vidéo' },
-  { value: 17,    label: 'Sciences & Nature' },
-  { value: 18,    label: 'Informatique' },
-  { value: 19,    label: 'Mathématiques' },
-  { value: 21,    label: 'Sports' },
-  { value: 22,    label: 'Géographie' },
-  { value: 23,    label: 'Histoire' },
-  { value: 27,    label: 'Animaux' },
-]
-
-const MODES: { value: GameMode; label: string }[] = [
-  { value: 'normal', label: 'Normal' },
-  { value: 'survie', label: 'Survie' },
-]
-
-const DIFFICULTIES: { value: Difficulty; label: string }[] = [
-  { value: 'easy',   label: 'Facile' },
-  { value: 'medium', label: 'Moyen' },
-  { value: 'hard',   label: 'Difficile' },
-]
-
+// StatsPage uses smaller buttons than LandingPage
 const btnBase = 'rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors duration-150'
 const btnSelected = 'border-neon-violet bg-neon-violet/15 text-white'
 const btnIdle = 'border-white/10 bg-white/5 text-white/40 hover:border-white/20 hover:text-white/60'

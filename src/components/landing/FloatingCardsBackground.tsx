@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { useMemo } from 'react'
 import { motion } from 'framer-motion'
 import type { TargetAndTransition, Transition } from 'framer-motion'
 import type { LaunchPhase } from './LandingPage'
@@ -69,7 +69,7 @@ interface Props {
 }
 
 export default function FloatingCardsBackground({ launchPhase }: Props) {
-  const cards = useRef(generateCards()).current
+  const cards = useMemo(() => generateCards(), [])
   const isIdle = launchPhase === 'idle'
 
   return (
