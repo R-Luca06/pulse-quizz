@@ -8,6 +8,7 @@ import TimerBar from './TimerBar'
 import StreakIndicator from './StreakIndicator'
 
 import type { QuestionResult, GameMode, Difficulty, Language, Category } from '../../types/quiz'
+import { QUESTION_DURATION, URGENT_THRESHOLD, COMBO_MILESTONES } from '../../constants/game'
 
 interface Props {
   onFinished: (score: number, results: QuestionResult[]) => void
@@ -23,7 +24,6 @@ const FEEDBACK_COLORS = {
   wrong:   'inset 0 0 160px rgba(239, 68, 68, 0.38)',
 }
 
-const COMBO_MILESTONES = [3, 5, 7, 10]
 
 interface BallConfig { id: number; top: number; left: number; size: number; opacity: number; floatY: number; duration: number; delay: number }
 
@@ -54,13 +54,13 @@ export default function QuizContainer({ onFinished, onQuit, gameMode, difficulty
   } = useQuiz(onFinished, { gameMode, difficulty, language, category })
 
   const { timeLeft, progress } = useTimer(
-    10,
+    QUESTION_DURATION,
     phase === 'playing',
     currentIndex,
     handleTimeout,
   )
 
-  const isUrgent = timeLeft <= 3 && timeLeft > 0 && phase === 'playing'
+  const isUrgent = timeLeft <= URGENT_THRESHOLD && timeLeft > 0 && phase === 'playing'
   const showFeedback = answerState === 'correct' || answerState === 'wrong'
 
   // Tick once per second during the urgent zone (Math.ceil changes only at each integer boundary)

@@ -1,4 +1,5 @@
 import type { GameMode, Difficulty, Category, QuestionResult } from '../types/quiz'
+import { NORMAL_MODE_QUESTIONS } from '../constants/game'
 
 export interface CategoryStats {
   gamesPlayed: number
@@ -75,7 +76,7 @@ export function updateStats(
 ): void {
   const streak = computeBestStreak(results)
   const totalTime = Math.round(results.reduce((s, r) => s + r.timeSpent, 0) * 10) / 10
-  const isPerfect = mode === 'normal' && score === results.length && score === 10
+  const isPerfect = mode === 'normal' && score === results.length && score === NORMAL_MODE_QUESTIONS
 
   // --- Category stats ---
   const cat = getCategoryStats(mode, difficulty, category)

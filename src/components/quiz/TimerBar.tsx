@@ -1,4 +1,5 @@
 import { motion, AnimatePresence } from 'framer-motion'
+import { URGENT_THRESHOLD } from '../../constants/game'
 
 interface Props {
   progress: number  // 1 → 0
@@ -6,13 +7,13 @@ interface Props {
 }
 
 function getColor(timeLeft: number) {
-  if (timeLeft > 6) return '#22C55E'
-  if (timeLeft > 3) return '#F97316'
+  if (timeLeft > URGENT_THRESHOLD * 2) return '#22C55E'
+  if (timeLeft > URGENT_THRESHOLD) return '#F97316'
   return '#EF4444'
 }
 
 export default function TimerBar({ progress, timeLeft }: Props) {
-  const isUrgent = timeLeft <= 3 && timeLeft > 0
+  const isUrgent = timeLeft <= URGENT_THRESHOLD && timeLeft > 0
 
   return (
     <>

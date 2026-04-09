@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-
-const TICK = 100 // ms
+import { TIMER_TICK } from '../constants/game'
 
 interface UseTimerReturn {
   timeLeft: number   // seconds remaining
@@ -32,7 +31,7 @@ export function useTimer(
 
     const id = setInterval(() => {
       setElapsed((prev) => {
-        const next = prev + TICK
+        const next = prev + TIMER_TICK
         if (next >= duration * 1000) {
           clearInterval(id)
           onTimeoutRef.current()
@@ -40,7 +39,7 @@ export function useTimer(
         }
         return next
       })
-    }, TICK)
+    }, TIMER_TICK)
 
     return () => clearInterval(id)
   }, [active, questionKey, duration])

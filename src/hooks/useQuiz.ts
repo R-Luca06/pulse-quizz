@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { fetchQuestions } from '../utils/trivia'
 import { playCorrect, playWrong, playTimeout } from '../utils/sounds'
+import { FEEDBACK_DURATION, NORMAL_MODE_QUESTIONS } from '../constants/game'
 import type { TriviaQuestion, AnswerState, QuizPhase, QuestionResult, GameMode, Difficulty, Language, Category } from '../types/quiz'
 
 interface QuizSettings {
@@ -9,8 +10,6 @@ interface QuizSettings {
   language: Language
   category: Category
 }
-
-const FEEDBACK_DURATION = 1500
 
 interface UseQuizReturn {
   phase: QuizPhase
@@ -79,7 +78,7 @@ export function useQuiz(
 
   const advance = useCallback(
     (nextIndex: number, currentScore: number) => {
-      if (nextIndex >= 10) {
+      if (nextIndex >= NORMAL_MODE_QUESTIONS) {
         setPhase('finished')
         onFinished(currentScore, resultsRef.current)
       } else {

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { CATEGORY_LABELS, DIFFICULTY_LABELS, MODE_LABELS } from '../../constants/quiz'
+import { NORMAL_MODE_QUESTIONS } from '../../constants/game'
 import { computeBestStreak } from '../../utils/statsStorage'
 import type { QuestionResult, GameMode, Difficulty, Category } from '../../types/quiz'
 
@@ -155,11 +156,11 @@ export default function ResultScreen({ score, results, onReplay, onBack, onShowS
             <motion.div variants={fadeUp} className="flex flex-col items-center gap-1 text-center">
               <p className="text-xl font-bold text-white sm:text-2xl">{tier.label}</p>
               <p className="text-sm text-white/30">
-                {score === 10
+                {score === NORMAL_MODE_QUESTIONS
                   ? 'Tu as répondu juste à toutes les questions !'
                   : score === 0
                   ? 'Toutes les questions ont eu raison de toi.'
-                  : `${score} bonne${score > 1 ? 's' : ''} réponse${score > 1 ? 's' : ''} sur 10`}
+                  : `${score} bonne${score > 1 ? 's' : ''} réponse${score > 1 ? 's' : ''} sur ${NORMAL_MODE_QUESTIONS}`}
               </p>
             </motion.div>
 
