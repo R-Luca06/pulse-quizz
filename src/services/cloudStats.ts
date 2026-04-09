@@ -67,7 +67,7 @@ export async function fetchAllStats(userId: string): Promise<{
 }> {
   const [catsResult, globalResult] = await Promise.all([
     supabase.from('user_stats').select('*').eq('user_id', userId),
-    supabase.from('user_global_stats').select('*').eq('user_id', userId).single(),
+    supabase.from('user_global_stats').select('*').eq('user_id', userId).maybeSingle(),
   ])
   return {
     categories: (catsResult.data ?? []) as CloudCategoryStatRow[],

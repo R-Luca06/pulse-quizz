@@ -47,6 +47,11 @@ const EMPTY_CAT_STATS: CategoryStats = {
   bestScore: 0, bestStreak: 0, fastestPerfect: null,
 }
 
+const EMPTY_GLOBAL_STATS: GlobalStats = {
+  version: 1, gamesPlayed: 0, totalQuestions: 0, totalCorrect: 0,
+  bestStreak: 0, fastestPerfect: null,
+}
+
 function cloudRowToCatStats(row: CloudCategoryStatRow): CategoryStats {
   return {
     version: 1,
@@ -81,7 +86,8 @@ export default function StatsPage({ onBack, defaultTab = 'stats', initialMode, i
 
   const [cloudCats, setCloudCats] = useState<CloudCategoryStatRow[]>([])
   const [cloudGlobal, setCloudGlobal] = useState<CloudGlobalStatRow | null>(null)
-  const [cloudLoading, setCloudLoading] = useState(false)
+  // Initialiser à true si user connecté pour éviter le flash localStorage au premier rendu
+  const [cloudLoading, setCloudLoading] = useState(() => user !== null)
 
   useEffect(() => {
     if (!user) {
@@ -110,8 +116,9 @@ export default function StatsPage({ onBack, defaultTab = 'stats', initialMode, i
   }, [activeTab, filterMode, filterDiff])
 
   const effectiveGlobal: GlobalStats = useMemo(() => {
-    if (user && cloudGlobal && !cloudLoading) return cloudRowToGlobalStats(cloudGlobal)
-    return getGlobalStats()
+    if (!user) return getGlobalStats()
+    if (cloudLoading) return EMPTY_GLOBAL_STATS
+    return cloudGlobal ? cloudRowToGlobalStats(cloudGlobal) : EMPTY_GLOBAL_STATS
   }, [user, cloudGlobal, cloudLoading])
 
   const globalRate = effectiveGlobal.totalQuestions > 0
