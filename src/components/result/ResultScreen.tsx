@@ -3,6 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { CATEGORY_LABELS, DIFFICULTY_LABELS, MODE_LABELS } from '../../constants/quiz'
 import { NORMAL_MODE_QUESTIONS } from '../../constants/game'
 import { computeBestStreak } from '../../utils/statsStorage'
+import { submitScore } from '../../services/leaderboard'
+import { useAuth } from '../../hooks/useAuth'
 import type { QuestionResult, GameMode, Difficulty, Category } from '../../types/quiz'
 
 interface Props {
@@ -11,6 +13,8 @@ interface Props {
   onReplay: () => void
   onBack: () => void
   onShowStats: () => void
+  onShowLeaderboard: () => void
+  onOpenAuth: () => void
   bestScore: number
   isNewBest: boolean
   gameMode: GameMode
@@ -31,10 +35,23 @@ function getTier(score: number) {
 
 const fadeUp = { hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0 } }
 
-export default function ResultScreen({ score, results, onReplay, onBack, onShowStats, bestScore, isNewBest, gameMode, difficulty, category }: Props) {
+export default function ResultScreen({ score, results, onReplay, onBack, onShowStats, onShowLeaderboard, onOpenAuth, bestScore, isNewBest, gameMode, difficulty, category }: Props) {
+  const { user, profile } = useAuth()
   const [displayed, setDisplayed] = useState(0)
   const [recapOpen, setRecapOpen] = useState(false)
+  const [publishState, setPublishState] = useState<'idle' | 'sending' | 'done' | 'error'>('idle')
   const tier = getTier(score)
+
+  async function handlePublish() {
+    if (!user || !profile) return
+    setPublishState('sending')
+    try {
+      await submitScore({ userId: user.id, username: profile.username, score, mode: gameMode, difficulty })
+      setPublishState('done')
+    } catch {
+      setPublishState('error')
+    }
+  }
 
   useEffect(() => {
     if (score === 0) return
@@ -83,20 +100,33 @@ export default function ResultScreen({ score, results, onReplay, onBack, onShowS
           >
             ← Paramètres
           </motion.button>
-          <motion.button
-            onClick={onShowStats}
+          <motion.div
+            className="flex gap-2"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.35, delay: 0.15 }}
-            aria-label="Voir les statistiques"
-            className="flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/30 transition-colors hover:border-white/20 hover:text-white/60"
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="18" y="3" width="4" height="18" rx="1"/>
-              <rect x="10" y="8" width="4" height="13" rx="1"/>
-              <rect x="2" y="13" width="4" height="8" rx="1"/>
-            </svg>
-          </motion.button>
+            <button
+              onClick={onShowLeaderboard}
+              aria-label="Voir le classement"
+              className="flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/30 transition-colors hover:border-white/20 hover:text-white/60"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M8 6h8M8 12h8M8 18h8M3 6h.01M3 12h.01M3 18h.01"/>
+              </svg>
+            </button>
+            <button
+              onClick={onShowStats}
+              aria-label="Voir les statistiques"
+              className="flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/30 transition-colors hover:border-white/20 hover:text-white/60"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="18" y="3" width="4" height="18" rx="1"/>
+                <rect x="10" y="8" width="4" height="13" rx="1"/>
+                <rect x="2" y="13" width="4" height="8" rx="1"/>
+              </svg>
+            </button>
+          </motion.div>
           <motion.button
             onClick={onReplay}
             initial={{ opacity: 0, x: 10 }}
@@ -226,6 +256,49 @@ export default function ResultScreen({ score, results, onReplay, onBack, onShowS
                 </div>
               </motion.div>
             )}
+
+            {/* Publier le score */}
+            <motion.div variants={fadeUp} className="w-full">
+              <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-white/30">Publier ton score</p>
+              {!user ? (
+                <button
+                  onClick={onOpenAuth}
+                  className="flex w-full items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/5 px-4 py-2.5 text-xs font-semibold text-white/50 transition-colors hover:border-white/20 hover:text-white/70"
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                    <circle cx="12" cy="7" r="4"/>
+                  </svg>
+                  Se connecter pour rejoindre le classement
+                </button>
+              ) : publishState === 'done' ? (
+                <div className="flex items-center gap-3">
+                  <p className="text-xs text-game-success">Score publié ✓</p>
+                  <button
+                    onClick={onShowLeaderboard}
+                    className="text-xs text-neon-violet underline underline-offset-2 hover:text-neon-violet/80"
+                  >
+                    Voir le classement →
+                  </button>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center justify-between rounded-lg border border-white/10 bg-white/5 px-4 py-2.5">
+                    <span className="text-sm font-semibold text-white/60">@{profile?.username}</span>
+                    <button
+                      disabled={publishState === 'sending'}
+                      onClick={handlePublish}
+                      className="rounded-lg bg-gradient-to-r from-neon-violet to-neon-blue px-4 py-1.5 text-xs font-bold text-white disabled:opacity-40"
+                    >
+                      {publishState === 'sending' ? '…' : 'Publier'}
+                    </button>
+                  </div>
+                  {publishState === 'error' && (
+                    <p className="text-xs text-game-danger">Erreur — réessaie</p>
+                  )}
+                </div>
+              )}
+            </motion.div>
 
             {/* Récapitulatif toggle */}
             {results.length > 0 && (

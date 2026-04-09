@@ -4,6 +4,8 @@ import FloatingCardsBackground from './FloatingCardsBackground'
 import StartButton from './StartButton'
 import { getMuted, setMuted } from '../../utils/sounds'
 import { CATEGORIES, MODES, DIFFICULTIES, LANGUAGES, btnBase, btnSelected, btnIdle } from '../../constants/quiz'
+import { useAuth } from '../../hooks/useAuth'
+import { useToast } from '../../contexts/ToastContext'
 import type { AppScreen } from '../../App'
 import type { GameSettings } from '../../hooks/useSettings'
 import type { Category } from '../../types/quiz'
@@ -17,10 +19,13 @@ interface Props {
   onExplosion: () => void
   screen: AppScreen
   autoOpenSettings?: boolean
-  onShowStats: () => void
+  onShowStats: (tab?: 'stats' | 'leaderboard') => void
+  onOpenAuth: () => void
 }
 
-export default function LandingPage({ settings, onSettingsChange, onStart, onExplosion, screen, autoOpenSettings, onShowStats }: Props) {
+export default function LandingPage({ settings, onSettingsChange, onStart, onExplosion, screen, autoOpenSettings, onShowStats, onOpenAuth }: Props) {
+  const { user, profile, signOut } = useAuth()
+  const toast = useToast()
   const isLaunching = screen === 'launching'
   const [launchPhase, setLaunchPhase] = useState<LaunchPhase>('idle')
   const shakeControls = useAnimationControls()
@@ -81,21 +86,81 @@ export default function LandingPage({ settings, onSettingsChange, onStart, onExp
         />
       )}
 
-      {/* Stats button */}
-      <motion.button
-        onClick={onShowStats}
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.6, delay: 0.4 }}
-        aria-label="Voir les statistiques"
-        className="absolute right-4 top-4 z-10 flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/30 transition-colors hover:border-white/20 hover:text-white/60"
+      {/* Top nav bar */}
+      <motion.nav
+        className="absolute inset-x-0 top-0 z-10 flex h-14 items-center justify-between px-4 sm:px-6"
+        initial={{ opacity: 0, y: -8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.3 }}
       >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <rect x="18" y="3" width="4" height="18" rx="1"/>
-          <rect x="10" y="8" width="4" height="13" rx="1"/>
-          <rect x="2" y="13" width="4" height="8" rx="1"/>
-        </svg>
-      </motion.button>
+        {/* Wordmark */}
+        <span className="text-sm font-black tracking-tight text-white/20 select-none">
+          Pulse<span className="text-neon-violet/40">Quizz</span>
+        </span>
+
+        {/* Actions */}
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={() => onShowStats('leaderboard')}
+            aria-label="Voir le classement"
+            className="group flex h-8 items-center overflow-hidden rounded-full border border-white/10 bg-white/5 pl-[9px] pr-[9px] text-white/30 transition-[border-color,color,padding] duration-300 ease-in-out hover:border-white/20 hover:pr-3 hover:text-white/60"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
+              <path d="M8 6h8M8 12h8M8 18h8M3 6h.01M3 12h.01M3 18h.01"/>
+            </svg>
+            <span className="max-w-0 overflow-hidden whitespace-nowrap text-xs font-semibold transition-[max-width,margin,opacity] duration-300 ease-in-out [opacity:0] group-hover:ml-1.5 group-hover:max-w-[80px] group-hover:[opacity:1] group-hover:[transition-delay:60ms]">
+              Classement
+            </span>
+          </button>
+          <button
+            onClick={() => onShowStats('stats')}
+            aria-label="Voir les statistiques"
+            className="group flex h-8 items-center overflow-hidden rounded-full border border-white/10 bg-white/5 pl-[9px] pr-[9px] text-white/30 transition-[border-color,color,padding] duration-300 ease-in-out hover:border-white/20 hover:pr-3 hover:text-white/60"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
+              <rect x="18" y="3" width="4" height="18" rx="1"/>
+              <rect x="10" y="8" width="4" height="13" rx="1"/>
+              <rect x="2" y="13" width="4" height="8" rx="1"/>
+            </svg>
+            <span className="max-w-0 overflow-hidden whitespace-nowrap text-xs font-semibold transition-[max-width,margin,opacity] duration-300 ease-in-out [opacity:0] group-hover:ml-1.5 group-hover:max-w-[80px] group-hover:[opacity:1] group-hover:[transition-delay:60ms]">
+              Statistiques
+            </span>
+          </button>
+
+          {/* Separator */}
+          <div className="mx-1 h-4 w-px bg-white/10" />
+
+          {/* Auth */}
+          {user ? (
+            <div className="flex items-center gap-2">
+              <span className="select-none text-xs font-semibold text-white/40">@{profile?.username}</span>
+              <button
+                onClick={() => signOut().then(() => toast.success('Déconnecté'))}
+                aria-label="Se déconnecter"
+                className="flex h-7 w-7 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/30 transition-colors hover:border-white/20 hover:text-white/60"
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                  <polyline points="16 17 21 12 16 7"/>
+                  <line x1="21" y1="12" x2="9" y2="12"/>
+                </svg>
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={onOpenAuth}
+              aria-label="Se connecter"
+              className="flex items-center gap-1.5 rounded-full border border-white/[0.07] bg-white/[0.03] px-3 py-1.5 text-xs font-semibold text-white/40 transition-colors hover:border-white/10 hover:text-white/60"
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                <circle cx="12" cy="7" r="4"/>
+              </svg>
+              Connexion
+            </button>
+          )}
+        </div>
+      </motion.nav>
 
       {/* Hero */}
       <motion.div
