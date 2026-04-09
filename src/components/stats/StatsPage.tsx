@@ -103,7 +103,7 @@ export default function StatsPage({ onBack, defaultTab = 'stats', initialMode, i
       })
       .catch(console.error)
       .finally(() => setCloudLoading(false))
-  }, [user])
+  }, [user?.id])
 
   useEffect(() => {
     if (activeTab !== 'leaderboard') return
@@ -199,8 +199,8 @@ export default function StatsPage({ onBack, defaultTab = 'stats', initialMode, i
             animate="show"
             className="flex flex-col gap-6 lg:sticky lg:top-6"
           >
-            {/* Bloc global — onglet stats uniquement */}
-            {activeTab === 'stats' && (
+            {/* Bloc global — onglet stats, connecté uniquement */}
+            {activeTab === 'stats' && user && (
               <motion.div variants={fadeUp}>
                 <p className="mb-3 text-[10px] font-bold uppercase tracking-widest text-white/30">
                   Global {user && <span className="text-neon-violet/60">· cloud</span>}
