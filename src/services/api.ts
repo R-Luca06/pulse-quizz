@@ -16,12 +16,15 @@ export interface QuizParams {
 }
 
 export class ApiError extends Error {
+  readonly code: 'rate_limit' | 'api_error' | 'network_error'
+
   constructor(
-    public readonly code: 'rate_limit' | 'api_error' | 'network_error',
+    code: 'rate_limit' | 'api_error' | 'network_error',
     message?: string,
   ) {
     super(message ?? code)
     this.name = 'ApiError'
+    this.code = code
   }
 }
 
