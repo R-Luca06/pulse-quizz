@@ -4,8 +4,9 @@ import FloatingCardsBackground from './FloatingCardsBackground'
 import StartButton from './StartButton'
 import { getMuted, setMuted } from '../../utils/sounds'
 import { CATEGORIES, MODES, DIFFICULTIES, LANGUAGES, btnBase, btnSelected, btnIdle } from '../../constants/quiz'
+import { useSettings } from '../../hooks/useSettings'
 import type { AppScreen } from '../../App'
-import type { GameMode, Difficulty, Language, Category } from '../../types/quiz'
+import type { Category } from '../../types/quiz'
 
 export type LaunchPhase = 'idle' | 'converging' | 'shaking' | 'exploding'
 
@@ -22,10 +23,8 @@ export default function LandingPage({ onStart, onExplosion, screen, autoOpenSett
   const [launchPhase, setLaunchPhase] = useState<LaunchPhase>('idle')
   const shakeControls = useAnimationControls()
 
-  const [mode, setMode]           = useState<GameMode>('normal')
-  const [difficulty, setDifficulty] = useState<Difficulty>('easy')
-  const [language, setLanguage]   = useState<Language>('en')
-  const [category, setCategory]   = useState<Category>('all')
+  const { settings, update } = useSettings()
+  const { mode, difficulty, language, category } = settings
   const [openSettings, setOpenSettings] = useState(autoOpenSettings ?? false)
   const [muted, setMutedState]    = useState(getMuted)
 
@@ -213,7 +212,7 @@ export default function LandingPage({ onStart, onExplosion, screen, autoOpenSett
                       {MODES.map(m => (
                         <button
                           key={m.value}
-                          onClick={() => setMode(m.value)}
+                          onClick={() => update({ mode: m.value })}
                           className={[btnBase, 'flex flex-col items-start gap-0.5 px-4 py-3', mode === m.value ? btnSelected : btnIdle].join(' ')}
                         >
                           <span className="font-bold">{m.label}</span>
@@ -230,7 +229,7 @@ export default function LandingPage({ onStart, onExplosion, screen, autoOpenSett
                       {DIFFICULTIES.map(d => (
                         <button
                           key={d.value}
-                          onClick={() => setDifficulty(d.value)}
+                          onClick={() => update({ difficulty: d.value })}
                           className={[btnBase, difficulty === d.value ? btnSelected : btnIdle].join(' ')}
                         >
                           {d.label}
@@ -247,7 +246,7 @@ export default function LandingPage({ onStart, onExplosion, screen, autoOpenSett
                         value={String(category)}
                         onChange={(e) => {
                           const v = e.target.value
-                          setCategory(v === 'all' ? 'all' : Number(v) as Category)
+                          update({ category: v === 'all' ? 'all' : Number(v) as Category })
                         }}
                         aria-label="Catégorie de questions"
                         className="w-full appearance-none rounded-xl border border-white/10 bg-white/5 py-3 pl-4 pr-10 text-sm font-semibold text-white focus:border-neon-violet/60 focus:outline-none"
@@ -276,7 +275,7 @@ export default function LandingPage({ onStart, onExplosion, screen, autoOpenSett
                         return (
                           <button
                             key={l.value}
-                            onClick={() => !disabled && setLanguage(l.value)}
+                            onClick={() => !disabled && update({ language: l.value })}
                             disabled={disabled}
                             className={[
                               btnBase,

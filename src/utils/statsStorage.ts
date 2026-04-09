@@ -1,16 +1,23 @@
 import type { GameMode, Difficulty, Category, QuestionResult } from '../types/quiz'
 import { NORMAL_MODE_QUESTIONS } from '../constants/game'
 
+// ─── Schema version ──────────────────────────────────────────────────────────
+// Bump this number whenever the shape of CategoryStats or GlobalStats changes.
+// Add a migration case in migrateCategory / migrateGlobal below.
+const STATS_VERSION = 1
+
 export interface CategoryStats {
+  version: number
   gamesPlayed: number
   totalQuestions: number
   totalCorrect: number
   bestScore: number
   bestStreak: number
-  fastestPerfect: number | null  // secondes, null si jamais 10/10 en mode normal
+  fastestPerfect: number | null  // secondes, null si jamais parfait en mode normal
 }
 
 export interface GlobalStats {
+  version: number
   gamesPlayed: number
   totalQuestions: number
   totalCorrect: number
@@ -19,6 +26,7 @@ export interface GlobalStats {
 }
 
 const EMPTY_CATEGORY_STATS: CategoryStats = {
+  version: STATS_VERSION,
   gamesPlayed: 0,
   totalQuestions: 0,
   totalCorrect: 0,
@@ -28,6 +36,7 @@ const EMPTY_CATEGORY_STATS: CategoryStats = {
 }
 
 const EMPTY_GLOBAL_STATS: GlobalStats = {
+  version: STATS_VERSION,
   gamesPlayed: 0,
   totalQuestions: 0,
   totalCorrect: 0,
@@ -35,14 +44,53 @@ const EMPTY_GLOBAL_STATS: GlobalStats = {
   fastestPerfect: null,
 }
 
+// ─── Migrations ───────────────────────────────────────────────────────────────
+// Each case upgrades data from version N-1 to N.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function migrateCategory(raw: any): CategoryStats {
+  const v = raw?.version ?? 0
+  if (v === 0) {
+    // v0 had no version field — fill defaults for any missing keys
+    return {
+      version: STATS_VERSION,
+      gamesPlayed:    raw.gamesPlayed    ?? 0,
+      totalQuestions: raw.totalQuestions ?? 0,
+      totalCorrect:   raw.totalCorrect   ?? 0,
+      bestScore:      raw.bestScore      ?? 0,
+      bestStreak:     raw.bestStreak     ?? 0,
+      fastestPerfect: raw.fastestPerfect ?? null,
+    }
+  }
+  return raw as CategoryStats
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function migrateGlobal(raw: any): GlobalStats {
+  const v = raw?.version ?? 0
+  if (v === 0) {
+    return {
+      version: STATS_VERSION,
+      gamesPlayed:    raw.gamesPlayed    ?? 0,
+      totalQuestions: raw.totalQuestions ?? 0,
+      totalCorrect:   raw.totalCorrect   ?? 0,
+      bestStreak:     raw.bestStreak     ?? 0,
+      fastestPerfect: raw.fastestPerfect ?? null,
+    }
+  }
+  return raw as GlobalStats
+}
+
+// ─── Keys ─────────────────────────────────────────────────────────────────────
 function categoryKey(mode: string, difficulty: string, category: string | number) {
   return `pulse_stats_${mode}_${difficulty}_${category}`
 }
 
+// ─── Readers ──────────────────────────────────────────────────────────────────
 export function getCategoryStats(mode: string, difficulty: string, category: string | number): CategoryStats {
   try {
     const raw = localStorage.getItem(categoryKey(mode, difficulty, category))
-    return raw ? (JSON.parse(raw) as CategoryStats) : { ...EMPTY_CATEGORY_STATS }
+    if (!raw) return { ...EMPTY_CATEGORY_STATS }
+    return migrateCategory(JSON.parse(raw))
   } catch {
     return { ...EMPTY_CATEGORY_STATS }
   }
@@ -51,12 +99,14 @@ export function getCategoryStats(mode: string, difficulty: string, category: str
 export function getGlobalStats(): GlobalStats {
   try {
     const raw = localStorage.getItem('pulse_stats_global')
-    return raw ? (JSON.parse(raw) as GlobalStats) : { ...EMPTY_GLOBAL_STATS }
+    if (!raw) return { ...EMPTY_GLOBAL_STATS }
+    return migrateGlobal(JSON.parse(raw))
   } catch {
     return { ...EMPTY_GLOBAL_STATS }
   }
 }
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 export function computeBestStreak(results: QuestionResult[]): number {
   let best = 0
   let current = 0
@@ -67,6 +117,7 @@ export function computeBestStreak(results: QuestionResult[]): number {
   return best
 }
 
+// ─── Writer ───────────────────────────────────────────────────────────────────
 export function updateStats(
   mode: GameMode,
   difficulty: Difficulty,
@@ -81,11 +132,12 @@ export function updateStats(
   // --- Category stats ---
   const cat = getCategoryStats(mode, difficulty, category)
   const newCat: CategoryStats = {
-    gamesPlayed:   cat.gamesPlayed + 1,
+    version:        STATS_VERSION,
+    gamesPlayed:    cat.gamesPlayed + 1,
     totalQuestions: cat.totalQuestions + results.length,
-    totalCorrect:  cat.totalCorrect + score,
-    bestScore:     Math.max(cat.bestScore, score),
-    bestStreak:    Math.max(cat.bestStreak, streak),
+    totalCorrect:   cat.totalCorrect + score,
+    bestScore:      Math.max(cat.bestScore, score),
+    bestStreak:     Math.max(cat.bestStreak, streak),
     fastestPerfect: isPerfect
       ? cat.fastestPerfect === null ? totalTime : Math.min(cat.fastestPerfect, totalTime)
       : cat.fastestPerfect,
@@ -95,10 +147,11 @@ export function updateStats(
   // --- Global stats ---
   const global = getGlobalStats()
   const newGlobal: GlobalStats = {
-    gamesPlayed:   global.gamesPlayed + 1,
+    version:        STATS_VERSION,
+    gamesPlayed:    global.gamesPlayed + 1,
     totalQuestions: global.totalQuestions + results.length,
-    totalCorrect:  global.totalCorrect + score,
-    bestStreak:    Math.max(global.bestStreak, streak),
+    totalCorrect:   global.totalCorrect + score,
+    bestStreak:     Math.max(global.bestStreak, streak),
     fastestPerfect: isPerfect
       ? global.fastestPerfect === null ? totalTime : Math.min(global.fastestPerfect, totalTime)
       : global.fastestPerfect,

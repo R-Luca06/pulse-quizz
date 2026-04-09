@@ -3,7 +3,10 @@ const key = (mode: string, difficulty: string, category: string | number) =>
 
 export function getBestScore(mode: string, difficulty: string, category: string | number): number {
   try {
-    return Number(localStorage.getItem(key(mode, difficulty, category)) ?? 0)
+    const raw = localStorage.getItem(key(mode, difficulty, category))
+    if (raw === null) return 0
+    const n = Number(raw)
+    return Number.isFinite(n) && n >= 0 ? n : 0
   } catch {
     return 0
   }
@@ -13,6 +16,6 @@ export function saveBestScore(mode: string, difficulty: string, category: string
   try {
     localStorage.setItem(key(mode, difficulty, category), String(score))
   } catch {
-    // ignore
+    // localStorage quota exceeded ou mode privé — on ignore silencieusement
   }
 }
