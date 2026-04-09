@@ -28,7 +28,7 @@ export async function submitScore(params: SubmitParams): Promise<void> {
     .eq('user_id', userId)
     .eq('mode', mode)
     .eq('difficulty', difficulty)
-    .single()
+    .maybeSingle()
 
   if (!existing || score > existing.score) {
     const { error } = await supabase

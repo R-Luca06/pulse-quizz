@@ -44,10 +44,10 @@ export default function App() {
     const newBest = score > prev
     if (newBest) saveBestScore(mode, difficulty, category, score)
     setGameResult({ score, results, bestScore: newBest ? score : prev, isNewBest: newBest })
-    updateStats(mode, difficulty, category, score, results)
     setScreen('result')
 
     if (user) {
+      updateStats(mode, difficulty, category, score, results)
       const catStats = getCategoryStats(mode, difficulty, category)
       const globalStats = getGlobalStats()
       syncCategoryStats(user.id, mode, difficulty, category, catStats).catch(console.error)

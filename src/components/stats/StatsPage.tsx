@@ -249,17 +249,21 @@ export default function StatsPage({ onBack, defaultTab = 'stats', initialMode, i
           </motion.div>
 
           {/* Colonne droite */}
-          <motion.div
-            variants={{ hidden: {}, show: { transition: { staggerChildren: 0.05, delayChildren: 0.2 } } }}
-            initial="hidden"
-            animate="show"
-            className="pb-8"
-          >
-            {activeTab === 'stats' ? (
+          <div className="pb-8">
+            {activeTab === 'stats' && !user ? (
+              <div className="flex flex-col items-center justify-center gap-3 py-20 text-center">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-white/20">
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                  <circle cx="12" cy="7" r="4"/>
+                </svg>
+                <p className="text-sm font-semibold text-white/50">Connecte-toi pour voir tes statistiques</p>
+                <p className="text-xs text-white/25">Tes parties sont sauvegardées dans le cloud</p>
+              </div>
+            ) : activeTab === 'stats' ? (
               <>
                 <p className="mb-3 text-[10px] font-bold uppercase tracking-widest text-white/30">Par catégorie</p>
                 <div className="flex flex-col gap-2 lg:grid lg:grid-cols-2 lg:gap-3">
-                  {sorted.map((cat) => {
+                  {sorted.map((cat, i) => {
                     const s = cat.stats
                     const played = s.gamesPlayed > 0
                     const rate = s.totalQuestions > 0
@@ -269,7 +273,9 @@ export default function StatsPage({ onBack, defaultTab = 'stats', initialMode, i
                     return (
                       <motion.div
                         key={String(cat.value)}
-                        variants={fadeUp}
+                        initial={{ opacity: 0, y: 16 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.3, delay: 0.2 + i * 0.04 }}
                         className={[
                           'rounded-xl border border-white/[0.08] bg-white/[0.03] p-4 transition-opacity',
                           played ? '' : 'opacity-40',
@@ -331,7 +337,7 @@ export default function StatsPage({ onBack, defaultTab = 'stats', initialMode, i
                 )}
               </>
             )}
-          </motion.div>
+          </div>
         </div>
       </div>
     </div>
