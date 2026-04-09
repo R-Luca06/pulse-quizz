@@ -6,49 +6,42 @@ import ResultScreen from './components/result/ResultScreen'
 import StatsPage from './components/stats/StatsPage'
 import { getBestScore, saveBestScore } from './utils/storage'
 import { updateStats } from './utils/statsStorage'
-import type { QuestionResult, GameMode, Difficulty, Language, Category } from './types/quiz'
+import { useSettings } from './hooks/useSettings'
+import type { QuestionResult } from './types/quiz'
 
 export type AppScreen = 'landing' | 'launching' | 'quiz' | 'result' | 'stats'
 
+interface GameResult {
+  score: number
+  results: QuestionResult[]
+  bestScore: number
+  isNewBest: boolean
+}
+
 export default function App() {
+  const { settings, update } = useSettings()
+
   const [screen, setScreen] = useState<AppScreen>('landing')
-  const [finalScore, setFinalScore] = useState(0)
-  const [finalResults, setFinalResults] = useState<QuestionResult[]>([])
-  const [gameMode, setGameMode] = useState<GameMode>('normal')
-  const [difficulty, setDifficulty] = useState<Difficulty>('easy')
-  const [language, setLanguage] = useState<Language>('en')
-  const [category, setCategory] = useState<Category>('all')
-  const [bestScore, setBestScore] = useState(0)
-  const [isNewBest, setIsNewBest] = useState(false)
+  const [gameResult, setGameResult] = useState<GameResult>({ score: 0, results: [], bestScore: 0, isNewBest: false })
   const [returnToSettings, setReturnToSettings] = useState(false)
   const [statsOrigin, setStatsOrigin] = useState<'landing' | 'result'>('landing')
 
-  function handleStart(mode: GameMode, diff: Difficulty, lang: Language, cat: Category) {
-    setGameMode(mode)
-    setDifficulty(diff)
-    setLanguage(lang)
-    setCategory(cat)
-    setScreen('launching')
-  }
+  function handleStart() { setScreen('launching') }
 
   function handleExplosion() { setScreen('quiz') }
 
   function handleFinished(score: number, results: QuestionResult[]) {
-    const prev = getBestScore(gameMode, difficulty, category)
+    const { mode, difficulty, category } = settings
+    const prev = getBestScore(mode, difficulty, category)
     const newBest = score > prev
-    if (newBest) saveBestScore(gameMode, difficulty, category, score)
-    setBestScore(newBest ? score : prev)
-    setIsNewBest(newBest)
-    setFinalScore(score)
-    setFinalResults(results)
-    updateStats(gameMode, difficulty, category, score, results)
+    if (newBest) saveBestScore(mode, difficulty, category, score)
+    setGameResult({ score, results, bestScore: newBest ? score : prev, isNewBest: newBest })
+    updateStats(mode, difficulty, category, score, results)
     setScreen('result')
   }
 
   function handleQuit() { setReturnToSettings(false); setScreen('landing') }
-
   function handleBack() { setReturnToSettings(true); setScreen('landing') }
-
   function handleReplay() { setScreen('quiz') }
 
   function handleShowStats(from: 'landing' | 'result') {
@@ -68,6 +61,8 @@ export default function App() {
             className="absolute inset-0"
           >
             <LandingPage
+              settings={settings}
+              onSettingsChange={update}
               onStart={handleStart}
               onExplosion={handleExplosion}
               screen={screen}
@@ -88,10 +83,10 @@ export default function App() {
             <QuizContainer
               onFinished={handleFinished}
               onQuit={handleQuit}
-              gameMode={gameMode}
-              difficulty={difficulty}
-              language={language}
-              category={category}
+              gameMode={settings.mode}
+              difficulty={settings.difficulty}
+              language={settings.language}
+              category={settings.category}
             />
           </motion.div>
         )}
@@ -105,16 +100,16 @@ export default function App() {
             className="absolute inset-0"
           >
             <ResultScreen
-              score={finalScore}
-              results={finalResults}
+              score={gameResult.score}
+              results={gameResult.results}
               onReplay={handleReplay}
               onBack={handleBack}
               onShowStats={() => handleShowStats('result')}
-              bestScore={bestScore}
-              isNewBest={isNewBest}
-              gameMode={gameMode}
-              difficulty={difficulty}
-              category={category}
+              bestScore={gameResult.bestScore}
+              isNewBest={gameResult.isNewBest}
+              gameMode={settings.mode}
+              difficulty={settings.difficulty}
+              category={settings.category}
             />
           </motion.div>
         )}

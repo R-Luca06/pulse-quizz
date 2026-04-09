@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { motion } from 'framer-motion'
 import { getCategoryStats, getGlobalStats } from '../../utils/statsStorage'
 import { CATEGORIES, MODES, DIFFICULTIES } from '../../constants/quiz'
@@ -37,20 +37,21 @@ export default function StatsPage({ onBack }: Props) {
   const [filterMode, setFilterMode] = useState<GameMode>('normal')
   const [filterDiff, setFilterDiff] = useState<Difficulty>('easy')
 
-  const global = getGlobalStats()
+  const global = useMemo(() => getGlobalStats(), [])
   const globalRate = global.totalQuestions > 0
     ? Math.round((global.totalCorrect / global.totalQuestions) * 100)
     : 0
 
-  const catsWithStats = CATEGORIES.map(cat => ({
-    ...cat,
-    stats: getCategoryStats(filterMode, filterDiff, cat.value),
-  }))
-
-  const sorted = [
-    ...catsWithStats.filter(c => c.stats.gamesPlayed > 0),
-    ...catsWithStats.filter(c => c.stats.gamesPlayed === 0),
-  ]
+  const sorted = useMemo(() => {
+    const catsWithStats = CATEGORIES.map(cat => ({
+      ...cat,
+      stats: getCategoryStats(filterMode, filterDiff, cat.value),
+    }))
+    return [
+      ...catsWithStats.filter(c => c.stats.gamesPlayed > 0),
+      ...catsWithStats.filter(c => c.stats.gamesPlayed === 0),
+    ]
+  }, [filterMode, filterDiff])
 
   return (
     <div className="relative flex min-h-screen flex-col items-center overflow-y-auto bg-game-bg px-4 py-6 sm:py-10">

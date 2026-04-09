@@ -4,29 +4,30 @@ import FloatingCardsBackground from './FloatingCardsBackground'
 import StartButton from './StartButton'
 import { getMuted, setMuted } from '../../utils/sounds'
 import { CATEGORIES, MODES, DIFFICULTIES, LANGUAGES, btnBase, btnSelected, btnIdle } from '../../constants/quiz'
-import { useSettings } from '../../hooks/useSettings'
 import type { AppScreen } from '../../App'
+import type { GameSettings } from '../../hooks/useSettings'
 import type { Category } from '../../types/quiz'
 
 export type LaunchPhase = 'idle' | 'converging' | 'shaking' | 'exploding'
 
 interface Props {
-  onStart: (mode: GameMode, difficulty: Difficulty, language: Language, category: Category) => void
+  settings: GameSettings
+  onSettingsChange: (patch: Partial<GameSettings>) => void
+  onStart: () => void
   onExplosion: () => void
   screen: AppScreen
   autoOpenSettings?: boolean
   onShowStats: () => void
 }
 
-export default function LandingPage({ onStart, onExplosion, screen, autoOpenSettings, onShowStats }: Props) {
+export default function LandingPage({ settings, onSettingsChange, onStart, onExplosion, screen, autoOpenSettings, onShowStats }: Props) {
   const isLaunching = screen === 'launching'
   const [launchPhase, setLaunchPhase] = useState<LaunchPhase>('idle')
   const shakeControls = useAnimationControls()
 
-  const { settings, update } = useSettings()
   const { mode, difficulty, language, category } = settings
   const [openSettings, setOpenSettings] = useState(autoOpenSettings ?? false)
-  const [muted, setMutedState]    = useState(getMuted)
+  const [muted, setMutedState] = useState(getMuted)
 
   useEffect(() => {
     if (!isLaunching) {
@@ -54,7 +55,7 @@ export default function LandingPage({ onStart, onExplosion, screen, autoOpenSett
 
   function handleLaunch() {
     setOpenSettings(false)
-    onStart(mode, difficulty, language, category)
+    onStart()
   }
 
   return (
@@ -212,7 +213,7 @@ export default function LandingPage({ onStart, onExplosion, screen, autoOpenSett
                       {MODES.map(m => (
                         <button
                           key={m.value}
-                          onClick={() => update({ mode: m.value })}
+                          onClick={() => onSettingsChange({ mode: m.value })}
                           className={[btnBase, 'flex flex-col items-start gap-0.5 px-4 py-3', mode === m.value ? btnSelected : btnIdle].join(' ')}
                         >
                           <span className="font-bold">{m.label}</span>
@@ -229,7 +230,7 @@ export default function LandingPage({ onStart, onExplosion, screen, autoOpenSett
                       {DIFFICULTIES.map(d => (
                         <button
                           key={d.value}
-                          onClick={() => update({ difficulty: d.value })}
+                          onClick={() => onSettingsChange({ difficulty: d.value })}
                           className={[btnBase, difficulty === d.value ? btnSelected : btnIdle].join(' ')}
                         >
                           {d.label}
@@ -246,7 +247,7 @@ export default function LandingPage({ onStart, onExplosion, screen, autoOpenSett
                         value={String(category)}
                         onChange={(e) => {
                           const v = e.target.value
-                          update({ category: v === 'all' ? 'all' : Number(v) as Category })
+                          onSettingsChange({ category: v === 'all' ? 'all' : Number(v) as Category })
                         }}
                         aria-label="Catégorie de questions"
                         className="w-full appearance-none rounded-xl border border-white/10 bg-white/5 py-3 pl-4 pr-10 text-sm font-semibold text-white focus:border-neon-violet/60 focus:outline-none"
@@ -275,7 +276,7 @@ export default function LandingPage({ onStart, onExplosion, screen, autoOpenSett
                         return (
                           <button
                             key={l.value}
-                            onClick={() => !disabled && update({ language: l.value })}
+                            onClick={() => !disabled && onSettingsChange({ language: l.value })}
                             disabled={disabled}
                             className={[
                               btnBase,
