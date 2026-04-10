@@ -132,6 +132,33 @@ export async function getCompTopScores(
   return data as LeaderboardEntry[]
 }
 
+export async function getCompLeaderboardPage(
+  language: Language,
+  page: number,
+  pageSize = 10,
+): Promise<LeaderboardEntry[]> {
+  const { data, error } = await supabase
+    .from('leaderboard')
+    .select('id, user_id, username, score, mode, difficulty, language, updated_at')
+    .eq('mode', 'compétitif')
+    .eq('language', language)
+    .order('score', { ascending: false })
+    .order('updated_at', { ascending: true })
+    .range(page * pageSize, (page + 1) * pageSize - 1)
+  if (error) throw new Error(error.message)
+  return data as LeaderboardEntry[]
+}
+
+export async function getCompLeaderboardCount(language: Language): Promise<number> {
+  const { count, error } = await supabase
+    .from('leaderboard')
+    .select('*', { count: 'exact', head: true })
+    .eq('mode', 'compétitif')
+    .eq('language', language)
+  if (error) throw new Error(error.message)
+  return count ?? 0
+}
+
 export async function getUserBestScore(userId: string, language: Language): Promise<number> {
   const { data } = await supabase
     .from('leaderboard')

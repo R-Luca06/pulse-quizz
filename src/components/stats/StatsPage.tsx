@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import type { CategoryStats, GlobalStats } from '../../utils/statsStorage'
 import { fetchAllStats } from '../../services/cloudStats'
 import type { CloudCategoryStatRow, CloudGlobalStatRow } from '../../services/cloudStats'
-import { getCompTopScores, getCompEntryGameData } from '../../services/leaderboard'
+import { getCompLeaderboardPage, getCompLeaderboardCount, getCompEntryGameData, getUserRank } from '../../services/leaderboard'
 import type { LeaderboardEntry, CompGameData } from '../../services/leaderboard'
 import { CATEGORIES, DIFFICULTIES, LANGUAGES } from '../../constants/quiz'
 import { useAuth } from '../../hooks/useAuth'
@@ -82,9 +82,16 @@ export default function StatsPage({ onBack, defaultTab = 'stats', initialDiff, i
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([])
   const [lbLoading, setLbLoading] = useState(false)
   const [lbError, setLbError] = useState(false)
+  const [lbPage, setLbPage] = useState(0)
+  const [lbTotalCount, setLbTotalCount] = useState(0)
+  const [lbPageKey, setLbPageKey] = useState(0)
+  const [userRankInLb, setUserRankInLb] = useState<number | null>(null)
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [expandedData, setExpandedData] = useState<Record<string, CompGameData[] | null>>({})
   const [expandLoading, setExpandLoading] = useState<string | null>(null)
+
+  const PAGE_SIZE = 10
+  const lbTotalPages = Math.ceil(lbTotalCount / PAGE_SIZE)
 
   const [cloudCats, setCloudCats] = useState<CloudCategoryStatRow[]>([])
   const [cloudGlobal, setCloudGlobal] = useState<CloudGlobalStatRow | null>(null)
@@ -112,11 +119,35 @@ export default function StatsPage({ onBack, defaultTab = 'stats', initialDiff, i
     setLbError(false)
     setLeaderboard([])
     setExpandedId(null)
-    getCompTopScores(filterLang)
+
+    Promise.all([
+      getCompLeaderboardCount(filterLang),
+      user ? getUserRank(user.id, filterLang) : Promise.resolve(null),
+    ])
+      .then(([count, rank]) => {
+        setLbTotalCount(count)
+        setUserRankInLb(rank)
+        const startPage = rank !== null ? Math.floor((rank - 1) / PAGE_SIZE) : 0
+        setLbPage(startPage)
+        setLbPageKey(k => k + 1)
+        return getCompLeaderboardPage(filterLang, startPage, PAGE_SIZE)
+      })
       .then(setLeaderboard)
       .catch(() => setLbError(true))
       .finally(() => setLbLoading(false))
-  }, [activeTab, filterLang])
+  }, [activeTab, filterLang]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  function goToPage(p: number) {
+    if (p < 0 || p >= lbTotalPages || lbLoading) return
+    setLbPage(p)
+    setLbPageKey(k => k + 1)
+    setExpandedId(null)
+    setLbLoading(true)
+    getCompLeaderboardPage(filterLang, p, PAGE_SIZE)
+      .then(setLeaderboard)
+      .catch(() => setLbError(true))
+      .finally(() => setLbLoading(false))
+  }
 
   async function handleToggleExpand(entry: LeaderboardEntry) {
     if (activeTab !== 'leaderboard') return
@@ -336,117 +367,229 @@ export default function StatsPage({ onBack, defaultTab = 'stats', initialDiff, i
               </>
             ) : (
               <>
-                <p className="mb-3 text-[10px] font-bold uppercase tracking-widest text-white/30">
-                  Top 10 <span className="text-orange-400/60">· Compétitif</span>
-                </p>
+                {/* Header + quick-jump buttons */}
+                <div className="mb-3 flex items-center justify-between">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-white/30">
+                    Classement <span className="text-orange-400/60">· Compétitif</span>
+                    {lbTotalCount > 0 && (
+                      <span className="ml-1 text-white/20">· {lbTotalCount}</span>
+                    )}
+                  </p>
+                  {lbTotalCount > 0 && (
+                    <div className="flex items-center gap-1.5">
+                      {lbPage !== 0 && (
+                        <button
+                          onClick={() => goToPage(0)}
+                          disabled={lbLoading}
+                          className="rounded-lg border border-white/[0.08] bg-white/[0.03] px-2 py-1 text-[10px] font-bold text-white/40 transition-colors hover:border-white/20 hover:text-white/70 disabled:opacity-30"
+                        >
+                          ↑ Top
+                        </button>
+                      )}
+                      {userRankInLb !== null && lbPage !== Math.floor((userRankInLb - 1) / PAGE_SIZE) && (
+                        <button
+                          onClick={() => goToPage(Math.floor((userRankInLb - 1) / PAGE_SIZE))}
+                          disabled={lbLoading}
+                          className="rounded-lg border border-orange-500/30 bg-orange-500/10 px-2 py-1 text-[10px] font-bold text-orange-400 transition-colors hover:bg-orange-500/20 disabled:opacity-30"
+                        >
+                          Mon rang #{userRankInLb}
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+
                 {lbLoading ? (
-                  <p className="text-xs text-white/30">Chargement…</p>
+                  <div className="flex items-center justify-center py-16">
+                    <div className="h-5 w-5 animate-spin rounded-full border-2 border-white/20 border-t-white/60" />
+                  </div>
                 ) : lbError ? (
                   <p className="text-xs text-game-danger">Erreur de connexion</p>
                 ) : leaderboard.length === 0 ? (
                   <p className="text-xs text-white/30">Pas encore de scores publiés pour ce filtre</p>
                 ) : (
-                  <div className="flex flex-col gap-1.5">
-                    {leaderboard.map((entry, i) => {
-                      const isExpanded = expandedId === entry.id
-                      const gameData = expandedData[entry.id]
-                      const isLoading = expandLoading === entry.id
+                  <>
+                    <AnimatePresence mode="wait">
+                      <motion.div
+                        key={lbPageKey}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.15 }}
+                        className="flex flex-col gap-1.5"
+                      >
+                        {leaderboard.map((entry, i) => {
+                          const rank = lbPage * PAGE_SIZE + i + 1
+                          const isPlayer = user?.id === entry.user_id
+                          const isExpanded = expandedId === entry.id
+                          const gameData = expandedData[entry.id]
+                          const isLoading = expandLoading === entry.id
 
-                      return (
-                        <motion.div
-                          key={entry.id}
-                          initial={{ opacity: 0, y: 8 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ delay: i * 0.04 }}
-                          className="overflow-hidden rounded-xl border border-white/[0.06] bg-white/[0.02]"
-                        >
-                          {/* Row principale */}
-                          <div
-                            className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-white/[0.03]"
-                            onClick={() => handleToggleExpand(entry)}
-                          >
-                            <span className="w-6 text-center text-xs font-black text-white/25">#{i + 1}</span>
-                            <span className="flex-1 text-sm font-bold text-white">{entry.username}</span>
-                            <span className="text-sm font-black tabular-nums text-orange-400">
-                              {entry.score} pts
-                            </span>
-                            <span className="text-[10px] text-white/20">
-                              {new Date(entry.updated_at).toLocaleDateString('fr-FR')}
-                            </span>
-                            <motion.svg
-                              animate={{ rotate: isExpanded ? 180 : 0 }}
-                              transition={{ duration: 0.2 }}
-                              width="10" height="10" viewBox="0 0 12 12" fill="none"
-                              className="shrink-0 text-white/20"
+                          return (
+                            <motion.div
+                              key={entry.id}
+                              initial={{ opacity: 0, y: 8 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              transition={{ delay: i * 0.04 }}
+                              className={[
+                                'overflow-hidden rounded-xl border',
+                                isPlayer
+                                  ? 'border-orange-500/30 bg-orange-500/10 shadow-[0_0_12px_rgba(249,115,22,0.15)]'
+                                  : 'border-white/[0.06] bg-white/[0.02]',
+                              ].join(' ')}
                             >
-                              <path d="M2 4l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                            </motion.svg>
-                          </div>
-
-                          {/* Détail recap */}
-                          <AnimatePresence>
-                              {isExpanded && (
-                                <motion.div
-                                  initial={{ height: 0, opacity: 0 }}
-                                  animate={{ height: 'auto', opacity: 1 }}
-                                  exit={{ height: 0, opacity: 0 }}
-                                  transition={{ duration: 0.25, ease: 'easeInOut' }}
-                                  className="overflow-hidden border-t border-white/[0.05]"
+                              {/* Row principale */}
+                              <div
+                                className={[
+                                  'flex items-center gap-3 px-4 py-3 cursor-pointer',
+                                  isPlayer ? 'hover:bg-orange-500/10' : 'hover:bg-white/[0.03]',
+                                ].join(' ')}
+                                onClick={() => handleToggleExpand(entry)}
+                              >
+                                <span className={`w-6 shrink-0 text-center text-xs font-black ${isPlayer ? 'text-orange-400' : 'text-white/25'}`}>
+                                  #{rank}
+                                </span>
+                                <span className="flex-1 truncate text-sm font-bold text-white">{entry.username}</span>
+                                <span className={`text-sm font-black tabular-nums ${isPlayer ? 'text-orange-400' : 'text-orange-400'}`}>
+                                  {entry.score} pts
+                                </span>
+                                <span className="text-[10px] text-white/20">
+                                  {new Date(entry.updated_at).toLocaleDateString('fr-FR')}
+                                </span>
+                                <motion.svg
+                                  animate={{ rotate: isExpanded ? 180 : 0 }}
+                                  transition={{ duration: 0.2 }}
+                                  width="10" height="10" viewBox="0 0 12 12" fill="none"
+                                  className="shrink-0 text-white/20"
                                 >
-                                  <div className="px-4 py-3">
-                                    {isLoading ? (
-                                      <p className="text-xs text-white/30">Chargement du détail…</p>
-                                    ) : !gameData || gameData.length === 0 ? (
-                                      <p className="text-xs text-white/30">Récapitulatif non disponible</p>
-                                    ) : (
-                                      <div className="flex flex-col gap-1">
-                                        {/* En-têtes */}
-                                        <div className="mb-1 grid grid-cols-[1fr_auto_auto_auto] gap-2 text-[9px] font-bold uppercase tracking-wider text-white/20">
-                                          <span>Question</span>
-                                          <span className="text-right">Temps</span>
-                                          <span className="text-right">Mult.</span>
-                                          <span className="text-right">Pts</span>
-                                        </div>
-                                        {gameData.map((q, qi) => (
-                                          <div
-                                            key={qi}
-                                            className={[
-                                              'grid grid-cols-[1fr_auto_auto_auto] gap-2 rounded-lg border-l-2 py-1.5 pl-2 pr-1',
-                                              q.isCorrect ? 'border-l-game-success/60' : 'border-l-game-danger/60',
-                                            ].join(' ')}
-                                          >
-                                            <p className="truncate text-[11px] text-white/50">{q.question}</p>
-                                            {q.isCorrect ? (
-                                              <>
-                                                <span className="text-[10px] tabular-nums text-white/25">{q.timeSpent.toFixed(1)}s</span>
-                                                <span className={[
-                                                  'text-[10px] font-bold tabular-nums',
-                                                  q.multiplier >= 3 ? 'text-yellow-400'
-                                                  : q.multiplier >= 2 ? 'text-purple-400'
-                                                  : q.multiplier >= 1.5 ? 'text-blue-400'
-                                                  : 'text-white/30',
-                                                ].join(' ')}>×{q.multiplier}</span>
-                                                <span className="text-[10px] font-bold tabular-nums text-orange-400">+{q.pointsEarned}</span>
-                                              </>
-                                            ) : (
-                                              <>
-                                                <span />
-                                                <span />
-                                                <span className="text-[10px] text-white/25 text-right">0 pts</span>
-                                              </>
-                                            )}
+                                  <path d="M2 4l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                </motion.svg>
+                              </div>
+
+                              {/* Détail recap */}
+                              <AnimatePresence>
+                                {isExpanded && (
+                                  <motion.div
+                                    initial={{ height: 0, opacity: 0 }}
+                                    animate={{ height: 'auto', opacity: 1 }}
+                                    exit={{ height: 0, opacity: 0 }}
+                                    transition={{ duration: 0.25, ease: 'easeInOut' }}
+                                    className="overflow-hidden border-t border-white/[0.05]"
+                                  >
+                                    <div className="px-4 py-3">
+                                      {isLoading ? (
+                                        <p className="text-xs text-white/30">Chargement du détail…</p>
+                                      ) : !gameData || gameData.length === 0 ? (
+                                        <p className="text-xs text-white/30">Récapitulatif non disponible</p>
+                                      ) : (
+                                        <div className="flex flex-col gap-1">
+                                          <div className="mb-1 grid grid-cols-[1fr_auto_auto_auto] gap-2 text-[9px] font-bold uppercase tracking-wider text-white/20">
+                                            <span>Question</span>
+                                            <span className="text-right">Temps</span>
+                                            <span className="text-right">Mult.</span>
+                                            <span className="text-right">Pts</span>
                                           </div>
-                                        ))}
-                                      </div>
-                                    )}
-                                  </div>
-                                </motion.div>
-                              )}
-                            </AnimatePresence>
-                        </motion.div>
-                      )
-                    })}
-                  </div>
+                                          {gameData.map((q, qi) => (
+                                            <div
+                                              key={qi}
+                                              className={[
+                                                'grid grid-cols-[1fr_auto_auto_auto] gap-2 rounded-lg border-l-2 py-1.5 pl-2 pr-1',
+                                                q.isCorrect ? 'border-l-game-success/60' : 'border-l-game-danger/60',
+                                              ].join(' ')}
+                                            >
+                                              <p className="truncate text-[11px] text-white/50">{q.question}</p>
+                                              {q.isCorrect ? (
+                                                <>
+                                                  <span className="text-[10px] tabular-nums text-white/25">{q.timeSpent.toFixed(1)}s</span>
+                                                  <span className={[
+                                                    'text-[10px] font-bold tabular-nums',
+                                                    q.multiplier >= 3 ? 'text-yellow-400'
+                                                    : q.multiplier >= 2 ? 'text-purple-400'
+                                                    : q.multiplier >= 1.5 ? 'text-blue-400'
+                                                    : 'text-white/30',
+                                                  ].join(' ')}>×{q.multiplier}</span>
+                                                  <span className="text-[10px] font-bold tabular-nums text-orange-400">+{q.pointsEarned}</span>
+                                                </>
+                                              ) : (
+                                                <>
+                                                  <span />
+                                                  <span />
+                                                  <span className="text-[10px] text-white/25 text-right">0 pts</span>
+                                                </>
+                                              )}
+                                            </div>
+                                          ))}
+                                        </div>
+                                      )}
+                                    </div>
+                                  </motion.div>
+                                )}
+                              </AnimatePresence>
+                            </motion.div>
+                          )
+                        })}
+                      </motion.div>
+                    </AnimatePresence>
+
+                    {/* Pagination */}
+                    {lbTotalPages > 1 && (
+                      <div className="mt-4 flex items-center justify-center gap-3">
+                        <button
+                          onClick={() => goToPage(lbPage - 1)}
+                          disabled={lbPage === 0 || lbLoading}
+                          className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/[0.08] bg-white/[0.03] text-white/50 transition-colors disabled:opacity-30 enabled:hover:border-white/20 enabled:hover:text-white"
+                        >
+                          ‹
+                        </button>
+
+                        <div className="flex items-center gap-1">
+                          {Array.from({ length: lbTotalPages }, (_, i) => {
+                            const show =
+                              i === 0 ||
+                              i === lbTotalPages - 1 ||
+                              Math.abs(i - lbPage) <= 1
+
+                            if (!show) {
+                              const prevShown =
+                                i - 1 === 0 ||
+                                i - 1 === lbTotalPages - 1 ||
+                                Math.abs(i - 1 - lbPage) <= 1
+                              if (!prevShown) return null
+                              return (
+                                <span key={`ellipsis-${i}`} className="px-1 text-xs text-white/20">…</span>
+                              )
+                            }
+
+                            const isUserPage = userRankInLb !== null && i === Math.floor((userRankInLb - 1) / PAGE_SIZE)
+                            return (
+                              <button
+                                key={i}
+                                onClick={() => goToPage(i)}
+                                className={[
+                                  'h-7 min-w-[28px] rounded-lg px-2 text-xs font-bold transition-colors',
+                                  i === lbPage
+                                    ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30'
+                                    : isUserPage
+                                    ? 'text-orange-400/60 hover:text-orange-400'
+                                    : 'text-white/40 hover:text-white/70',
+                                ].join(' ')}
+                              >
+                                {i + 1}
+                              </button>
+                            )
+                          })}
+                        </div>
+
+                        <button
+                          onClick={() => goToPage(lbPage + 1)}
+                          disabled={lbPage >= lbTotalPages - 1 || lbLoading}
+                          className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/[0.08] bg-white/[0.03] text-white/50 transition-colors disabled:opacity-30 enabled:hover:border-white/20 enabled:hover:text-white"
+                        >
+                          ›
+                        </button>
+                      </div>
+                    )}
+                  </>
                 )}
               </>
             )}
