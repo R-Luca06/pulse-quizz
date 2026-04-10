@@ -5,7 +5,7 @@ import { fetchAllStats } from '../../services/cloudStats'
 import type { CloudCategoryStatRow, CloudGlobalStatRow } from '../../services/cloudStats'
 import { getCompLeaderboardPage, getCompLeaderboardCount, getCompEntryGameData, getUserRank } from '../../services/leaderboard'
 import type { LeaderboardEntry, CompGameData } from '../../services/leaderboard'
-import { CATEGORIES, DIFFICULTIES, LANGUAGES, btnBaseSm, btnSelected, btnIdleSm } from '../../constants/quiz'
+import { CATEGORIES, FR_CATEGORIES, DIFFICULTIES, LANGUAGES, btnBaseSm, btnSelected, btnIdleSm } from '../../constants/quiz'
 import { useAuth } from '../../hooks/useAuth'
 import type { Difficulty, Language } from '../../types/quiz'
 
@@ -72,8 +72,10 @@ function cloudRowToGlobalStats(row: CloudGlobalStatRow): GlobalStats {
 export default function StatsPage({ onBack, defaultTab = 'stats', initialDiff, initialLang }: Props) {
   const { user } = useAuth()
   const [activeTab, setActiveTab] = useState<'stats' | 'leaderboard'>(defaultTab)
-  const [filterDiff, setFilterDiff] = useState<Difficulty>(initialDiff ?? 'easy')
+  const validInitialDiff = initialDiff && initialDiff !== 'mixed' ? initialDiff : 'easy'
+  const [filterDiff, setFilterDiff] = useState<Difficulty>(validInitialDiff)
   const [filterLang, setFilterLang] = useState<Language>(initialLang ?? 'en')
+  const [statsLang, setStatsLang] = useState<Language>(initialLang ?? 'en')
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([])
   const [lbLoading, setLbLoading] = useState(false)
   const [lbError, setLbError] = useState(false)
@@ -183,7 +185,11 @@ export default function StatsPage({ onBack, defaultTab = 'stats', initialDiff, i
       return row ? cloudRowToCatStats(row) : { ...EMPTY_CAT_STATS }
     }
 
-    const catsWithStats = CATEGORIES.map(cat => ({
+    const catList = statsLang === 'fr'
+      ? FR_CATEGORIES.filter(c => c.value !== 'all')
+      : CATEGORIES.filter(c => c.value !== 'all')
+
+    const catsWithStats = catList.map(cat => ({
       ...cat,
       stats: getStats(cat.value),
     }))
@@ -191,7 +197,7 @@ export default function StatsPage({ onBack, defaultTab = 'stats', initialDiff, i
       ...catsWithStats.filter(c => c.stats.gamesPlayed > 0),
       ...catsWithStats.filter(c => c.stats.gamesPlayed === 0),
     ]
-  }, [filterDiff, user, cloudCats, cloudLoading])
+  }, [filterDiff, statsLang, user, cloudCats, cloudLoading])
 
   return (
     <div className="relative flex min-h-screen flex-col items-center overflow-y-auto bg-game-bg px-4 py-6 sm:py-10">
@@ -270,7 +276,7 @@ export default function StatsPage({ onBack, defaultTab = 'stats', initialDiff, i
               <p className="text-[10px] font-bold uppercase tracking-widest text-white/30">Filtrer par</p>
               <div className="flex flex-col gap-2">
                 {activeTab === 'leaderboard' ? (
-                  /* Leaderboard : langue uniquement (toujours compétitif) */
+                  /* Leaderboard : langue uniquement */
                   <div className="flex gap-2">
                     {LANGUAGES.map(l => (
                       <button
@@ -283,18 +289,31 @@ export default function StatsPage({ onBack, defaultTab = 'stats', initialDiff, i
                     ))}
                   </div>
                 ) : (
-                  /* Stats : difficulté uniquement (toujours mode normal) */
-                  <div className="flex gap-2">
-                    {DIFFICULTIES.map(d => (
-                      <button
-                        key={d.value}
-                        onClick={() => setFilterDiff(d.value)}
-                        className={[btnBaseSm, filterDiff === d.value ? btnSelected : btnIdleSm].join(' ')}
-                      >
-                        {d.label}
-                      </button>
-                    ))}
-                  </div>
+                  /* Stats : langue + difficulté */
+                  <>
+                    <div className="flex gap-2">
+                      {LANGUAGES.map(l => (
+                        <button
+                          key={l.value}
+                          onClick={() => setStatsLang(l.value)}
+                          className={[btnBaseSm, statsLang === l.value ? btnSelected : btnIdleSm].join(' ')}
+                        >
+                          {l.label}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="flex gap-2">
+                      {DIFFICULTIES.map(d => (
+                        <button
+                          key={d.value}
+                          onClick={() => setFilterDiff(d.value)}
+                          className={[btnBaseSm, filterDiff === d.value ? btnSelected : btnIdleSm].join(' ')}
+                        >
+                          {d.label}
+                        </button>
+                      ))}
+                    </div>
+                  </>
                 )}
               </div>
             </motion.div>

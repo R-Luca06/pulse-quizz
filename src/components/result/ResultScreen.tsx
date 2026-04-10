@@ -94,7 +94,7 @@ export default function ResultScreen({ score, results, onReplay, onBack, onShowS
             transition={{ duration: 0.35, delay: 0.1 }}
             className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white/40 transition-colors hover:border-white/20 hover:text-white/70"
           >
-            ← Paramètres
+            ← Accueil
           </motion.button>
           <motion.div
             className="flex gap-2"

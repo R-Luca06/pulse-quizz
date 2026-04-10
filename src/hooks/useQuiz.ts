@@ -172,7 +172,7 @@ export function useQuiz(
 
   const scheduleNext = useCallback(
     (newScore: number, gameOver = false) => {
-      if (gameOver || settings.gameMode === 'compétitif') {
+      if (gameOver) {
         feedbackTimer.current = setTimeout(() => {
           setPhase('finished')
           onFinished(newScore, resultsRef.current)
@@ -185,7 +185,7 @@ export function useQuiz(
         )
       }
     },
-    [settings.gameMode, questions, currentIndex, advance, onFinished],
+    [questions, currentIndex, advance, onFinished],
   )
 
   const handleAnswer = useCallback(

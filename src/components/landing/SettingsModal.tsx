@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { getMuted, setMuted } from '../../utils/sounds'
-import { CATEGORIES, MODES, DIFFICULTIES, LANGUAGES, btnBase, btnSelected, btnIdle } from '../../constants/quiz'
+import { CATEGORIES, FR_CATEGORIES, MODES, DIFFICULTIES, LANGUAGES, btnBase, btnSelected, btnIdle } from '../../constants/quiz'
 import type { GameSettings } from '../../hooks/useSettings'
 import type { Category } from '../../types/quiz'
 
@@ -16,6 +16,7 @@ interface Props {
 export default function SettingsModal({ settings, onSettingsChange, onLaunch, onClose, onShowRules }: Props) {
   const { mode, difficulty, language, category } = settings
   const isCompetitif = mode === 'compétitif'
+  const isFrench = language === 'fr'
   const [muted, setMutedState] = useState(getMuted)
 
   function handleMuteToggle() {
@@ -24,13 +25,29 @@ export default function SettingsModal({ settings, onSettingsChange, onLaunch, on
     setMutedState(next)
   }
 
+  const LAST_DIFF_KEY = 'pulse_last_normal_diff'
+
   function handleModeChange(newMode: GameSettings['mode']) {
     if (newMode === 'compétitif') {
+      localStorage.setItem(LAST_DIFF_KEY, difficulty)
       onSettingsChange({ mode: newMode, difficulty: 'mixed', category: 'all' })
     } else {
-      onSettingsChange({ mode: newMode, difficulty: 'easy' })
+      const saved = localStorage.getItem(LAST_DIFF_KEY) as GameSettings['difficulty'] | null
+      const validDiffs: GameSettings['difficulty'][] = ['easy', 'medium', 'hard']
+      onSettingsChange({ mode: newMode, difficulty: validDiffs.includes(saved as GameSettings['difficulty']) ? saved! : 'easy' })
     }
   }
+
+  function handleLanguageChange(lang: GameSettings['language']) {
+    // Réinitialise la catégorie si on bascule vers le français et que la catégorie actuelle
+    // est un ID OpenTDB numérique (non disponible en FR)
+    const patch: Partial<GameSettings> = { language: lang }
+    if (lang === 'fr' && typeof category === 'number') patch.category = 'all'
+    onSettingsChange(patch)
+  }
+
+  const availableCategories = isFrench ? FR_CATEGORIES : CATEGORIES
+  const categoryDisabled = isCompetitif
 
   return (
     <AnimatePresence>
@@ -172,8 +189,8 @@ export default function SettingsModal({ settings, onSettingsChange, onLaunch, on
                 </div>
               </div>
 
-              {/* Catégorie — grisée en mode compétitif */}
-              <div className={`flex flex-col gap-2 transition-opacity duration-200 ${isCompetitif ? 'pointer-events-none opacity-35' : ''}`}>
+              {/* Catégorie — grisée en mode compétitif uniquement */}
+              <div className={`flex flex-col gap-2 transition-opacity duration-200 ${categoryDisabled ? 'pointer-events-none opacity-35' : ''}`}>
                 <div className="flex items-center gap-2">
                   <p className="text-[10px] font-bold uppercase tracking-widest text-white/30">Catégorie</p>
                   {isCompetitif && (
@@ -187,12 +204,16 @@ export default function SettingsModal({ settings, onSettingsChange, onLaunch, on
                     value={String(category)}
                     onChange={(e) => {
                       const v = e.target.value
-                      onSettingsChange({ category: v === 'all' ? 'all' : Number(v) as Category })
+                      if (isFrench) {
+                        onSettingsChange({ category: v === 'all' ? 'all' : v })
+                      } else {
+                        onSettingsChange({ category: v === 'all' ? 'all' : Number(v) as Category })
+                      }
                     }}
                     aria-label="Catégorie de questions"
                     className="w-full appearance-none rounded-xl border border-white/10 bg-white/5 py-3 pl-4 pr-10 text-sm font-semibold text-white focus:border-neon-violet/60 focus:outline-none"
                   >
-                    {CATEGORIES.map(c => (
+                    {availableCategories.map(c => (
                       <option key={String(c.value)} value={String(c.value)} className="bg-[#0d0d18]">
                         {c.label}
                       </option>
@@ -211,30 +232,15 @@ export default function SettingsModal({ settings, onSettingsChange, onLaunch, on
               <div className="flex flex-col gap-2">
                 <p className="text-[10px] font-bold uppercase tracking-widest text-white/30">Langue</p>
                 <div className="flex gap-2">
-                  {LANGUAGES.map(l => {
-                    const disabled = l.value === 'fr'
-                    return (
-                      <button
-                        key={l.value}
-                        onClick={() => !disabled && onSettingsChange({ language: l.value })}
-                        disabled={disabled}
-                        className={[
-                          btnBase,
-                          'relative',
-                          disabled
-                            ? 'cursor-not-allowed border-white/5 bg-white/3 text-white/20 opacity-50'
-                            : language === l.value ? btnSelected : btnIdle,
-                        ].join(' ')}
-                      >
-                        {l.label}
-                        {disabled && (
-                          <span className="absolute -right-1 -top-2 rounded-full bg-white/10 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider text-white/30">
-                            bientôt
-                          </span>
-                        )}
-                      </button>
-                    )
-                  })}
+                  {LANGUAGES.map(l => (
+                    <button
+                      key={l.value}
+                      onClick={() => handleLanguageChange(l.value)}
+                      className={[btnBase, language === l.value ? btnSelected : btnIdle].join(' ')}
+                    >
+                      {l.label}
+                    </button>
+                  ))}
                 </div>
               </div>
             </div>

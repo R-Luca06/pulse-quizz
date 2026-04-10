@@ -16,6 +16,16 @@ export const CATEGORIES: { value: Category; label: string }[] = [
   { value: 27,    label: 'Animaux' },
 ]
 
+/** Catégories disponibles en français (doivent correspondre au champ `category` dans Supabase) */
+export const FR_CATEGORIES: { value: Category; label: string }[] = [
+  { value: 'all',              label: 'Toutes catégories' },
+  { value: 'Culture générale', label: 'Culture générale' },
+  { value: 'Géographie',       label: 'Géographie' },
+  { value: 'Histoire',         label: 'Histoire' },
+  { value: 'Mathématiques',    label: 'Mathématiques' },
+  { value: 'Sciences & Nature',label: 'Sciences & Nature' },
+]
+
 export const MODES: { value: GameMode; label: string; desc: string }[] = [
   { value: 'normal',      label: 'Normal',      desc: '10 questions' },
   { value: 'compétitif',  label: 'Compétitif',  desc: 'Soyez premier !' },
