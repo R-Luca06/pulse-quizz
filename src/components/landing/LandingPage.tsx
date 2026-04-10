@@ -2,13 +2,12 @@ import { useEffect, useState } from 'react'
 import { motion, useAnimationControls, AnimatePresence } from 'framer-motion'
 import FloatingCardsBackground from './FloatingCardsBackground'
 import StartButton from './StartButton'
-import { getMuted, setMuted } from '../../utils/sounds'
-import { CATEGORIES, MODES, DIFFICULTIES, LANGUAGES, COMP_SPEED_TIERS_LABELS, btnBase, btnSelected, btnIdle } from '../../constants/quiz'
+import SettingsModal from './SettingsModal'
+import RulesModal from './RulesModal'
 import { useAuth } from '../../hooks/useAuth'
 import { useToast } from '../../contexts/ToastContext'
 import type { AppScreen } from '../../App'
 import type { GameSettings } from '../../hooks/useSettings'
-import type { Category } from '../../types/quiz'
 
 export type LaunchPhase = 'idle' | 'converging' | 'shaking' | 'exploding'
 
@@ -30,10 +29,7 @@ export default function LandingPage({ settings, onSettingsChange, onStart, onExp
   const [launchPhase, setLaunchPhase] = useState<LaunchPhase>('idle')
   const shakeControls = useAnimationControls()
 
-  const { mode, difficulty, language, category } = settings
-  const isCompetitif = mode === 'compétitif'
   const [openSettings, setOpenSettings] = useState(autoOpenSettings ?? false)
-  const [muted, setMutedState] = useState(getMuted)
   const [showRules, setShowRules] = useState(false)
 
   useEffect(() => {
@@ -54,23 +50,9 @@ export default function LandingPage({ settings, onSettingsChange, onStart, onExp
     return () => clearTimeout(t)
   }, [isLaunching, shakeControls])
 
-  function handleMuteToggle() {
-    const next = !muted
-    setMuted(next)
-    setMutedState(next)
-  }
-
   function handleLaunch() {
     setOpenSettings(false)
     onStart()
-  }
-
-  function handleModeChange(newMode: GameSettings['mode']) {
-    if (newMode === 'compétitif') {
-      onSettingsChange({ mode: newMode, difficulty: 'mixed', category: 'all' })
-    } else {
-      onSettingsChange({ mode: newMode, difficulty: 'easy' })
-    }
   }
 
   return (
@@ -104,7 +86,7 @@ export default function LandingPage({ settings, onSettingsChange, onStart, onExp
         transition={{ duration: 0.5, delay: 0.3 }}
       >
         {/* Wordmark */}
-        <span className="text-sm font-black tracking-tight text-white/20 select-none">
+        <span className="select-none text-sm font-black tracking-tight text-white/20">
           Pulse<span className="text-neon-violet/40">Quizz</span>
         </span>
 
@@ -215,324 +197,23 @@ export default function LandingPage({ settings, onSettingsChange, onStart, onExp
         </motion.div>
       </motion.div>
 
-      {/* Settings popup */}
+      {/* Modals */}
       <AnimatePresence>
         {openSettings && (
-          <>
-            {/* Backdrop */}
-            <motion.div
-              key="backdrop"
-              className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.2 }}
-              onClick={() => setOpenSettings(false)}
-            />
-
-            {/* Modal */}
-            <motion.div
-              key="modal"
-              className="fixed inset-0 z-50 flex items-center justify-center px-4"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.2 }}
-            >
-              <motion.div
-                className="relative w-full max-w-sm rounded-2xl border border-white/10 bg-[#0d0d18] p-6 shadow-2xl"
-                initial={{ scale: 0.92, y: 16 }}
-                animate={{ scale: 1, y: 0 }}
-                exit={{ scale: 0.95, y: 8 }}
-                transition={{ type: 'spring', stiffness: 380, damping: 30 }}
-                onClick={(e) => e.stopPropagation()}
-              >
-                {/* Modal header */}
-                <div className="mb-5 flex items-center justify-between">
-                  <button
-                    onClick={handleMuteToggle}
-                    aria-label={muted ? 'Activer le son' : 'Couper le son'}
-                    className="flex h-7 w-7 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/40 transition-colors hover:border-white/20 hover:text-white/70"
-                  >
-                    {muted ? (
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
-                        <line x1="23" y1="9" x2="17" y2="15"/>
-                        <line x1="17" y1="9" x2="23" y2="15"/>
-                      </svg>
-                    ) : (
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
-                        <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
-                        <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
-                      </svg>
-                    )}
-                  </button>
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-white/30">Paramètres</p>
-                  <button
-                    onClick={() => setOpenSettings(false)}
-                    aria-label="Fermer les paramètres"
-                    className="flex h-7 w-7 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/40 transition-colors hover:border-white/20 hover:text-white/70"
-                  >
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                      <path d="M1 1l10 10M11 1L1 11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                    </svg>
-                  </button>
-                </div>
-
-                <div className="flex flex-col gap-5">
-                  {/* Mode */}
-                  <div className="flex flex-col gap-2">
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-white/30">Mode</p>
-                    <div className="flex gap-2">
-                      {MODES.map(m => {
-                        const isComp = m.value === 'compétitif'
-                        const isSelected = mode === m.value
-                        return (
-                          <motion.div
-                            key={m.value}
-                            animate={isComp ? {
-                              boxShadow: isSelected
-                                ? ['0 0 10px rgba(249,115,22,0.3)', '0 0 24px rgba(249,115,22,0.65)', '0 0 10px rgba(249,115,22,0.3)']
-                                : ['0 0 4px rgba(249,115,22,0.08)', '0 0 12px rgba(249,115,22,0.2)', '0 0 4px rgba(249,115,22,0.08)'],
-                            } : { boxShadow: 'none' }}
-                            transition={{ duration: 1.4, repeat: Infinity, ease: 'easeInOut' }}
-                            className="relative flex-1 rounded-xl"
-                          >
-                            <button
-                              onClick={() => handleModeChange(m.value)}
-                              className={[
-                                'w-full rounded-xl border px-4 py-3 text-sm font-semibold transition-all duration-150 text-left flex flex-col items-start gap-0.5',
-                                isComp && isSelected
-                                  ? 'border-orange-500/60 bg-gradient-to-br from-orange-500/20 to-red-500/10 text-white'
-                                  : isComp && !isSelected
-                                  ? 'border-orange-500/20 bg-orange-500/5 text-white/60 hover:border-orange-500/40 hover:text-white/80'
-                                  : isSelected
-                                  ? btnSelected
-                                  : btnIdle,
-                              ].join(' ')}
-                            >
-                              <span className={['font-bold', isComp ? 'text-orange-300' : ''].join(' ')}>
-                                {m.label}
-                              </span>
-                              <span className="text-xs opacity-60">{m.desc}</span>
-                            </button>
-                            {/* Info button pour le mode compétitif */}
-                            {isComp && (
-                              <button
-                                onClick={(e) => { e.stopPropagation(); setShowRules(true) }}
-                                aria-label="Règles du mode Compétitif"
-                                className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full border border-orange-500/30 bg-[#0d0d18] text-xs font-bold text-orange-400/70 hover:border-orange-500/60 hover:text-orange-400 transition-colors"
-                              >
-                                i
-                              </button>
-                            )}
-                          </motion.div>
-                        )
-                      })}
-                    </div>
-                  </div>
-
-                  {/* Niveau — grisé en mode compétitif */}
-                  <div className={`flex flex-col gap-2 transition-opacity duration-200 ${isCompetitif ? 'pointer-events-none opacity-35' : ''}`}>
-                    <div className="flex items-center gap-2">
-                      <p className="text-[10px] font-bold uppercase tracking-widest text-white/30">Niveau</p>
-                      {isCompetitif && (
-                        <span className="rounded-full bg-white/10 px-2 py-0.5 text-[8px] font-bold uppercase tracking-wider text-white/30">
-                          Aléatoire
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex gap-2">
-                      {DIFFICULTIES.map(d => (
-                        <button
-                          key={d.value}
-                          onClick={() => onSettingsChange({ difficulty: d.value })}
-                          className={[btnBase, difficulty === d.value ? btnSelected : btnIdle].join(' ')}
-                        >
-                          {d.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Catégorie — grisée en mode compétitif */}
-                  <div className={`flex flex-col gap-2 transition-opacity duration-200 ${isCompetitif ? 'pointer-events-none opacity-35' : ''}`}>
-                    <div className="flex items-center gap-2">
-                      <p className="text-[10px] font-bold uppercase tracking-widest text-white/30">Catégorie</p>
-                      {isCompetitif && (
-                        <span className="rounded-full bg-white/10 px-2 py-0.5 text-[8px] font-bold uppercase tracking-wider text-white/30">
-                          Aléatoire
-                        </span>
-                      )}
-                    </div>
-                    <div className="relative">
-                      <select
-                        value={String(category)}
-                        onChange={(e) => {
-                          const v = e.target.value
-                          onSettingsChange({ category: v === 'all' ? 'all' : Number(v) as Category })
-                        }}
-                        aria-label="Catégorie de questions"
-                        className="w-full appearance-none rounded-xl border border-white/10 bg-white/5 py-3 pl-4 pr-10 text-sm font-semibold text-white focus:border-neon-violet/60 focus:outline-none"
-                      >
-                        {CATEGORIES.map(c => (
-                          <option key={String(c.value)} value={String(c.value)} className="bg-[#0d0d18]">
-                            {c.label}
-                          </option>
-                        ))}
-                      </select>
-                      <svg
-                        className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-white/30"
-                        width="12" height="12" viewBox="0 0 12 12" fill="none"
-                      >
-                        <path d="M2 4l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                      </svg>
-                    </div>
-                  </div>
-
-                  {/* Langue */}
-                  <div className="flex flex-col gap-2">
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-white/30">Langue</p>
-                    <div className="flex gap-2">
-                      {LANGUAGES.map(l => {
-                        const disabled = l.value === 'fr'
-                        return (
-                          <button
-                            key={l.value}
-                            onClick={() => !disabled && onSettingsChange({ language: l.value })}
-                            disabled={disabled}
-                            className={[
-                              btnBase,
-                              'relative',
-                              disabled
-                                ? 'cursor-not-allowed border-white/5 bg-white/3 text-white/20 opacity-50'
-                                : language === l.value ? btnSelected : btnIdle,
-                            ].join(' ')}
-                          >
-                            {l.label}
-                            {disabled && (
-                              <span className="absolute -right-1 -top-2 rounded-full bg-white/10 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider text-white/30">
-                                bientôt
-                              </span>
-                            )}
-                          </button>
-                        )
-                      })}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Launch */}
-                <motion.button
-                  onClick={handleLaunch}
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.97 }}
-                  animate={isCompetitif ? {
-                    boxShadow: ['0 0 16px rgba(249,115,22,0.35)', '0 0 32px rgba(249,115,22,0.7)', '0 0 16px rgba(249,115,22,0.35)'],
-                  } : { boxShadow: '0 0 0px rgba(0,0,0,0)' }}
-                  transition={{ duration: 1.4, repeat: isCompetitif ? Infinity : 0, ease: 'easeInOut' }}
-                  className={[
-                    'mt-6 w-full rounded-xl py-3 text-sm font-bold tracking-wide text-white',
-                    isCompetitif
-                      ? 'bg-gradient-to-r from-orange-500 to-red-500'
-                      : 'bg-gradient-to-r from-neon-violet to-neon-blue shadow-neon-violet',
-                  ].join(' ')}
-                >
-                  {isCompetitif ? 'Entrer en compétition' : 'Lancer'}
-                </motion.button>
-              </motion.div>
-            </motion.div>
-          </>
+          <SettingsModal
+            key="settings"
+            settings={settings}
+            onSettingsChange={onSettingsChange}
+            onLaunch={handleLaunch}
+            onClose={() => setOpenSettings(false)}
+            onShowRules={() => setShowRules(true)}
+          />
         )}
       </AnimatePresence>
 
-      {/* Rules popup — Mode Compétitif */}
       <AnimatePresence>
         {showRules && (
-          <>
-            <motion.div
-              key="rules-backdrop"
-              className="fixed inset-0 z-[60] bg-black/70 backdrop-blur-sm"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.2 }}
-              onClick={() => setShowRules(false)}
-            />
-            <motion.div
-              key="rules-modal"
-              className="fixed inset-0 z-[70] flex items-center justify-center px-4"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.2 }}
-            >
-              <motion.div
-                className="relative w-full max-w-sm rounded-2xl border border-orange-500/20 bg-[#0d0d18] p-6 shadow-[0_0_40px_rgba(249,115,22,0.15)]"
-                initial={{ scale: 0.92, y: 16 }}
-                animate={{ scale: 1, y: 0 }}
-                exit={{ scale: 0.95, y: 8 }}
-                transition={{ type: 'spring', stiffness: 380, damping: 30 }}
-                onClick={(e) => e.stopPropagation()}
-              >
-                {/* Header */}
-                <div className="mb-4 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xl">🔥</span>
-                    <h2 className="text-base font-black text-orange-300">Mode Compétitif</h2>
-                  </div>
-                  <button
-                    onClick={() => setShowRules(false)}
-                    className="flex h-7 w-7 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/40 transition-colors hover:border-white/20 hover:text-white/70"
-                  >
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                      <path d="M1 1l10 10M11 1L1 11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                    </svg>
-                  </button>
-                </div>
-
-                <div className="flex flex-col gap-3 text-sm text-white/60">
-                  {/* Règles */}
-                  <div className="flex flex-col gap-2">
-                    {[
-                      { icon: '∞', text: 'Questions infinies — la partie s\'arrête dès la première erreur ou timeout' },
-                      { icon: '🎲', text: 'Thème et difficulté aléatoires — aucun filtre, seule la langue est choisie' },
-                      { icon: '⚡', text: 'Réponds vite pour multiplier tes points' },
-                      { icon: '🏆', text: 'Ton meilleur score est publié automatiquement dans le classement' },
-                    ].map((rule, i) => (
-                      <div key={i} className="flex items-center gap-3 rounded-xl border border-white/5 bg-white/[0.03] px-3 py-2.5">
-                        <span className="shrink-0 text-base leading-none">{rule.icon}</span>
-                        <span className="leading-snug">{rule.text}</span>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Tableau des multiplicateurs */}
-                  <div className="rounded-xl border border-orange-500/15 bg-orange-500/5 p-3">
-                    <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-orange-400/60">Multiplicateurs de vitesse</p>
-                    <div className="flex flex-col gap-1">
-                      {COMP_SPEED_TIERS_LABELS.map(t => (
-                        <div key={t.label} className="flex items-center justify-between">
-                          <span className="text-xs text-white/40">{t.label}</span>
-                          <span className={['text-xs font-bold', t.color].join(' ')}>{t.multiplier}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                <motion.button
-                  onClick={() => setShowRules(false)}
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.97 }}
-                  className="mt-5 w-full rounded-xl bg-gradient-to-r from-orange-500 to-red-500 py-2.5 text-sm font-bold text-white shadow-[0_0_20px_rgba(249,115,22,0.3)]"
-                >
-                  Compris !
-                </motion.button>
-              </motion.div>
-            </motion.div>
-          </>
+          <RulesModal key="rules" onClose={() => setShowRules(false)} />
         )}
       </AnimatePresence>
     </div>

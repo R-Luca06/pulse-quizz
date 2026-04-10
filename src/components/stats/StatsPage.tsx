@@ -5,7 +5,7 @@ import { fetchAllStats } from '../../services/cloudStats'
 import type { CloudCategoryStatRow, CloudGlobalStatRow } from '../../services/cloudStats'
 import { getCompLeaderboardPage, getCompLeaderboardCount, getCompEntryGameData, getUserRank } from '../../services/leaderboard'
 import type { LeaderboardEntry, CompGameData } from '../../services/leaderboard'
-import { CATEGORIES, DIFFICULTIES, LANGUAGES } from '../../constants/quiz'
+import { CATEGORIES, DIFFICULTIES, LANGUAGES, btnBaseSm, btnSelected, btnIdleSm } from '../../constants/quiz'
 import { useAuth } from '../../hooks/useAuth'
 import type { Difficulty, Language } from '../../types/quiz'
 
@@ -15,11 +15,6 @@ interface Props {
   initialDiff?: Difficulty
   initialLang?: Language
 }
-
-// StatsPage uses smaller buttons than LandingPage
-const btnBase = 'rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors duration-150'
-const btnSelected = 'border-neon-violet bg-neon-violet/15 text-white'
-const btnIdle = 'border-white/10 bg-white/5 text-white/40 hover:border-white/20 hover:text-white/60'
 
 function StatTile({ label, value, accent }: { label: string; value: string | number; accent?: string }) {
   return (
@@ -227,13 +222,13 @@ export default function StatsPage({ onBack, defaultTab = 'stats', initialDiff, i
           >
             <button
               onClick={() => setActiveTab('stats')}
-              className={[btnBase, 'px-3 py-1', activeTab === 'stats' ? btnSelected : btnIdle].join(' ')}
+              className={[btnBaseSm, 'px-3 py-1', activeTab === 'stats' ? btnSelected : btnIdleSm].join(' ')}
             >
               Mes stats
             </button>
             <button
               onClick={() => setActiveTab('leaderboard')}
-              className={[btnBase, 'px-3 py-1', activeTab === 'leaderboard' ? btnSelected : btnIdle].join(' ')}
+              className={[btnBaseSm, 'px-3 py-1', activeTab === 'leaderboard' ? btnSelected : btnIdleSm].join(' ')}
             >
               Classement
             </button>
@@ -281,7 +276,7 @@ export default function StatsPage({ onBack, defaultTab = 'stats', initialDiff, i
                       <button
                         key={l.value}
                         onClick={() => setFilterLang(l.value)}
-                        className={[btnBase, filterLang === l.value ? btnSelected : btnIdle].join(' ')}
+                        className={[btnBaseSm, filterLang === l.value ? btnSelected : btnIdleSm].join(' ')}
                       >
                         {l.label}
                       </button>
@@ -294,7 +289,7 @@ export default function StatsPage({ onBack, defaultTab = 'stats', initialDiff, i
                       <button
                         key={d.value}
                         onClick={() => setFilterDiff(d.value)}
-                        className={[btnBase, filterDiff === d.value ? btnSelected : btnIdle].join(' ')}
+                        className={[btnBaseSm, filterDiff === d.value ? btnSelected : btnIdleSm].join(' ')}
                       >
                         {d.label}
                       </button>

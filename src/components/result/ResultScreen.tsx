@@ -41,10 +41,10 @@ const COMP_TIERS = [
 const fadeUp = { hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0 } }
 
 export default function ResultScreen({ score, results, onReplay, onBack, onShowStats, onShowLeaderboard, onOpenAuth, bestScore, isNewBest, gameMode, difficulty, category, language, userRank, rankDelta }: Props) {
-  const { user, profile } = useAuth()
+  const { user } = useAuth()
   const isCompetitif = gameMode === 'compétitif'
   const tiers = isCompetitif ? COMP_TIERS : NORMAL_TIERS
-  const tier = tiers.find(t => score >= t.min)!
+  const tier = tiers.find(t => score >= t.min) ?? tiers[tiers.length - 1]
   const [displayed, setDisplayed] = useState(0)
   const [recapOpen, setRecapOpen] = useState(false)
   useEffect(() => {

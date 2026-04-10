@@ -32,12 +32,16 @@ export default function StreakIndicator({ streak }: Props) {
             : '0 0 10px rgba(251, 146, 60, 0.2)',
         }}
       >
-        <motion.span
-          animate={isHot ? { rotate: [0, -15, 15, -10, 10, 0] } : {}}
-          transition={{ duration: 0.5, repeat: Infinity, repeatDelay: 1.5 }}
-        >
-          {icon}
-        </motion.span>
+        {isHot ? (
+          <motion.span
+            animate={{ rotate: [0, -15, 15, -10, 10, 0] }}
+            transition={{ duration: 0.5, repeat: Infinity, repeatDelay: 1.5 }}
+          >
+            {icon}
+          </motion.span>
+        ) : (
+          <span>{icon}</span>
+        )}
         {streak}
       </motion.div>
     </AnimatePresence>

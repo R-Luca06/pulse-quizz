@@ -35,3 +35,21 @@ export const COMP_SPEED_TIERS: { maxTime: number; multiplier: number }[] = [
   { maxTime: 8,        multiplier: 1.2 },
   { maxTime: Infinity, multiplier: 1   },
 ]
+
+// ─── API ─────────────────────────────────────────────────────────────────────
+/** Nombre de questions demandées par batch à OpenTDB */
+export const QUESTIONS_PER_BATCH = 10
+
+/** Timeout réseau pour les requêtes OpenTDB (ms) */
+export const API_TIMEOUT_MS = 8000
+
+/** Code HTTP retourné par OpenTDB en cas de rate-limit */
+export const OPENTDB_HTTP_RATE_LIMIT = 429
+
+/** response_code OpenTDB indiquant un rate-limit (Token Empty) */
+export const OPENTDB_CODE_RATE_LIMIT = 5
+
+/** Retourne le palier de vitesse correspondant au temps écoulé (en secondes) */
+export function getSpeedTier(elapsedSeconds: number) {
+  return COMP_SPEED_TIERS.find(t => elapsedSeconds <= t.maxTime) ?? COMP_SPEED_TIERS[COMP_SPEED_TIERS.length - 1]
+}

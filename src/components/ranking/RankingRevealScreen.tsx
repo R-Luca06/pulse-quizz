@@ -30,8 +30,8 @@ export default function RankingRevealScreen({
   userRank,
   rankDelta,
   userId,
-  username,
-  userScore,
+  username: _username,
+  userScore: _userScore,
   language,
   onDone,
 }: Props) {

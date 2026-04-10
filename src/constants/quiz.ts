@@ -58,7 +58,11 @@ export const COMP_SPEED_TIERS_LABELS: { label: string; multiplier: string; color
   { label: '≤ 10 secondes', multiplier: '× 1', color: 'text-white/25' },
 ]
 
-// Styles boutons partagés (LandingPage)
+// Styles boutons partagés (LandingPage — taille normale)
 export const btnBase = 'flex-1 rounded-xl border px-3 py-2.5 text-sm font-semibold transition-colors duration-150 text-center'
 export const btnSelected = 'border-neon-violet bg-neon-violet/15 text-white'
 export const btnIdle = 'border-white/10 bg-white/5 text-white/45 hover:border-white/20 hover:text-white/70'
+
+// Styles boutons partagés (StatsPage — taille réduite)
+export const btnBaseSm = 'rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors duration-150'
+export const btnIdleSm = 'border-white/10 bg-white/5 text-white/40 hover:border-white/20 hover:text-white/60'

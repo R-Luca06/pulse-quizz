@@ -19,9 +19,11 @@ interface Props {
   category: Category
 }
 
-const FEEDBACK_COLORS = {
-  correct: 'inset 0 0 160px rgba(34, 197, 94, 0.38)',
-  wrong:   'inset 0 0 160px rgba(239, 68, 68, 0.38)',
+const FEEDBACK_COLORS: Record<string, string> = {
+  correct:  'inset 0 0 160px rgba(34, 197, 94, 0.38)',
+  wrong:    'inset 0 0 160px rgba(239, 68, 68, 0.38)',
+  timeout:  '',
+  idle:     '',
 }
 
 
@@ -143,7 +145,7 @@ export default function QuizContainer({ onFinished, onQuit, gameMode, difficulty
             animate={{ opacity: [0, 1, 0] }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.55, ease: 'easeOut', times: [0, 0.2, 1] }}
-            style={{ boxShadow: FEEDBACK_COLORS[answerState as 'correct' | 'wrong'] }}
+            style={{ boxShadow: FEEDBACK_COLORS[answerState] }}
           />
         )}
       </AnimatePresence>

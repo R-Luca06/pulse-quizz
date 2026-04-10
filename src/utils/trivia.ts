@@ -1,4 +1,5 @@
 import type { TriviaQuestion, Difficulty, Language, Category } from '../types/quiz'
+import { QUESTIONS_PER_BATCH, API_TIMEOUT_MS, OPENTDB_HTTP_RATE_LIMIT, OPENTDB_CODE_RATE_LIMIT } from '../constants/game'
 
 interface RawTriviaResult {
   question: string
@@ -23,14 +24,14 @@ function shuffle<T>(arr: T[]): T[] {
 }
 
 export async function fetchQuestions(difficulty: Difficulty = 'mixed', language: Language = 'en', category: Category = 'all', externalSignal?: AbortSignal): Promise<TriviaQuestion[]> {
-  const params = new URLSearchParams({ amount: '10', type: 'multiple' })
+  const params = new URLSearchParams({ amount: String(QUESTIONS_PER_BATCH), type: 'multiple' })
   if (difficulty !== 'mixed') params.set('difficulty', difficulty)
   if (language !== 'en') params.set('lang', language)
   if (category !== 'all') params.set('category', String(category))
   const controller = new AbortController()
   // Propagate external abort (e.g. component unmount) into internal controller
   externalSignal?.addEventListener('abort', () => controller.abort(), { once: true })
-  const timer = setTimeout(() => controller.abort(), 8000)
+  const timer = setTimeout(() => controller.abort(), API_TIMEOUT_MS)
   let res: Response
   try {
     res = await fetch(`https://opentdb.com/api.php?${params}`, { signal: controller.signal })
@@ -40,10 +41,10 @@ export async function fetchQuestions(difficulty: Difficulty = 'mixed', language:
     throw err
   }
   clearTimeout(timer)
-  if (res.status === 429) throw new Error('rate_limit')
+  if (res.status === OPENTDB_HTTP_RATE_LIMIT) throw new Error('rate_limit')
   if (!res.ok) throw new Error('api_error')
   const data = await res.json()
-  if (data.response_code === 5) throw new Error('rate_limit')
+  if (data.response_code === OPENTDB_CODE_RATE_LIMIT) throw new Error('rate_limit')
   if (data.response_code !== 0) throw new Error('api_error')
 
   return data.results.map((q: RawTriviaResult) => {

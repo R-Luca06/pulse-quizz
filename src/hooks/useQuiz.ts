@@ -7,6 +7,7 @@ import {
   COMP_BASE_POINTS,
   COMP_PREFETCH_THRESHOLD,
   COMP_SPEED_TIERS,
+  getSpeedTier,
 } from '../constants/game'
 import type { TriviaQuestion, AnswerState, QuizPhase, QuestionResult, GameMode, Difficulty, Language, Category } from '../types/quiz'
 
@@ -113,8 +114,7 @@ export function useQuiz(
         if (multiplierTimer.current) clearInterval(multiplierTimer.current)
         multiplierTimer.current = setInterval(() => {
           const elapsed = (Date.now() - questionStartTime.current) / 1000
-          const tier = COMP_SPEED_TIERS.find(t => elapsed <= t.maxTime)
-          setCurrentMultiplier(tier?.multiplier ?? 1)
+          setCurrentMultiplier(getSpeedTier(elapsed).multiplier)
         }, 100)
       }
     } else {
@@ -170,6 +170,24 @@ export function useQuiz(
     [onFinished, settings.gameMode, prefetchIfNeeded],
   )
 
+  const scheduleNext = useCallback(
+    (newScore: number, gameOver = false) => {
+      if (gameOver || settings.gameMode === 'compétitif') {
+        feedbackTimer.current = setTimeout(() => {
+          setPhase('finished')
+          onFinished(newScore, resultsRef.current)
+        }, FEEDBACK_DURATION)
+      } else {
+        const snap = questions
+        feedbackTimer.current = setTimeout(
+          () => advance(currentIndex + 1, newScore, snap),
+          FEEDBACK_DURATION,
+        )
+      }
+    },
+    [settings.gameMode, questions, currentIndex, advance, onFinished],
+  )
+
   const handleAnswer = useCallback(
     (answer: string) => {
       if (answerState !== 'idle' || !questions[currentIndex]) return
@@ -182,8 +200,7 @@ export function useQuiz(
       let newScore = score
 
       if (isCorrect && settings.gameMode === 'compétitif') {
-        const tier = COMP_SPEED_TIERS.find(t => timeSpent <= t.maxTime) ?? COMP_SPEED_TIERS[COMP_SPEED_TIERS.length - 1]
-        multiplier = tier.multiplier
+        multiplier = getSpeedTier(timeSpent).multiplier
         pointsEarned = Math.round(COMP_BASE_POINTS * multiplier)
         newScore = score + pointsEarned
       } else if (isCorrect) {
@@ -212,17 +229,9 @@ export function useQuiz(
         setStreak(0)
       }
 
-      if (!isCorrect && settings.gameMode === 'compétitif') {
-        feedbackTimer.current = setTimeout(() => {
-          setPhase('finished')
-          onFinished(newScore, resultsRef.current)
-        }, FEEDBACK_DURATION)
-      } else {
-        const snap = questions
-        feedbackTimer.current = setTimeout(() => advance(currentIndex + 1, newScore, snap), FEEDBACK_DURATION)
-      }
+      scheduleNext(newScore, !isCorrect && settings.gameMode === 'compétitif')
     },
-    [answerState, questions, currentIndex, score, advance, settings.gameMode, onFinished],
+    [answerState, questions, currentIndex, score, scheduleNext, settings.gameMode],
   )
 
   const handleTimeout = useCallback(() => {
@@ -243,16 +252,8 @@ export function useQuiz(
     setStreak(0)
     playTimeout()
 
-    if (settings.gameMode === 'compétitif') {
-      feedbackTimer.current = setTimeout(() => {
-        setPhase('finished')
-        onFinished(score, resultsRef.current)
-      }, FEEDBACK_DURATION)
-    } else {
-      const snap = questions
-      feedbackTimer.current = setTimeout(() => advance(currentIndex + 1, score, snap), FEEDBACK_DURATION)
-    }
-  }, [answerState, questions, currentIndex, score, advance, settings.gameMode, onFinished])
+    scheduleNext(score, settings.gameMode === 'compétitif')
+  }, [answerState, questions, currentIndex, score, scheduleNext, settings.gameMode])
 
   return {
     phase,

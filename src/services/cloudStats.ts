@@ -1,5 +1,4 @@
 import { supabase } from './supabase'
-import type { CategoryStats, GlobalStats } from '../utils/statsStorage'
 import { computeBestStreak } from '../utils/statsStorage'
 import type { GameMode, Difficulty, Category, QuestionResult } from '../types/quiz'
 import { NORMAL_MODE_QUESTIONS } from '../constants/game'

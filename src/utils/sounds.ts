@@ -1,3 +1,9 @@
+// ─── Audio constants ─────────────────────────────────────────────────────────
+const FREQ = { correct1: 523, correct2: 783, wrong: 220, timeout: 180, tick: 900 } as const
+const VOL  = { correct1: 0.15, correct2: 0.12, wrong: 0.12, timeout: 0.1, tick: 0.06 } as const
+const DUR  = { correct1: 0.1, correct2: 0.18, wrong: 0.18, timeout: 0.22, tick: 0.04 } as const
+const CORRECT_CHORD_DELAY_MS = 80
+
 let ctx: AudioContext | null = null
 let muted = false
 
@@ -58,18 +64,18 @@ function beep(
 }
 
 export function playCorrect() {
-  beep(523, 0.1, 'sine', 0.15)
-  setTimeout(() => beep(783, 0.18, 'sine', 0.12), 80)
+  beep(FREQ.correct1, DUR.correct1, 'sine', VOL.correct1)
+  setTimeout(() => beep(FREQ.correct2, DUR.correct2, 'sine', VOL.correct2), CORRECT_CHORD_DELAY_MS)
 }
 
 export function playWrong() {
-  beep(220, 0.18, 'sawtooth', 0.12)
+  beep(FREQ.wrong, DUR.wrong, 'sawtooth', VOL.wrong)
 }
 
 export function playTimeout() {
-  beep(180, 0.22, 'triangle', 0.1)
+  beep(FREQ.timeout, DUR.timeout, 'triangle', VOL.timeout)
 }
 
 export function playTick() {
-  beep(900, 0.04, 'square', 0.06)
+  beep(FREQ.tick, DUR.tick, 'square', VOL.tick)
 }

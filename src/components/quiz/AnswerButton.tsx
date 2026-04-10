@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { motion } from 'framer-motion'
 import type { AnswerState } from '../../types/quiz'
 
@@ -26,7 +27,7 @@ const PULSE_CORRECT = {
   transition: { delay: 0.15, duration: 0.35, ease: 'easeOut' },
 }
 
-export default function AnswerButton({
+const AnswerButton = memo(function AnswerButton({
   label,
   letter,
   answerState,
@@ -93,4 +94,6 @@ export default function AnswerButton({
       <span className="leading-snug">{label}</span>
     </motion.button>
   )
-}
+})
+
+export default AnswerButton
