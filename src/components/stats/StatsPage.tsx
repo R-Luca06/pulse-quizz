@@ -419,7 +419,7 @@ export default function StatsPage({ onBack, defaultTab = 'stats', initialDiff, i
                         className="flex flex-col gap-1.5"
                       >
                         {leaderboard.map((entry, i) => {
-                          const rank = lbPage * PAGE_SIZE + i + 1
+                          const rank = entry.rank ?? (lbPage * PAGE_SIZE + i + 1)
                           const isPlayer = user?.id === entry.user_id
                           const isExpanded = expandedId === entry.id
                           const gameData = expandedData[entry.id]

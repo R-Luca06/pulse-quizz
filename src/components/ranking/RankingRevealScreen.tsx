@@ -73,7 +73,6 @@ export default function RankingRevealScreen({
     setPage(p)
   }
 
-  const globalRankStart = page * PAGE_SIZE + 1
 
   return (
     <div className="relative flex min-h-screen flex-col items-center justify-center bg-game-bg px-4 py-10 overflow-hidden">
@@ -142,7 +141,7 @@ export default function RankingRevealScreen({
                 className="flex flex-col gap-1.5"
               >
                 {entries.map((entry, i) => {
-                  const rank = globalRankStart + i
+                  const rank = entry.rank ?? (page * PAGE_SIZE + i + 1)
                   const isPlayer = entry.user_id === userId
                   return (
                     <motion.div

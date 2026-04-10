@@ -21,6 +21,7 @@ export interface LeaderboardEntry {
   language: Language
   updated_at: string
   game_data?: CompGameData[]
+  rank?: number // computed client-side: same rank for tied scores
 }
 
 export interface SubmitParams {
@@ -146,7 +147,26 @@ export async function getCompLeaderboardPage(
     .order('updated_at', { ascending: true })
     .range(page * pageSize, (page + 1) * pageSize - 1)
   if (error) throw new Error(error.message)
-  return data as LeaderboardEntry[]
+  const entries = data as LeaderboardEntry[]
+  if (entries.length === 0) return []
+
+  // Count entries with a strictly higher score than the first entry on this page.
+  // This gives us the base rank (same for all tied entries at the top of the page).
+  const { count: higherCount } = await supabase
+    .from('leaderboard')
+    .select('*', { count: 'exact', head: true })
+    .eq('mode', 'compétitif')
+    .eq('language', language)
+    .gt('score', entries[0].score)
+
+  const baseRank = (higherCount ?? 0) + 1
+
+  // Each entry's rank = baseRank + number of entries on this page with a strictly higher score.
+  // Entries with the same score get the same rank.
+  return entries.map(entry => ({
+    ...entry,
+    rank: baseRank + entries.filter(e => e.score > entry.score).length,
+  }))
 }
 
 export async function getCompLeaderboardCount(language: Language): Promise<number> {
