@@ -1,7 +1,13 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { fetchQuestions, ApiError } from '../services/api'
+import { fetchQuestions, fetchCompetitifBatch, ApiError } from '../services/api'
 import { playCorrect, playWrong, playTimeout } from '../utils/sounds'
-import { FEEDBACK_DURATION, NORMAL_MODE_QUESTIONS } from '../constants/game'
+import {
+  FEEDBACK_DURATION,
+  NORMAL_MODE_QUESTIONS,
+  COMP_BASE_POINTS,
+  COMP_PREFETCH_THRESHOLD,
+  COMP_SPEED_TIERS,
+} from '../constants/game'
 import type { TriviaQuestion, AnswerState, QuizPhase, QuestionResult, GameMode, Difficulty, Language, Category } from '../types/quiz'
 
 interface QuizSettings {
@@ -20,6 +26,8 @@ interface UseQuizReturn {
   streak: number
   selectedAnswer: string | null
   answerState: AnswerState
+  totalAnswered: number
+  currentMultiplier: number
   handleAnswer: (answer: string) => void
   handleTimeout: () => void
   retry: () => void
@@ -37,19 +45,33 @@ export function useQuiz(
   const [streak, setStreak] = useState(0)
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null)
   const [answerState, setAnswerState] = useState<AnswerState>('idle')
+  const [currentMultiplier, setCurrentMultiplier] = useState(COMP_SPEED_TIERS[0].multiplier)
   const feedbackTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const multiplierTimer = useRef<ReturnType<typeof setInterval> | null>(null)
   const resultsRef = useRef<QuestionResult[]>([])
   const questionStartTime = useRef<number>(Date.now())
+  const isPrefetching = useRef(false)
+  const loadAbortRef = useRef<AbortController | null>(null)
+  // Snapshot des settings à l'init — pour le prefetch compétitif
+  const settingsRef = useRef(settings)
 
   const loadQuestions = useCallback(async () => {
+    // Cancel any previous in-flight request (prevents double-fetch from StrictMode remount)
+    loadAbortRef.current?.abort()
+    const controller = new AbortController()
+    loadAbortRef.current = controller
+
     setPhase('loading')
     resultsRef.current = []
     try {
-      const qs = await fetchQuestions({
-        difficulty: settings.difficulty,
-        language: settings.language,
-        category: settings.category,
-      })
+      const qs = settings.gameMode === 'compétitif'
+        ? await fetchCompetitifBatch(settings.language, controller.signal)
+        : await fetchQuestions({
+            difficulty: settings.difficulty,
+            language: settings.language,
+            category: settings.category,
+          }, controller.signal)
+      if (controller.signal.aborted) return
       setQuestions(qs)
       setCurrentIndex(0)
       setScore(0)
@@ -59,6 +81,7 @@ export function useQuiz(
       questionStartTime.current = Date.now()
       setPhase('playing')
     } catch (err) {
+      if (controller.signal.aborted) return
       if (err instanceof ApiError && err.code === 'rate_limit') {
         setIsRetrying(true)
         setTimeout(() => { setIsRetrying(false); loadQuestions() }, 5000)
@@ -69,30 +92,82 @@ export function useQuiz(
   }, [])
 
   useEffect(() => {
+    settingsRef.current = settings
+  })
+
+  useEffect(() => {
     loadQuestions()
-    return () => { if (feedbackTimer.current) clearTimeout(feedbackTimer.current) }
+    return () => {
+      loadAbortRef.current?.abort()
+      if (feedbackTimer.current) clearTimeout(feedbackTimer.current)
+      if (multiplierTimer.current) clearInterval(multiplierTimer.current)
+    }
   }, [loadQuestions])
 
-  // Reset start time whenever a new question begins
+  // Reset start time + multiplicateur dès qu'une nouvelle question commence
   useEffect(() => {
     if (phase === 'playing') {
       questionStartTime.current = Date.now()
+      if (settingsRef.current.gameMode === 'compétitif') {
+        setCurrentMultiplier(COMP_SPEED_TIERS[0].multiplier)
+        if (multiplierTimer.current) clearInterval(multiplierTimer.current)
+        multiplierTimer.current = setInterval(() => {
+          const elapsed = (Date.now() - questionStartTime.current) / 1000
+          const tier = COMP_SPEED_TIERS.find(t => elapsed <= t.maxTime)
+          setCurrentMultiplier(tier?.multiplier ?? 1)
+        }, 100)
+      }
+    } else {
+      if (multiplierTimer.current) {
+        clearInterval(multiplierTimer.current)
+        multiplierTimer.current = null
+      }
     }
   }, [currentIndex, phase])
 
+  const prefetchIfNeeded = useCallback((questionsArr: TriviaQuestion[], nextIndex: number) => {
+    if (settingsRef.current.gameMode !== 'compétitif') return
+    const remaining = questionsArr.length - nextIndex
+    if (remaining <= COMP_PREFETCH_THRESHOLD && !isPrefetching.current) {
+      isPrefetching.current = true
+      fetchCompetitifBatch(settingsRef.current.language)
+        .then(newBatch => {
+          setQuestions(prev => [...prev, ...newBatch])
+        })
+        .catch(console.error)
+        .finally(() => { isPrefetching.current = false })
+    }
+  }, [])
+
   const advance = useCallback(
-    (nextIndex: number, currentScore: number) => {
-      if (nextIndex >= NORMAL_MODE_QUESTIONS) {
+    (nextIndex: number, currentScore: number, questionsArr: TriviaQuestion[]) => {
+      if (settings.gameMode === 'normal' && nextIndex >= NORMAL_MODE_QUESTIONS) {
         setPhase('finished')
         onFinished(currentScore, resultsRef.current)
+      } else if (settings.gameMode === 'compétitif' && nextIndex >= questionsArr.length) {
+        // Précharge en cours — afficher loading brièvement
+        setPhase('loading')
+        const waitForQuestions = setInterval(() => {
+          setQuestions(prev => {
+            if (prev.length > nextIndex) {
+              clearInterval(waitForQuestions)
+              setCurrentIndex(nextIndex)
+              setSelectedAnswer(null)
+              setAnswerState('idle')
+              setPhase('playing')
+            }
+            return prev
+          })
+        }, 100)
       } else {
+        prefetchIfNeeded(questionsArr, nextIndex)
         setCurrentIndex(nextIndex)
         setSelectedAnswer(null)
         setAnswerState('idle')
         setPhase('playing')
       }
     },
-    [onFinished],
+    [onFinished, settings.gameMode, prefetchIfNeeded],
   )
 
   const handleAnswer = useCallback(
@@ -102,12 +177,27 @@ export function useQuiz(
       const isCorrect = answer === correct
       const timeSpent = Math.round((Date.now() - questionStartTime.current) / 100) / 10
 
+      let pointsEarned: number | undefined
+      let multiplier: number | undefined
+      let newScore = score
+
+      if (isCorrect && settings.gameMode === 'compétitif') {
+        const tier = COMP_SPEED_TIERS.find(t => timeSpent <= t.maxTime) ?? COMP_SPEED_TIERS[COMP_SPEED_TIERS.length - 1]
+        multiplier = tier.multiplier
+        pointsEarned = Math.round(COMP_BASE_POINTS * multiplier)
+        newScore = score + pointsEarned
+      } else if (isCorrect) {
+        newScore = score + 1
+      }
+
       resultsRef.current.push({
         question: questions[currentIndex].question,
         correctAnswer: correct,
         userAnswer: answer,
         isCorrect,
         timeSpent,
+        ...(pointsEarned !== undefined && { pointsEarned }),
+        ...(multiplier !== undefined && { multiplier }),
       })
 
       setSelectedAnswer(answer)
@@ -115,7 +205,6 @@ export function useQuiz(
       setPhase('feedback')
       if (isCorrect) playCorrect(); else playWrong()
 
-      const newScore = isCorrect ? score + 1 : score
       if (isCorrect) {
         setScore(newScore)
         setStreak((s) => s + 1)
@@ -123,16 +212,17 @@ export function useQuiz(
         setStreak(0)
       }
 
-      if (!isCorrect && settings.gameMode === 'survie') {
+      if (!isCorrect && settings.gameMode === 'compétitif') {
         feedbackTimer.current = setTimeout(() => {
           setPhase('finished')
           onFinished(newScore, resultsRef.current)
         }, FEEDBACK_DURATION)
       } else {
-        feedbackTimer.current = setTimeout(() => advance(currentIndex + 1, newScore), FEEDBACK_DURATION)
+        const snap = questions
+        feedbackTimer.current = setTimeout(() => advance(currentIndex + 1, newScore, snap), FEEDBACK_DURATION)
       }
     },
-    [answerState, questions, currentIndex, score, advance],
+    [answerState, questions, currentIndex, score, advance, settings.gameMode, onFinished],
   )
 
   const handleTimeout = useCallback(() => {
@@ -153,15 +243,16 @@ export function useQuiz(
     setStreak(0)
     playTimeout()
 
-    if (settings.gameMode === 'survie') {
+    if (settings.gameMode === 'compétitif') {
       feedbackTimer.current = setTimeout(() => {
         setPhase('finished')
         onFinished(score, resultsRef.current)
       }, FEEDBACK_DURATION)
     } else {
-      feedbackTimer.current = setTimeout(() => advance(currentIndex + 1, score), FEEDBACK_DURATION)
+      const snap = questions
+      feedbackTimer.current = setTimeout(() => advance(currentIndex + 1, score, snap), FEEDBACK_DURATION)
     }
-  }, [answerState, questions, currentIndex, score, advance])
+  }, [answerState, questions, currentIndex, score, advance, settings.gameMode, onFinished])
 
   return {
     phase,
@@ -172,6 +263,8 @@ export function useQuiz(
     streak,
     selectedAnswer,
     answerState,
+    totalAnswered: resultsRef.current.length,
+    currentMultiplier,
     handleAnswer,
     handleTimeout,
     retry: loadQuestions,

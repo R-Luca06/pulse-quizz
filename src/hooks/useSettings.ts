@@ -17,17 +17,24 @@ const DEFAULTS: GameSettings = {
   category: 'all',
 }
 
+const VALID_MODES: GameMode[] = ['normal', 'compétitif']
+const NORMAL_DIFFICULTIES: Difficulty[] = ['easy', 'medium', 'hard']
+
 function load(): GameSettings {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return { ...DEFAULTS }
     const parsed = JSON.parse(raw) as Partial<GameSettings>
-    // Merge avec les defaults pour tolérer des clés manquantes
+    const mode = VALID_MODES.includes(parsed.mode as GameMode) ? parsed.mode as GameMode : DEFAULTS.mode
+    // En mode normal, 'mixed' n'est pas valide — fallback sur 'easy'
+    const difficulty = mode === 'normal' && !NORMAL_DIFFICULTIES.includes(parsed.difficulty as Difficulty)
+      ? DEFAULTS.difficulty
+      : (parsed.difficulty ?? DEFAULTS.difficulty)
     return {
-      mode:       parsed.mode       ?? DEFAULTS.mode,
-      difficulty: parsed.difficulty ?? DEFAULTS.difficulty,
-      language:   parsed.language   ?? DEFAULTS.language,
-      category:   parsed.category   ?? DEFAULTS.category,
+      mode,
+      difficulty,
+      language: parsed.language ?? DEFAULTS.language,
+      category: parsed.category ?? DEFAULTS.category,
     }
   } catch {
     return { ...DEFAULTS }

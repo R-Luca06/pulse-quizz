@@ -9,7 +9,7 @@ export interface TriviaQuestion {
 
 export type AnswerState = 'idle' | 'correct' | 'wrong' | 'timeout'
 export type QuizPhase = 'loading' | 'playing' | 'feedback' | 'finished' | 'error'
-export type GameMode   = 'normal' | 'survie'
+export type GameMode   = 'normal' | 'compétitif'
 export type Difficulty = 'mixed' | 'easy' | 'medium' | 'hard'
 export type Language   = 'en' | 'fr'
 export type Category   = number | 'all'
@@ -20,4 +20,6 @@ export interface QuestionResult {
   userAnswer: string | null  // null = timeout
   isCorrect: boolean
   timeSpent: number          // secondes, arrondi à 1 décimale
+  pointsEarned?: number      // mode compétitif uniquement
+  multiplier?: number        // mode compétitif uniquement (ex: 3, 2, 1.5, 1.2, 1)
 }

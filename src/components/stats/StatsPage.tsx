@@ -1,20 +1,19 @@
 import { useState, useMemo, useEffect } from 'react'
-import { motion } from 'framer-motion'
-import { getCategoryStats, getGlobalStats } from '../../utils/statsStorage'
+import { motion, AnimatePresence } from 'framer-motion'
 import type { CategoryStats, GlobalStats } from '../../utils/statsStorage'
 import { fetchAllStats } from '../../services/cloudStats'
 import type { CloudCategoryStatRow, CloudGlobalStatRow } from '../../services/cloudStats'
-import { getTopScores } from '../../services/leaderboard'
-import type { LeaderboardEntry } from '../../services/leaderboard'
-import { CATEGORIES, MODES, DIFFICULTIES } from '../../constants/quiz'
+import { getCompTopScores, getCompEntryGameData } from '../../services/leaderboard'
+import type { LeaderboardEntry, CompGameData } from '../../services/leaderboard'
+import { CATEGORIES, DIFFICULTIES, LANGUAGES } from '../../constants/quiz'
 import { useAuth } from '../../hooks/useAuth'
-import type { GameMode, Difficulty } from '../../types/quiz'
+import type { Difficulty, Language } from '../../types/quiz'
 
 interface Props {
   onBack: () => void
   defaultTab?: 'stats' | 'leaderboard'
-  initialMode?: GameMode
   initialDiff?: Difficulty
+  initialLang?: Language
 }
 
 // StatsPage uses smaller buttons than LandingPage
@@ -75,18 +74,20 @@ function cloudRowToGlobalStats(row: CloudGlobalStatRow): GlobalStats {
   }
 }
 
-export default function StatsPage({ onBack, defaultTab = 'stats', initialMode, initialDiff }: Props) {
+export default function StatsPage({ onBack, defaultTab = 'stats', initialDiff, initialLang }: Props) {
   const { user } = useAuth()
   const [activeTab, setActiveTab] = useState<'stats' | 'leaderboard'>(defaultTab)
-  const [filterMode, setFilterMode] = useState<GameMode>(initialMode ?? 'normal')
   const [filterDiff, setFilterDiff] = useState<Difficulty>(initialDiff ?? 'easy')
+  const [filterLang, setFilterLang] = useState<Language>(initialLang ?? 'en')
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([])
   const [lbLoading, setLbLoading] = useState(false)
   const [lbError, setLbError] = useState(false)
+  const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [expandedData, setExpandedData] = useState<Record<string, CompGameData[] | null>>({})
+  const [expandLoading, setExpandLoading] = useState<string | null>(null)
 
   const [cloudCats, setCloudCats] = useState<CloudCategoryStatRow[]>([])
   const [cloudGlobal, setCloudGlobal] = useState<CloudGlobalStatRow | null>(null)
-  // Initialiser à true si user connecté pour éviter le flash localStorage au premier rendu
   const [cloudLoading, setCloudLoading] = useState(() => user !== null)
 
   useEffect(() => {
@@ -109,15 +110,36 @@ export default function StatsPage({ onBack, defaultTab = 'stats', initialMode, i
     if (activeTab !== 'leaderboard') return
     setLbLoading(true)
     setLbError(false)
-    getTopScores(filterMode, filterDiff)
+    setLeaderboard([])
+    setExpandedId(null)
+    getCompTopScores(filterLang)
       .then(setLeaderboard)
       .catch(() => setLbError(true))
       .finally(() => setLbLoading(false))
-  }, [activeTab, filterMode, filterDiff])
+  }, [activeTab, filterLang])
+
+  async function handleToggleExpand(entry: LeaderboardEntry) {
+    if (activeTab !== 'leaderboard') return
+    const id = entry.id
+    if (expandedId === id) {
+      setExpandedId(null)
+      return
+    }
+    setExpandedId(id)
+    if (expandedData[id] !== undefined) return
+    setExpandLoading(id)
+    try {
+      const data = await getCompEntryGameData(id)
+      setExpandedData(prev => ({ ...prev, [id]: data }))
+    } catch {
+      setExpandedData(prev => ({ ...prev, [id]: null }))
+    } finally {
+      setExpandLoading(null)
+    }
+  }
 
   const effectiveGlobal: GlobalStats = useMemo(() => {
-    if (!user) return getGlobalStats()
-    if (cloudLoading) return EMPTY_GLOBAL_STATS
+    if (!user || cloudLoading) return EMPTY_GLOBAL_STATS
     return cloudGlobal ? cloudRowToGlobalStats(cloudGlobal) : EMPTY_GLOBAL_STATS
   }, [user, cloudGlobal, cloudLoading])
 
@@ -126,14 +148,13 @@ export default function StatsPage({ onBack, defaultTab = 'stats', initialMode, i
     : 0
 
   const sorted = useMemo(() => {
+    if (!user) return []
     const getStats = (catValue: string | number): CategoryStats => {
-      if (user && !cloudLoading) {
-        const row = cloudCats.find(
-          r => r.mode === filterMode && r.difficulty === filterDiff && r.category === String(catValue)
-        )
-        return row ? cloudRowToCatStats(row) : { ...EMPTY_CAT_STATS }
-      }
-      return getCategoryStats(filterMode, filterDiff, catValue)
+      if (cloudLoading) return { ...EMPTY_CAT_STATS }
+      const row = cloudCats.find(
+        r => r.mode === 'normal' && r.difficulty === filterDiff && r.category === String(catValue)
+      )
+      return row ? cloudRowToCatStats(row) : { ...EMPTY_CAT_STATS }
     }
 
     const catsWithStats = CATEGORIES.map(cat => ({
@@ -144,7 +165,7 @@ export default function StatsPage({ onBack, defaultTab = 'stats', initialMode, i
       ...catsWithStats.filter(c => c.stats.gamesPlayed > 0),
       ...catsWithStats.filter(c => c.stats.gamesPlayed === 0),
     ]
-  }, [filterMode, filterDiff, user, cloudCats, cloudLoading])
+  }, [filterDiff, user, cloudCats, cloudLoading])
 
   return (
     <div className="relative flex min-h-screen flex-col items-center overflow-y-auto bg-game-bg px-4 py-6 sm:py-10">
@@ -153,10 +174,10 @@ export default function StatsPage({ onBack, defaultTab = 'stats', initialMode, i
         <div className="absolute left-1/2 top-1/3 h-[300px] w-[300px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-neon-violet/8 blur-3xl lg:h-[500px] lg:w-[500px]" />
       </div>
 
-      {/* Container — max-w-lg mobile, max-w-5xl desktop */}
+      {/* Container */}
       <div className="relative z-10 flex w-full max-w-lg flex-col gap-6 lg:max-w-5xl">
 
-        {/* Header — toujours pleine largeur */}
+        {/* Header */}
         <div className="flex items-center justify-between">
           <motion.button
             onClick={onBack}
@@ -192,7 +213,7 @@ export default function StatsPage({ onBack, defaultTab = 'stats', initialMode, i
         {/* Contenu — 1 colonne mobile, 2 colonnes lg */}
         <div className="flex flex-col gap-6 lg:grid lg:grid-cols-[260px_1fr] lg:items-start lg:gap-10">
 
-          {/* Colonne gauche — Global + Filtres (sticky sur lg) */}
+          {/* Colonne gauche — Global + Filtres */}
           <motion.div
             variants={{ hidden: {}, show: { transition: { staggerChildren: 0.08, delayChildren: 0.15 } } }}
             initial="hidden"
@@ -222,28 +243,33 @@ export default function StatsPage({ onBack, defaultTab = 'stats', initialMode, i
             <motion.div variants={fadeUp} className="flex flex-col gap-3">
               <p className="text-[10px] font-bold uppercase tracking-widest text-white/30">Filtrer par</p>
               <div className="flex flex-col gap-2">
-                <div className="flex gap-2">
-                  {MODES.map(m => (
-                    <button
-                      key={m.value}
-                      onClick={() => setFilterMode(m.value)}
-                      className={[btnBase, filterMode === m.value ? btnSelected : btnIdle].join(' ')}
-                    >
-                      {m.label}
-                    </button>
-                  ))}
-                </div>
-                <div className="flex gap-2">
-                  {DIFFICULTIES.map(d => (
-                    <button
-                      key={d.value}
-                      onClick={() => setFilterDiff(d.value)}
-                      className={[btnBase, filterDiff === d.value ? btnSelected : btnIdle].join(' ')}
-                    >
-                      {d.label}
-                    </button>
-                  ))}
-                </div>
+                {activeTab === 'leaderboard' ? (
+                  /* Leaderboard : langue uniquement (toujours compétitif) */
+                  <div className="flex gap-2">
+                    {LANGUAGES.map(l => (
+                      <button
+                        key={l.value}
+                        onClick={() => setFilterLang(l.value)}
+                        className={[btnBase, filterLang === l.value ? btnSelected : btnIdle].join(' ')}
+                      >
+                        {l.label}
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  /* Stats : difficulté uniquement (toujours mode normal) */
+                  <div className="flex gap-2">
+                    {DIFFICULTIES.map(d => (
+                      <button
+                        key={d.value}
+                        onClick={() => setFilterDiff(d.value)}
+                        className={[btnBase, filterDiff === d.value ? btnSelected : btnIdle].join(' ')}
+                      >
+                        {d.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             </motion.div>
           </motion.div>
@@ -310,7 +336,9 @@ export default function StatsPage({ onBack, defaultTab = 'stats', initialMode, i
               </>
             ) : (
               <>
-                <p className="mb-3 text-[10px] font-bold uppercase tracking-widest text-white/30">Top 10</p>
+                <p className="mb-3 text-[10px] font-bold uppercase tracking-widest text-white/30">
+                  Top 10 <span className="text-orange-400/60">· Compétitif</span>
+                </p>
                 {lbLoading ? (
                   <p className="text-xs text-white/30">Chargement…</p>
                 ) : lbError ? (
@@ -319,20 +347,105 @@ export default function StatsPage({ onBack, defaultTab = 'stats', initialMode, i
                   <p className="text-xs text-white/30">Pas encore de scores publiés pour ce filtre</p>
                 ) : (
                   <div className="flex flex-col gap-1.5">
-                    {leaderboard.map((entry, i) => (
-                      <motion.div
-                        key={entry.id}
-                        variants={fadeUp}
-                        className="flex items-center gap-3 rounded-xl border border-white/[0.06] bg-white/[0.02] px-4 py-3"
-                      >
-                        <span className="w-6 text-center text-xs font-black text-white/25">#{i + 1}</span>
-                        <span className="flex-1 text-sm font-bold text-white">{entry.username}</span>
-                        <span className="text-sm font-black tabular-nums text-neon-violet">{entry.score}/10</span>
-                        <span className="text-[10px] text-white/20">
-                          {new Date(entry.updated_at).toLocaleDateString('fr-FR')}
-                        </span>
-                      </motion.div>
-                    ))}
+                    {leaderboard.map((entry, i) => {
+                      const isExpanded = expandedId === entry.id
+                      const gameData = expandedData[entry.id]
+                      const isLoading = expandLoading === entry.id
+
+                      return (
+                        <motion.div
+                          key={entry.id}
+                          initial={{ opacity: 0, y: 8 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: i * 0.04 }}
+                          className="overflow-hidden rounded-xl border border-white/[0.06] bg-white/[0.02]"
+                        >
+                          {/* Row principale */}
+                          <div
+                            className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-white/[0.03]"
+                            onClick={() => handleToggleExpand(entry)}
+                          >
+                            <span className="w-6 text-center text-xs font-black text-white/25">#{i + 1}</span>
+                            <span className="flex-1 text-sm font-bold text-white">{entry.username}</span>
+                            <span className="text-sm font-black tabular-nums text-orange-400">
+                              {entry.score} pts
+                            </span>
+                            <span className="text-[10px] text-white/20">
+                              {new Date(entry.updated_at).toLocaleDateString('fr-FR')}
+                            </span>
+                            <motion.svg
+                              animate={{ rotate: isExpanded ? 180 : 0 }}
+                              transition={{ duration: 0.2 }}
+                              width="10" height="10" viewBox="0 0 12 12" fill="none"
+                              className="shrink-0 text-white/20"
+                            >
+                              <path d="M2 4l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                            </motion.svg>
+                          </div>
+
+                          {/* Détail recap */}
+                          <AnimatePresence>
+                              {isExpanded && (
+                                <motion.div
+                                  initial={{ height: 0, opacity: 0 }}
+                                  animate={{ height: 'auto', opacity: 1 }}
+                                  exit={{ height: 0, opacity: 0 }}
+                                  transition={{ duration: 0.25, ease: 'easeInOut' }}
+                                  className="overflow-hidden border-t border-white/[0.05]"
+                                >
+                                  <div className="px-4 py-3">
+                                    {isLoading ? (
+                                      <p className="text-xs text-white/30">Chargement du détail…</p>
+                                    ) : !gameData || gameData.length === 0 ? (
+                                      <p className="text-xs text-white/30">Récapitulatif non disponible</p>
+                                    ) : (
+                                      <div className="flex flex-col gap-1">
+                                        {/* En-têtes */}
+                                        <div className="mb-1 grid grid-cols-[1fr_auto_auto_auto] gap-2 text-[9px] font-bold uppercase tracking-wider text-white/20">
+                                          <span>Question</span>
+                                          <span className="text-right">Temps</span>
+                                          <span className="text-right">Mult.</span>
+                                          <span className="text-right">Pts</span>
+                                        </div>
+                                        {gameData.map((q, qi) => (
+                                          <div
+                                            key={qi}
+                                            className={[
+                                              'grid grid-cols-[1fr_auto_auto_auto] gap-2 rounded-lg border-l-2 py-1.5 pl-2 pr-1',
+                                              q.isCorrect ? 'border-l-game-success/60' : 'border-l-game-danger/60',
+                                            ].join(' ')}
+                                          >
+                                            <p className="truncate text-[11px] text-white/50">{q.question}</p>
+                                            {q.isCorrect ? (
+                                              <>
+                                                <span className="text-[10px] tabular-nums text-white/25">{q.timeSpent.toFixed(1)}s</span>
+                                                <span className={[
+                                                  'text-[10px] font-bold tabular-nums',
+                                                  q.multiplier >= 3 ? 'text-yellow-400'
+                                                  : q.multiplier >= 2 ? 'text-purple-400'
+                                                  : q.multiplier >= 1.5 ? 'text-blue-400'
+                                                  : 'text-white/30',
+                                                ].join(' ')}>×{q.multiplier}</span>
+                                                <span className="text-[10px] font-bold tabular-nums text-orange-400">+{q.pointsEarned}</span>
+                                              </>
+                                            ) : (
+                                              <>
+                                                <span />
+                                                <span />
+                                                <span className="text-[10px] text-white/25 text-right">0 pts</span>
+                                              </>
+                                            )}
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+                                </motion.div>
+                              )}
+                            </AnimatePresence>
+                        </motion.div>
+                      )
+                    })}
                   </div>
                 )}
               </>

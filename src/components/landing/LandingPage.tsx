@@ -3,7 +3,7 @@ import { motion, useAnimationControls, AnimatePresence } from 'framer-motion'
 import FloatingCardsBackground from './FloatingCardsBackground'
 import StartButton from './StartButton'
 import { getMuted, setMuted } from '../../utils/sounds'
-import { CATEGORIES, MODES, DIFFICULTIES, LANGUAGES, btnBase, btnSelected, btnIdle } from '../../constants/quiz'
+import { CATEGORIES, MODES, DIFFICULTIES, LANGUAGES, COMP_SPEED_TIERS_LABELS, btnBase, btnSelected, btnIdle } from '../../constants/quiz'
 import { useAuth } from '../../hooks/useAuth'
 import { useToast } from '../../contexts/ToastContext'
 import type { AppScreen } from '../../App'
@@ -31,8 +31,10 @@ export default function LandingPage({ settings, onSettingsChange, onStart, onExp
   const shakeControls = useAnimationControls()
 
   const { mode, difficulty, language, category } = settings
+  const isCompetitif = mode === 'compétitif'
   const [openSettings, setOpenSettings] = useState(autoOpenSettings ?? false)
   const [muted, setMutedState] = useState(getMuted)
+  const [showRules, setShowRules] = useState(false)
 
   useEffect(() => {
     if (!isLaunching) {
@@ -61,6 +63,14 @@ export default function LandingPage({ settings, onSettingsChange, onStart, onExp
   function handleLaunch() {
     setOpenSettings(false)
     onStart()
+  }
+
+  function handleModeChange(newMode: GameSettings['mode']) {
+    if (newMode === 'compétitif') {
+      onSettingsChange({ mode: newMode, difficulty: 'mixed', category: 'all' })
+    } else {
+      onSettingsChange({ mode: newMode, difficulty: 'easy' })
+    }
   }
 
   return (
@@ -275,22 +285,64 @@ export default function LandingPage({ settings, onSettingsChange, onStart, onExp
                   <div className="flex flex-col gap-2">
                     <p className="text-[10px] font-bold uppercase tracking-widest text-white/30">Mode</p>
                     <div className="flex gap-2">
-                      {MODES.map(m => (
-                        <button
-                          key={m.value}
-                          onClick={() => onSettingsChange({ mode: m.value })}
-                          className={[btnBase, 'flex flex-col items-start gap-0.5 px-4 py-3', mode === m.value ? btnSelected : btnIdle].join(' ')}
-                        >
-                          <span className="font-bold">{m.label}</span>
-                          <span className="text-xs opacity-60">{m.desc}</span>
-                        </button>
-                      ))}
+                      {MODES.map(m => {
+                        const isComp = m.value === 'compétitif'
+                        const isSelected = mode === m.value
+                        return (
+                          <motion.div
+                            key={m.value}
+                            animate={isComp ? {
+                              boxShadow: isSelected
+                                ? ['0 0 10px rgba(249,115,22,0.3)', '0 0 24px rgba(249,115,22,0.65)', '0 0 10px rgba(249,115,22,0.3)']
+                                : ['0 0 4px rgba(249,115,22,0.08)', '0 0 12px rgba(249,115,22,0.2)', '0 0 4px rgba(249,115,22,0.08)'],
+                            } : { boxShadow: 'none' }}
+                            transition={{ duration: 1.4, repeat: Infinity, ease: 'easeInOut' }}
+                            className="relative flex-1 rounded-xl"
+                          >
+                            <button
+                              onClick={() => handleModeChange(m.value)}
+                              className={[
+                                'w-full rounded-xl border px-4 py-3 text-sm font-semibold transition-all duration-150 text-left flex flex-col items-start gap-0.5',
+                                isComp && isSelected
+                                  ? 'border-orange-500/60 bg-gradient-to-br from-orange-500/20 to-red-500/10 text-white'
+                                  : isComp && !isSelected
+                                  ? 'border-orange-500/20 bg-orange-500/5 text-white/60 hover:border-orange-500/40 hover:text-white/80'
+                                  : isSelected
+                                  ? btnSelected
+                                  : btnIdle,
+                              ].join(' ')}
+                            >
+                              <span className={['font-bold', isComp ? 'text-orange-300' : ''].join(' ')}>
+                                {m.label}
+                              </span>
+                              <span className="text-xs opacity-60">{m.desc}</span>
+                            </button>
+                            {/* Info button pour le mode compétitif */}
+                            {isComp && (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); setShowRules(true) }}
+                                aria-label="Règles du mode Compétitif"
+                                className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full border border-orange-500/30 bg-[#0d0d18] text-xs font-bold text-orange-400/70 hover:border-orange-500/60 hover:text-orange-400 transition-colors"
+                              >
+                                i
+                              </button>
+                            )}
+                          </motion.div>
+                        )
+                      })}
                     </div>
                   </div>
 
-                  {/* Niveau */}
-                  <div className="flex flex-col gap-2">
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-white/30">Niveau</p>
+                  {/* Niveau — grisé en mode compétitif */}
+                  <div className={`flex flex-col gap-2 transition-opacity duration-200 ${isCompetitif ? 'pointer-events-none opacity-35' : ''}`}>
+                    <div className="flex items-center gap-2">
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-white/30">Niveau</p>
+                      {isCompetitif && (
+                        <span className="rounded-full bg-white/10 px-2 py-0.5 text-[8px] font-bold uppercase tracking-wider text-white/30">
+                          Aléatoire
+                        </span>
+                      )}
+                    </div>
                     <div className="flex gap-2">
                       {DIFFICULTIES.map(d => (
                         <button
@@ -304,9 +356,16 @@ export default function LandingPage({ settings, onSettingsChange, onStart, onExp
                     </div>
                   </div>
 
-                  {/* Catégorie */}
-                  <div className="flex flex-col gap-2">
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-white/30">Catégorie</p>
+                  {/* Catégorie — grisée en mode compétitif */}
+                  <div className={`flex flex-col gap-2 transition-opacity duration-200 ${isCompetitif ? 'pointer-events-none opacity-35' : ''}`}>
+                    <div className="flex items-center gap-2">
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-white/30">Catégorie</p>
+                      {isCompetitif && (
+                        <span className="rounded-full bg-white/10 px-2 py-0.5 text-[8px] font-bold uppercase tracking-wider text-white/30">
+                          Aléatoire
+                        </span>
+                      )}
+                    </div>
                     <div className="relative">
                       <select
                         value={String(category)}
@@ -369,9 +428,107 @@ export default function LandingPage({ settings, onSettingsChange, onStart, onExp
                   onClick={handleLaunch}
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.97 }}
-                  className="mt-6 w-full rounded-xl bg-gradient-to-r from-neon-violet to-neon-blue py-3 text-sm font-bold tracking-wide text-white shadow-neon-violet"
+                  animate={isCompetitif ? {
+                    boxShadow: ['0 0 16px rgba(249,115,22,0.35)', '0 0 32px rgba(249,115,22,0.7)', '0 0 16px rgba(249,115,22,0.35)'],
+                  } : { boxShadow: '0 0 0px rgba(0,0,0,0)' }}
+                  transition={{ duration: 1.4, repeat: isCompetitif ? Infinity : 0, ease: 'easeInOut' }}
+                  className={[
+                    'mt-6 w-full rounded-xl py-3 text-sm font-bold tracking-wide text-white',
+                    isCompetitif
+                      ? 'bg-gradient-to-r from-orange-500 to-red-500'
+                      : 'bg-gradient-to-r from-neon-violet to-neon-blue shadow-neon-violet',
+                  ].join(' ')}
                 >
-                  Lancer
+                  {isCompetitif ? 'Entrer en compétition' : 'Lancer'}
+                </motion.button>
+              </motion.div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* Rules popup — Mode Compétitif */}
+      <AnimatePresence>
+        {showRules && (
+          <>
+            <motion.div
+              key="rules-backdrop"
+              className="fixed inset-0 z-[60] bg-black/70 backdrop-blur-sm"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              onClick={() => setShowRules(false)}
+            />
+            <motion.div
+              key="rules-modal"
+              className="fixed inset-0 z-[70] flex items-center justify-center px-4"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+            >
+              <motion.div
+                className="relative w-full max-w-sm rounded-2xl border border-orange-500/20 bg-[#0d0d18] p-6 shadow-[0_0_40px_rgba(249,115,22,0.15)]"
+                initial={{ scale: 0.92, y: 16 }}
+                animate={{ scale: 1, y: 0 }}
+                exit={{ scale: 0.95, y: 8 }}
+                transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* Header */}
+                <div className="mb-4 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xl">🔥</span>
+                    <h2 className="text-base font-black text-orange-300">Mode Compétitif</h2>
+                  </div>
+                  <button
+                    onClick={() => setShowRules(false)}
+                    className="flex h-7 w-7 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/40 transition-colors hover:border-white/20 hover:text-white/70"
+                  >
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                      <path d="M1 1l10 10M11 1L1 11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                    </svg>
+                  </button>
+                </div>
+
+                <div className="flex flex-col gap-3 text-sm text-white/60">
+                  {/* Règles */}
+                  <div className="flex flex-col gap-2">
+                    {[
+                      { icon: '∞', text: 'Questions infinies — la partie s\'arrête dès la première erreur ou timeout' },
+                      { icon: '🎲', text: 'Thème et difficulté aléatoires — aucun filtre, seule la langue est choisie' },
+                      { icon: '⚡', text: 'Réponds vite pour multiplier tes points' },
+                      { icon: '🏆', text: 'Ton meilleur score est publié automatiquement dans le classement' },
+                    ].map((rule, i) => (
+                      <div key={i} className="flex items-center gap-3 rounded-xl border border-white/5 bg-white/[0.03] px-3 py-2.5">
+                        <span className="shrink-0 text-base leading-none">{rule.icon}</span>
+                        <span className="leading-snug">{rule.text}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Tableau des multiplicateurs */}
+                  <div className="rounded-xl border border-orange-500/15 bg-orange-500/5 p-3">
+                    <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-orange-400/60">Multiplicateurs de vitesse</p>
+                    <div className="flex flex-col gap-1">
+                      {COMP_SPEED_TIERS_LABELS.map(t => (
+                        <div key={t.label} className="flex items-center justify-between">
+                          <span className="text-xs text-white/40">{t.label}</span>
+                          <span className={['text-xs font-bold', t.color].join(' ')}>{t.multiplier}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <motion.button
+                  onClick={() => setShowRules(false)}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.97 }}
+                  className="mt-5 w-full rounded-xl bg-gradient-to-r from-orange-500 to-red-500 py-2.5 text-sm font-bold text-white shadow-[0_0_20px_rgba(249,115,22,0.3)]"
+                >
+                  Compris !
                 </motion.button>
               </motion.div>
             </motion.div>

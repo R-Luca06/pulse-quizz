@@ -64,8 +64,9 @@ export default function AuthModal({ onClose, defaultTab = 'signin' }: Props) {
   async function handleSignUp(e: React.FormEvent) {
     e.preventDefault()
     setSuError('')
-    if (suUsername.trim().length < 2) {
-      setSuError('Le pseudo doit faire au moins 2 caractères')
+    const USERNAME_RE = /^[a-zA-Z0-9_-]{2,20}$/
+    if (!USERNAME_RE.test(suUsername.trim())) {
+      setSuError('Pseudo invalide — lettres, chiffres, _ et - uniquement (2–20 car.)')
       return
     }
     setSuLoading(true)

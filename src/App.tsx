@@ -5,12 +5,11 @@ import QuizContainer from './components/quiz/QuizContainer'
 import ResultScreen from './components/result/ResultScreen'
 import StatsPage from './components/stats/StatsPage'
 import AuthModal from './components/auth/AuthModal'
-import { getBestScore, saveBestScore } from './utils/storage'
-import { updateStats, getCategoryStats, getGlobalStats } from './utils/statsStorage'
-import { syncCategoryStats, syncGlobalStats } from './services/cloudStats'
+import { incrementCategoryStats, incrementGlobalStats, getCloudBestScore } from './services/cloudStats'
+import { submitScore, getUserBestScore, getUserRank } from './services/leaderboard'
 import { useSettings } from './hooks/useSettings'
 import { useAuth } from './hooks/useAuth'
-import type { QuestionResult } from './types/quiz'
+import type { QuestionResult, Language } from './types/quiz'
 
 export type AppScreen = 'landing' | 'launching' | 'quiz' | 'result' | 'stats'
 
@@ -19,39 +18,80 @@ interface GameResult {
   results: QuestionResult[]
   bestScore: number
   isNewBest: boolean
+  userRank: number | null
+  rankDelta: number | null
 }
 
 export default function App() {
   const { settings, update } = useSettings()
-  const { user } = useAuth()
+  const { user, profile } = useAuth()
 
   const [screen, setScreen] = useState<AppScreen>('landing')
-  const [gameResult, setGameResult] = useState<GameResult>({ score: 0, results: [], bestScore: 0, isNewBest: false })
+  const [gameResult, setGameResult] = useState<GameResult>({ score: 0, results: [], bestScore: 0, isNewBest: false, userRank: null, rankDelta: null })
   const [returnToSettings, setReturnToSettings] = useState(false)
   const [statsOrigin, setStatsOrigin] = useState<'landing' | 'result'>('landing')
   const [statsDefaultTab, setStatsDefaultTab] = useState<'stats' | 'leaderboard'>('stats')
-  const [statsInitialMode, setStatsInitialMode] = useState<typeof settings.mode | undefined>(undefined)
   const [statsInitialDiff, setStatsInitialDiff] = useState<typeof settings.difficulty | undefined>(undefined)
+  const [statsInitialLang, setStatsInitialLang] = useState<Language | undefined>(undefined)
   const [authModalOpen, setAuthModalOpen] = useState(false)
 
   function handleStart() { setScreen('launching') }
 
   function handleExplosion() { setScreen('quiz') }
 
-  function handleFinished(score: number, results: QuestionResult[]) {
-    const { mode, difficulty, category } = settings
-    const prev = getBestScore(mode, difficulty, category)
-    const newBest = score > prev
-    if (newBest) saveBestScore(mode, difficulty, category, score)
-    setGameResult({ score, results, bestScore: newBest ? score : prev, isNewBest: newBest })
+  async function handleFinished(score: number, results: QuestionResult[]) {
+    const { mode, difficulty, category, language } = settings
+
+    // Fetch previous best from cloud (0 if not logged in or no entry)
+    let prevBest = 0
+    let prevRank: number | null = null
+    if (user) {
+      if (mode === 'normal') {
+        prevBest = await getCloudBestScore(user.id, mode, difficulty, category)
+      } else if (mode === 'compétitif') {
+        ;[prevBest, prevRank] = await Promise.all([
+          getUserBestScore(user.id, language),
+          getUserRank(user.id, language),
+        ])
+      }
+    }
+
+    const isNewBest = score > prevBest
+    setGameResult({ score, results, bestScore: isNewBest ? score : prevBest, isNewBest, userRank: null, rankDelta: null })
     setScreen('result')
 
     if (user) {
-      updateStats(mode, difficulty, category, score, results)
-      const catStats = getCategoryStats(mode, difficulty, category)
-      const globalStats = getGlobalStats()
-      syncCategoryStats(user.id, mode, difficulty, category, catStats).catch(console.error)
-      syncGlobalStats(user.id, globalStats).catch(console.error)
+      if (mode === 'normal') {
+        incrementCategoryStats(user.id, mode, difficulty, category, score, results).catch(console.error)
+        incrementGlobalStats(user.id, results, score, mode).catch(console.error)
+      }
+
+      // Publication automatique en mode compétitif
+      if (mode === 'compétitif' && profile) {
+        submitScore({
+          userId: user.id,
+          username: profile.username,
+          score,
+          mode,
+          difficulty: 'mixed',
+          language,
+          gameData: results.map(r => ({
+            question: r.question,
+            correctAnswer: r.correctAnswer,
+            userAnswer: r.userAnswer,
+            isCorrect: r.isCorrect,
+            timeSpent: r.timeSpent,
+            pointsEarned: r.pointsEarned ?? 0,
+            multiplier: r.multiplier ?? 1,
+          })),
+        })
+          .then(() => getUserRank(user.id, language))
+          .then(newRank => {
+            const delta = newRank !== null && prevRank !== null ? prevRank - newRank : null
+            setGameResult(prev => ({ ...prev, userRank: newRank, rankDelta: delta }))
+          })
+          .catch(console.error)
+      }
     }
   }
 
@@ -62,12 +102,12 @@ export default function App() {
   function handleShowStats(from: 'landing' | 'result', tab: 'stats' | 'leaderboard' = 'stats') {
     setStatsOrigin(from)
     setStatsDefaultTab(tab)
-    if (from === 'result' && tab === 'leaderboard') {
-      setStatsInitialMode(settings.mode)
+    if (from === 'result') {
       setStatsInitialDiff(settings.difficulty)
+      setStatsInitialLang(settings.language)
     } else {
-      setStatsInitialMode(undefined)
       setStatsInitialDiff(undefined)
+      setStatsInitialLang(undefined)
     }
     setScreen('stats')
   }
@@ -137,6 +177,9 @@ export default function App() {
                 gameMode={settings.mode}
                 difficulty={settings.difficulty}
                 category={settings.category}
+                language={settings.language}
+                userRank={gameResult.userRank}
+                rankDelta={gameResult.rankDelta}
               />
             </motion.div>
           )}
@@ -149,7 +192,12 @@ export default function App() {
               exit={{ opacity: 0, transition: { duration: 0.25 } }}
               className="absolute inset-0"
             >
-              <StatsPage onBack={handleBackFromStats} defaultTab={statsDefaultTab} initialMode={statsInitialMode} initialDiff={statsInitialDiff} />
+              <StatsPage
+                onBack={handleBackFromStats}
+                defaultTab={statsDefaultTab}
+                initialDiff={statsInitialDiff}
+                initialLang={statsInitialLang}
+              />
             </motion.div>
           )}
         </AnimatePresence>

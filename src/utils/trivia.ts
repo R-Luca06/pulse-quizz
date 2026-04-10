@@ -22,12 +22,24 @@ function shuffle<T>(arr: T[]): T[] {
   return a
 }
 
-export async function fetchQuestions(difficulty: Difficulty = 'mixed', language: Language = 'en', category: Category = 'all'): Promise<TriviaQuestion[]> {
+export async function fetchQuestions(difficulty: Difficulty = 'mixed', language: Language = 'en', category: Category = 'all', externalSignal?: AbortSignal): Promise<TriviaQuestion[]> {
   const params = new URLSearchParams({ amount: '10', type: 'multiple' })
   if (difficulty !== 'mixed') params.set('difficulty', difficulty)
   if (language !== 'en') params.set('lang', language)
   if (category !== 'all') params.set('category', String(category))
-  const res = await fetch(`https://opentdb.com/api.php?${params}`)
+  const controller = new AbortController()
+  // Propagate external abort (e.g. component unmount) into internal controller
+  externalSignal?.addEventListener('abort', () => controller.abort(), { once: true })
+  const timer = setTimeout(() => controller.abort(), 8000)
+  let res: Response
+  try {
+    res = await fetch(`https://opentdb.com/api.php?${params}`, { signal: controller.signal })
+  } catch (err) {
+    clearTimeout(timer)
+    if ((err as Error).name === 'AbortError') throw new Error('api_error')
+    throw err
+  }
+  clearTimeout(timer)
   if (res.status === 429) throw new Error('rate_limit')
   if (!res.ok) throw new Error('api_error')
   const data = await res.json()

@@ -48,6 +48,8 @@ export default function QuizContainer({ onFinished, onQuit, gameMode, difficulty
     streak,
     selectedAnswer,
     answerState,
+    totalAnswered,
+    currentMultiplier,
     handleAnswer,
     handleTimeout,
     retry,
@@ -191,22 +193,49 @@ export default function QuizContainer({ onFinished, onQuit, gameMode, difficulty
             </svg>
           </button>
           <div className="text-sm font-semibold text-white/40">
-            <span className="text-white">{currentIndex + 1}</span>
+            <span className="text-white">
+              {gameMode === 'compétitif' ? totalAnswered + 1 : currentIndex + 1}
+            </span>
             {gameMode === 'normal' && <span> / 10</span>}
           </div>
         </div>
         <StreakIndicator streak={streak} />
-        <div className="text-sm font-semibold">
-          <motion.span
-            key={score}
-            className="inline-block text-neon-violet"
-            initial={{ scale: 1.6, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ type: 'spring', stiffness: 500, damping: 22 }}
-          >
-            {score}
-          </motion.span>
-          <span className="text-white/40"> pts</span>
+        <div className="flex items-center gap-2">
+          {/* Badge multiplicateur — mode compétitif uniquement */}
+          {gameMode === 'compétitif' && phase === 'playing' && (
+            <motion.div
+              key={currentMultiplier}
+              initial={{ scale: 1.3, opacity: 0.6 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ type: 'spring', stiffness: 500, damping: 22 }}
+              className={[
+                'rounded-lg border px-2 py-0.5 text-xs font-black',
+                currentMultiplier >= 3
+                  ? 'border-yellow-500/40 bg-yellow-500/15 text-yellow-400'
+                  : currentMultiplier >= 2
+                  ? 'border-purple-500/40 bg-purple-500/15 text-purple-400'
+                  : currentMultiplier >= 1.5
+                  ? 'border-blue-500/40 bg-blue-500/15 text-blue-400'
+                  : currentMultiplier >= 1.2
+                  ? 'border-white/15 bg-white/5 text-white/40'
+                  : 'border-white/10 bg-white/3 text-white/25',
+              ].join(' ')}
+            >
+              ×{currentMultiplier % 1 === 0 ? currentMultiplier : currentMultiplier}
+            </motion.div>
+          )}
+          <div className="text-sm font-semibold">
+            <motion.span
+              key={score}
+              className="inline-block text-neon-violet"
+              initial={{ scale: 1.6, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ type: 'spring', stiffness: 500, damping: 22 }}
+            >
+              {score}
+            </motion.span>
+            <span className="text-white/40"> pts</span>
+          </div>
         </div>
       </div>
 

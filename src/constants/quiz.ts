@@ -17,8 +17,8 @@ export const CATEGORIES: { value: Category; label: string }[] = [
 ]
 
 export const MODES: { value: GameMode; label: string; desc: string }[] = [
-  { value: 'normal', label: 'Normal', desc: '10 questions' },
-  { value: 'survie', label: 'Survie', desc: 'Soyez irréprochable' },
+  { value: 'normal',      label: 'Normal',      desc: '10 questions' },
+  { value: 'compétitif',  label: 'Compétitif',  desc: 'Soyez premier !' },
 ]
 
 export const DIFFICULTIES: { value: Difficulty; label: string }[] = [
@@ -44,6 +44,19 @@ export const DIFFICULTY_LABELS: Record<string, string> = Object.fromEntries(
 export const MODE_LABELS: Record<string, string> = Object.fromEntries(
   MODES.map(m => [m.value, m.label])
 )
+
+export const LANGUAGE_LABELS: Record<string, string> = Object.fromEntries(
+  LANGUAGES.map(l => [l.value, l.label])
+)
+
+/** Paliers de vitesse pour l'affichage dans la popup règles */
+export const COMP_SPEED_TIERS_LABELS: { label: string; multiplier: string; color: string }[] = [
+  { label: '≤ 2 secondes', multiplier: '× 3', color: 'text-yellow-400' },
+  { label: '≤ 4 secondes', multiplier: '× 2', color: 'text-purple-400' },
+  { label: '≤ 6 secondes', multiplier: '× 1.5', color: 'text-blue-400' },
+  { label: '≤ 8 secondes', multiplier: '× 1.2', color: 'text-white/40' },
+  { label: '≤ 10 secondes', multiplier: '× 1', color: 'text-white/25' },
+]
 
 // Styles boutons partagés (LandingPage)
 export const btnBase = 'flex-1 rounded-xl border px-3 py-2.5 text-sm font-semibold transition-colors duration-150 text-center'

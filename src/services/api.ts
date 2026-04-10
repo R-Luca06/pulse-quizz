@@ -28,9 +28,9 @@ export class ApiError extends Error {
   }
 }
 
-export async function fetchQuestions(params: QuizParams): Promise<TriviaQuestion[]> {
+export async function fetchQuestions(params: QuizParams, signal?: AbortSignal): Promise<TriviaQuestion[]> {
   try {
-    return await fetchFromOpenTDB(params.difficulty, params.language, params.category)
+    return await fetchFromOpenTDB(params.difficulty, params.language, params.category, signal)
   } catch (err) {
     if (err instanceof Error) {
       if (err.message === 'rate_limit') throw new ApiError('rate_limit')
@@ -38,4 +38,9 @@ export async function fetchQuestions(params: QuizParams): Promise<TriviaQuestion
     }
     throw new ApiError('network_error')
   }
+}
+
+/** Batch de 10 questions aléatoires (sans filtre difficulté/catégorie) pour le mode compétitif */
+export async function fetchCompetitifBatch(language: Language, signal?: AbortSignal): Promise<TriviaQuestion[]> {
+  return fetchQuestions({ difficulty: 'mixed', language, category: 'all' }, signal)
 }

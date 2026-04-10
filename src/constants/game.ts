@@ -19,3 +19,19 @@ export const NORMAL_MODE_QUESTIONS = 10
 // ─── Combo ───────────────────────────────────────────────────────────────────
 /** Paliers de streak déclenchant l'overlay combo */
 export const COMBO_MILESTONES = [3, 5, 7, 10]
+
+// ─── Mode compétitif ─────────────────────────────────────────────────────────
+/** Points de base par bonne réponse */
+export const COMP_BASE_POINTS = 100
+
+/** Nombre de questions restantes déclenchant le préchargement du batch suivant */
+export const COMP_PREFETCH_THRESHOLD = 4
+
+/** Paliers de multiplicateur selon le temps de réponse (secondes) */
+export const COMP_SPEED_TIERS: { maxTime: number; multiplier: number }[] = [
+  { maxTime: 2,        multiplier: 3   },
+  { maxTime: 4,        multiplier: 2   },
+  { maxTime: 6,        multiplier: 1.5 },
+  { maxTime: 8,        multiplier: 1.2 },
+  { maxTime: Infinity, multiplier: 1   },
+]
