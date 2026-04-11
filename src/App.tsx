@@ -124,7 +124,7 @@ export default function App() {
   }
 
   function handleQuit() { setReturnToSettings(false); setScreen('landing') }
-  function handleBack() { setReturnToSettings(true); setScreen('landing') }
+
   function handleReplay() { setScreen('quiz') }
 
   function handleShowStats(from: 'landing' | 'result', tab: 'stats' | 'leaderboard' = 'stats') {
@@ -212,7 +212,7 @@ export default function App() {
                 score={gameResult.score}
                 results={gameResult.results}
                 onReplay={handleReplay}
-                onBack={handleBack}
+                onBack={handleQuit}
                 onShowStats={() => handleShowStats('result')}
                 onShowLeaderboard={() => handleShowStats('result', 'leaderboard')}
                 onOpenAuth={() => setAuthModalOpen(true)}

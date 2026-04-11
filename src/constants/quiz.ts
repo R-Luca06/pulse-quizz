@@ -22,6 +22,8 @@ export const FR_CATEGORIES: { value: Category; label: string }[] = [
   { value: 'Culture générale', label: 'Culture générale' },
   { value: 'Géographie',       label: 'Géographie' },
   { value: 'Histoire',         label: 'Histoire' },
+  { value: 'Informatique',     label: 'Informatique' },
+  { value: 'Jeux vidéo',       label: 'Jeux vidéo' },
   { value: 'Mathématiques',    label: 'Mathématiques' },
   { value: 'Sciences & Nature',label: 'Sciences & Nature' },
 ]
