@@ -36,7 +36,7 @@ interface UseQuizReturn {
 
 export function useQuiz(
   onFinished: (score: number, results: QuestionResult[]) => void,
-  settings: QuizSettings = { gameMode: 'normal', difficulty: 'mixed', language: 'en', category: 'all' },
+  settings: QuizSettings = { gameMode: 'normal', difficulty: 'mixed', language: 'fr', category: 'all' },
 ): UseQuizReturn {
   const [phase, setPhase] = useState<QuizPhase>('loading')
   const [isRetrying, setIsRetrying] = useState(false)

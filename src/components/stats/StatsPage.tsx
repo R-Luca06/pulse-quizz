@@ -5,7 +5,7 @@ import { fetchAllStats } from '../../services/cloudStats'
 import type { CloudCategoryStatRow, CloudGlobalStatRow } from '../../services/cloudStats'
 import { getCompLeaderboardPage, getCompLeaderboardCount, getCompEntryGameData, getUserRank } from '../../services/leaderboard'
 import type { LeaderboardEntry, CompGameData } from '../../services/leaderboard'
-import { CATEGORIES, FR_CATEGORIES, DIFFICULTIES, LANGUAGES, btnBaseSm, btnSelected, btnIdleSm } from '../../constants/quiz'
+import { FR_CATEGORIES, DIFFICULTIES, LANGUAGES, btnBaseSm, btnSelected, btnIdleSm } from '../../constants/quiz'
 import { useAuth } from '../../hooks/useAuth'
 import type { Difficulty, Language } from '../../types/quiz'
 
@@ -74,8 +74,8 @@ export default function StatsPage({ onBack, defaultTab = 'stats', initialDiff, i
   const [activeTab, setActiveTab] = useState<'stats' | 'leaderboard'>(defaultTab)
   const validInitialDiff = initialDiff && initialDiff !== 'mixed' ? initialDiff : 'easy'
   const [filterDiff, setFilterDiff] = useState<Difficulty>(validInitialDiff)
-  const [filterLang, setFilterLang] = useState<Language>(initialLang ?? 'en')
-  const [statsLang, setStatsLang] = useState<Language>(initialLang ?? 'en')
+  const [filterLang, setFilterLang] = useState<Language>(initialLang ?? 'fr')
+  const [statsLang, setStatsLang] = useState<Language>(initialLang ?? 'fr')
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([])
   const [lbLoading, setLbLoading] = useState(false)
   const [lbError, setLbError] = useState(false)
@@ -185,9 +185,7 @@ export default function StatsPage({ onBack, defaultTab = 'stats', initialDiff, i
       return row ? cloudRowToCatStats(row) : { ...EMPTY_CAT_STATS }
     }
 
-    const catList = statsLang === 'fr'
-      ? FR_CATEGORIES.filter(c => c.value !== 'all')
-      : CATEGORIES.filter(c => c.value !== 'all')
+    const catList = FR_CATEGORIES.filter(c => c.value !== 'all')
 
     const catsWithStats = catList.map(cat => ({
       ...cat,
@@ -197,7 +195,7 @@ export default function StatsPage({ onBack, defaultTab = 'stats', initialDiff, i
       ...catsWithStats.filter(c => c.stats.gamesPlayed > 0),
       ...catsWithStats.filter(c => c.stats.gamesPlayed === 0),
     ]
-  }, [filterDiff, statsLang, user, cloudCats, cloudLoading])
+  }, [filterDiff, user, cloudCats, cloudLoading])
 
   return (
     <div className="relative flex min-h-screen flex-col items-center overflow-y-auto bg-game-bg px-4 py-6 sm:py-10">

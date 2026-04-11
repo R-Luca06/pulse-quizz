@@ -2,11 +2,12 @@
  * Couche d'abstraction API — point d'entrée unique pour les données du jeu.
  *
  * Routing :
- *   language = 'en'  → OpenTDB (opentdb.com)
  *   language = 'fr'  → Supabase table `questions` (via RPC get_random_questions)
+ *
+ * Note : le routing vers OpenTDB (language = 'en') est conservé en commentaire
+ * pour réactivation future si une source EN est ajoutée.
  */
 
-import { fetchQuestions as fetchFromOpenTDB } from '../utils/trivia'
 import { supabase } from './supabase'
 import { QUESTIONS_PER_BATCH } from '../constants/game'
 import type { TriviaQuestion, Difficulty, Language, Category } from '../types/quiz'
@@ -62,7 +63,7 @@ async function fetchQuestionsFromSupabase(
   const { data, error } = await supabase.rpc('get_random_questions', {
     p_language:   'fr',
     p_difficulty: difficulty,
-    p_category:   category === 'all' || typeof category === 'number' ? 'all' : String(category),
+    p_category:   category === 'all' ? 'all' : category,
     p_limit:      QUESTIONS_PER_BATCH,
   })
 
@@ -83,22 +84,12 @@ async function fetchQuestionsFromSupabase(
 // ─── Public API ──────────────────────────────────────────────────────────────
 
 export async function fetchQuestions(params: QuizParams, signal?: AbortSignal): Promise<TriviaQuestion[]> {
-  if (params.language === 'fr') {
-    try {
-      return await fetchQuestionsFromSupabase(params.difficulty, params.category, signal)
-    } catch (err) {
-      if (err instanceof ApiError) throw err
-      throw new ApiError('network_error')
-    }
-  }
-
+  // Routing conditionnel réservé pour future réactivation d'une source EN :
+  // if (params.language === 'en') { return fetchFromExternalSource(...) }
   try {
-    return await fetchFromOpenTDB(params.difficulty, params.language, params.category, signal)
+    return await fetchQuestionsFromSupabase(params.difficulty, params.category, signal)
   } catch (err) {
-    if (err instanceof Error) {
-      if (err.message === 'rate_limit') throw new ApiError('rate_limit')
-      if (err.message === 'api_error')  throw new ApiError('api_error')
-    }
+    if (err instanceof ApiError) throw err
     throw new ApiError('network_error')
   }
 }

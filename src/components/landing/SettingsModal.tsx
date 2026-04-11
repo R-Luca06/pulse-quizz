@@ -1,9 +1,8 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { getMuted, setMuted } from '../../utils/sounds'
-import { CATEGORIES, FR_CATEGORIES, MODES, DIFFICULTIES, LANGUAGES, btnBase, btnSelected, btnIdle } from '../../constants/quiz'
+import { FR_CATEGORIES, MODES, DIFFICULTIES, LANGUAGES, btnBase, btnSelected, btnIdle } from '../../constants/quiz'
 import type { GameSettings } from '../../hooks/useSettings'
-import type { Category } from '../../types/quiz'
 
 interface Props {
   settings: GameSettings
@@ -16,7 +15,6 @@ interface Props {
 export default function SettingsModal({ settings, onSettingsChange, onLaunch, onClose, onShowRules }: Props) {
   const { mode, difficulty, language, category } = settings
   const isCompetitif = mode === 'compétitif'
-  const isFrench = language === 'fr'
   const [muted, setMutedState] = useState(getMuted)
 
   function handleMuteToggle() {
@@ -39,14 +37,10 @@ export default function SettingsModal({ settings, onSettingsChange, onLaunch, on
   }
 
   function handleLanguageChange(lang: GameSettings['language']) {
-    // Réinitialise la catégorie si on bascule vers le français et que la catégorie actuelle
-    // est un ID OpenTDB numérique (non disponible en FR)
-    const patch: Partial<GameSettings> = { language: lang }
-    if (lang === 'fr' && typeof category === 'number') patch.category = 'all'
-    onSettingsChange(patch)
+    onSettingsChange({ language: lang })
   }
 
-  const availableCategories = isFrench ? FR_CATEGORIES : CATEGORIES
+  const availableCategories = FR_CATEGORIES
   const categoryDisabled = isCompetitif
 
   return (
@@ -204,11 +198,7 @@ export default function SettingsModal({ settings, onSettingsChange, onLaunch, on
                     value={String(category)}
                     onChange={(e) => {
                       const v = e.target.value
-                      if (isFrench) {
-                        onSettingsChange({ category: v === 'all' ? 'all' : v })
-                      } else {
-                        onSettingsChange({ category: v === 'all' ? 'all' : Number(v) as Category })
-                      }
+                      onSettingsChange({ category: v === 'all' ? 'all' : v })
                     }}
                     aria-label="Catégorie de questions"
                     className="w-full appearance-none rounded-xl border border-white/10 bg-white/5 py-3 pl-4 pr-10 text-sm font-semibold text-white focus:border-neon-violet/60 focus:outline-none"

@@ -6,30 +6,12 @@ import ResultScreen from './components/result/ResultScreen'
 import RankingRevealScreen from './components/ranking/RankingRevealScreen'
 import StatsPage from './components/stats/StatsPage'
 import AuthModal from './components/auth/AuthModal'
-import { incrementCategoryStats, incrementGlobalStats, getCloudBestScore } from './services/cloudStats'
-import { submitScore, getUserBestScore, getUserRank } from './services/leaderboard'
 import { useSettings } from './hooks/useSettings'
 import { useAuth } from './hooks/useAuth'
-import type { QuestionResult, Language } from './types/quiz'
+import { useGameOrchestration } from './hooks/useGameOrchestration'
+import type { Language, GameResult, RankingData } from './types/quiz'
 
 export type AppScreen = 'landing' | 'launching' | 'quiz' | 'ranking' | 'result' | 'stats'
-
-interface GameResult {
-  score: number
-  results: QuestionResult[]
-  bestScore: number
-  isNewBest: boolean
-  userRank: number | null
-  rankDelta: number | null
-}
-
-interface RankingData {
-  userRank: number | null
-  rankDelta: number | null
-  userId: string
-  username: string
-  userScore: number
-}
 
 export default function App() {
   const { settings, update } = useSettings()
@@ -38,6 +20,8 @@ export default function App() {
   const [screen, setScreen] = useState<AppScreen>('landing')
   const [gameResult, setGameResult] = useState<GameResult>({ score: 0, results: [], bestScore: 0, isNewBest: false, userRank: null, rankDelta: null })
   const [rankingData, setRankingData] = useState<RankingData | null>(null)
+
+  const { handleFinished } = useGameOrchestration({ settings, user, profile, setScreen, setGameResult, setRankingData })
   const [returnToSettings, setReturnToSettings] = useState(false)
   const [statsOrigin, setStatsOrigin] = useState<'landing' | 'result'>('landing')
   const [statsDefaultTab, setStatsDefaultTab] = useState<'stats' | 'leaderboard'>('stats')
@@ -48,80 +32,6 @@ export default function App() {
   function handleStart() { setScreen('launching') }
 
   function handleExplosion() { setScreen('quiz') }
-
-  async function handleFinished(score: number, results: QuestionResult[]) {
-    const { mode, difficulty, category, language } = settings
-
-    // Fetch previous best from cloud (0 if not logged in or no entry)
-    let prevBest = 0
-    let prevRank: number | null = null
-    if (user) {
-      if (mode === 'normal') {
-        prevBest = await getCloudBestScore(user.id, mode, difficulty, category)
-      } else if (mode === 'compétitif') {
-        ;[prevBest, prevRank] = await Promise.all([
-          getUserBestScore(user.id, language),
-          getUserRank(user.id, language),
-        ])
-      }
-    }
-
-    const isNewBest = score > prevBest
-    const baseResult: GameResult = {
-      score,
-      results,
-      bestScore: isNewBest ? score : prevBest,
-      isNewBest,
-      userRank: null,
-      rankDelta: null,
-    }
-    setGameResult(baseResult)
-
-    // Non-competitive or unauthenticated — fast path
-    if (!user || mode !== 'compétitif' || !profile) {
-      if (user && mode === 'normal') {
-        incrementCategoryStats(user.id, mode, difficulty, category, score, results).catch(console.error)
-        incrementGlobalStats(user.id, results, score, mode).catch(console.error)
-      }
-      setScreen('result')
-      return
-    }
-
-    // Competitive + authenticated — await all data then show ranking reveal
-    try {
-      await submitScore({
-        userId: user.id,
-        username: profile.username,
-        score,
-        mode,
-        difficulty: 'mixed',
-        language,
-        gameData: results.map(r => ({
-          question: r.question,
-          correctAnswer: r.correctAnswer,
-          userAnswer: r.userAnswer,
-          isCorrect: r.isCorrect,
-          timeSpent: r.timeSpent,
-          pointsEarned: r.pointsEarned ?? 0,
-          multiplier: r.multiplier ?? 1,
-        })),
-      })
-      const newRank = await getUserRank(user.id, language)
-      const delta = newRank !== null && prevRank !== null ? prevRank - newRank : null
-      setGameResult(prev => ({ ...prev, userRank: newRank, rankDelta: delta }))
-      setRankingData({
-        userRank: newRank,
-        rankDelta: delta,
-        userId: user.id,
-        username: profile.username,
-        userScore: score,
-      })
-      setScreen('ranking')
-    } catch (err) {
-      console.error(err)
-      setScreen('result')
-    }
-  }
 
   function handleQuit() { setReturnToSettings(false); setScreen('landing') }
 

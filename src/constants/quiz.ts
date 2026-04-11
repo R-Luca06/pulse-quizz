@@ -1,22 +1,6 @@
 import type { GameMode, Difficulty, Language, Category } from '../types/quiz'
 
-export const CATEGORIES: { value: Category; label: string }[] = [
-  { value: 'all', label: 'Toutes catégories' },
-  { value: 9,     label: 'Culture générale' },
-  { value: 11,    label: 'Cinéma' },
-  { value: 12,    label: 'Musique' },
-  { value: 14,    label: 'Télévision' },
-  { value: 15,    label: 'Jeux vidéo' },
-  { value: 17,    label: 'Sciences & Nature' },
-  { value: 18,    label: 'Informatique' },
-  { value: 19,    label: 'Mathématiques' },
-  { value: 21,    label: 'Sports' },
-  { value: 22,    label: 'Géographie' },
-  { value: 23,    label: 'Histoire' },
-  { value: 27,    label: 'Animaux' },
-]
-
-/** Catégories disponibles en français (doivent correspondre au champ `category` dans Supabase) */
+/** Catégories disponibles (correspondent au champ `category` dans Supabase) */
 export const FR_CATEGORIES: { value: Category; label: string }[] = [
   { value: 'all',              label: 'Toutes catégories' },
   { value: 'Culture générale', label: 'Culture générale' },
@@ -41,12 +25,11 @@ export const DIFFICULTIES: { value: Difficulty; label: string }[] = [
 
 export const LANGUAGES: { value: Language; label: string }[] = [
   { value: 'fr', label: 'Français' },
-  { value: 'en', label: 'English' },
 ]
 
 // Lookups pour l'affichage (ResultScreen, StatsPage)
 export const CATEGORY_LABELS: Record<string, string> = Object.fromEntries(
-  CATEGORIES.map(c => [String(c.value), c.label])
+  FR_CATEGORIES.map(c => [String(c.value), c.label])
 )
 
 export const DIFFICULTY_LABELS: Record<string, string> = Object.fromEntries(

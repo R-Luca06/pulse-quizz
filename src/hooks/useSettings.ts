@@ -13,11 +13,12 @@ const STORAGE_KEY = 'pulse_settings'
 const DEFAULTS: GameSettings = {
   mode: 'normal',
   difficulty: 'easy',
-  language: 'en',
+  language: 'fr',
   category: 'all',
 }
 
 const VALID_MODES: GameMode[] = ['normal', 'compétitif']
+const VALID_LANGUAGES: Language[] = ['fr']
 const NORMAL_DIFFICULTIES: Difficulty[] = ['easy', 'medium', 'hard']
 
 function load(): GameSettings {
@@ -30,10 +31,11 @@ function load(): GameSettings {
     const difficulty = mode === 'normal' && !NORMAL_DIFFICULTIES.includes(parsed.difficulty as Difficulty)
       ? DEFAULTS.difficulty
       : (parsed.difficulty ?? DEFAULTS.difficulty)
+    const language = VALID_LANGUAGES.includes(parsed.language as Language) ? parsed.language as Language : DEFAULTS.language
     return {
       mode,
       difficulty,
-      language: parsed.language ?? DEFAULTS.language,
+      language,
       category: parsed.category ?? DEFAULTS.category,
     }
   } catch {
