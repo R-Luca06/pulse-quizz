@@ -14,6 +14,7 @@ interface Props {
   defaultTab?: 'stats' | 'leaderboard'
   initialDiff?: Difficulty
   initialLang?: Language
+  hideNav?: boolean
 }
 
 function StatTile({ label, value, accent }: { label: string; value: string | number; accent?: string }) {
@@ -69,7 +70,7 @@ function cloudRowToGlobalStats(row: CloudGlobalStatRow): GlobalStats {
   }
 }
 
-export default function StatsPage({ onBack, defaultTab = 'stats', initialDiff, initialLang }: Props) {
+export default function StatsPage({ onBack, defaultTab = 'stats', initialDiff, initialLang, hideNav = false }: Props) {
   const { user } = useAuth()
   const [activeTab, setActiveTab] = useState<'stats' | 'leaderboard'>(defaultTab)
   const validInitialDiff = initialDiff && initialDiff !== 'mixed' ? initialDiff : 'easy'
@@ -198,57 +199,61 @@ export default function StatsPage({ onBack, defaultTab = 'stats', initialDiff, i
   }, [filterDiff, user, cloudCats, cloudLoading])
 
   return (
-    <div className="relative flex min-h-screen flex-col items-center overflow-y-auto bg-game-bg px-4 py-6 sm:py-10">
-      {/* Background blob */}
-      <div className="pointer-events-none fixed inset-0">
-        <div className="absolute left-1/2 top-1/3 h-[300px] w-[300px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-neon-violet/8 blur-3xl lg:h-[500px] lg:w-[500px]" />
-      </div>
+    <div className={`relative flex flex-col items-center overflow-y-auto bg-game-bg px-4 py-6 sm:py-10 ${hideNav ? '' : 'min-h-screen'}`}>
+      {/* Background blob — uniquement hors mode intégré */}
+      {!hideNav && (
+        <div className="pointer-events-none fixed inset-0">
+          <div className="absolute left-1/2 top-1/3 h-[300px] w-[300px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-neon-violet/8 blur-3xl lg:h-[500px] lg:w-[500px]" />
+        </div>
+      )}
 
       {/* Container */}
       <div className="relative z-10 flex w-full max-w-lg flex-col gap-6 lg:max-w-5xl">
 
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <motion.button
-            onClick={onBack}
-            initial={{ opacity: 0, x: -10 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.3 }}
-            className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white/40 transition-colors hover:border-white/20 hover:text-white/70"
-          >
-            ← Retour
-          </motion.button>
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.3, delay: 0.1 }}
-            className="flex gap-2"
-          >
-            <button
-              onClick={() => setActiveTab('stats')}
-              className={[btnBaseSm, 'px-3 py-1', activeTab === 'stats' ? btnSelected : btnIdleSm].join(' ')}
+        {/* Header — masqué en mode intégré */}
+        {!hideNav && (
+          <div className="flex items-center justify-between">
+            <motion.button
+              onClick={onBack}
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.3 }}
+              className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white/40 transition-colors hover:border-white/20 hover:text-white/70"
             >
-              Mes stats
-            </button>
-            <button
-              onClick={() => setActiveTab('leaderboard')}
-              className={[btnBaseSm, 'px-3 py-1', activeTab === 'leaderboard' ? btnSelected : btnIdleSm].join(' ')}
+              ← Retour
+            </motion.button>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.3, delay: 0.1 }}
+              className="flex gap-2"
             >
-              Classement
-            </button>
-          </motion.div>
-          <div className="w-20" />
-        </div>
+              <button
+                onClick={() => setActiveTab('stats')}
+                className={[btnBaseSm, 'px-3 py-1', activeTab === 'stats' ? btnSelected : btnIdleSm].join(' ')}
+              >
+                Mes stats
+              </button>
+              <button
+                onClick={() => setActiveTab('leaderboard')}
+                className={[btnBaseSm, 'px-3 py-1', activeTab === 'leaderboard' ? btnSelected : btnIdleSm].join(' ')}
+              >
+                Classement
+              </button>
+            </motion.div>
+            <div className="w-20" />
+          </div>
+        )}
 
         {/* Contenu — 1 colonne mobile, 2 colonnes lg */}
         <div className="flex flex-col gap-6 lg:grid lg:grid-cols-[260px_1fr] lg:items-start lg:gap-10">
 
           {/* Colonne gauche — Global + Filtres */}
           <motion.div
-            variants={{ hidden: {}, show: { transition: { staggerChildren: 0.08, delayChildren: 0.15 } } }}
-            initial="hidden"
-            animate="show"
-            className="flex flex-col gap-6 lg:sticky lg:top-6"
+            variants={hideNav ? undefined : { hidden: {}, show: { transition: { staggerChildren: 0.08, delayChildren: 0.15 } } }}
+            initial={hideNav ? false : 'hidden'}
+            animate={hideNav ? false : 'show'}
+            className={`flex flex-col gap-6 ${hideNav ? '' : 'lg:sticky lg:top-6'}`}
           >
             {/* Bloc global — onglet stats, connecté uniquement */}
             {activeTab === 'stats' && user && (

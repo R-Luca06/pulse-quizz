@@ -6,12 +6,13 @@ import ResultScreen from './components/result/ResultScreen'
 import RankingRevealScreen from './components/ranking/RankingRevealScreen'
 import StatsPage from './components/stats/StatsPage'
 import AuthModal from './components/auth/AuthModal'
+import ProfilePage from './components/profile/ProfilePage'
 import { useSettings } from './hooks/useSettings'
 import { useAuth } from './hooks/useAuth'
 import { useGameOrchestration } from './hooks/useGameOrchestration'
 import type { Language, GameResult, RankingData } from './types/quiz'
 
-export type AppScreen = 'landing' | 'launching' | 'quiz' | 'ranking' | 'result' | 'stats'
+export type AppScreen = 'landing' | 'launching' | 'quiz' | 'ranking' | 'result' | 'stats' | 'profile'
 
 export default function App() {
   const { settings, update } = useSettings()
@@ -52,6 +53,8 @@ export default function App() {
 
   function handleBackFromStats() { setScreen(statsOrigin) }
 
+  function handleShowProfile() { setScreen('profile') }
+
   return (
     <>
       <div className="min-h-screen bg-game-bg font-game">
@@ -71,6 +74,7 @@ export default function App() {
                 autoOpenSettings={returnToSettings}
                 onShowStats={(tab) => handleShowStats('landing', tab)}
                 onOpenAuth={() => setAuthModalOpen(true)}
+                onShowProfile={handleShowProfile}
               />
             </motion.div>
           )}
@@ -135,6 +139,18 @@ export default function App() {
                 userRank={gameResult.userRank}
                 rankDelta={gameResult.rankDelta}
               />
+            </motion.div>
+          )}
+
+          {screen === 'profile' && (
+            <motion.div
+              key="profile"
+              initial={{ opacity: 0, y: 40 }}
+              animate={{ opacity: 1, y: 0, transition: { duration: 0.5, delay: 0.1, ease: 'easeOut' } }}
+              exit={{ opacity: 0, transition: { duration: 0.25 } }}
+              className="absolute inset-0"
+            >
+              <ProfilePage onBack={() => setScreen('landing')} />
             </motion.div>
           )}
 

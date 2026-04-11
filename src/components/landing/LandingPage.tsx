@@ -20,9 +20,10 @@ interface Props {
   autoOpenSettings?: boolean
   onShowStats: (tab?: 'stats' | 'leaderboard') => void
   onOpenAuth: () => void
+  onShowProfile: () => void
 }
 
-export default function LandingPage({ settings, onSettingsChange, onStart, onExplosion, screen, autoOpenSettings, onShowStats, onOpenAuth }: Props) {
+export default function LandingPage({ settings, onSettingsChange, onStart, onExplosion, screen, autoOpenSettings, onShowStats, onOpenAuth, onShowProfile }: Props) {
   const { user, profile, signOut } = useAuth()
   const toast = useToast()
   const isLaunching = screen === 'launching'
@@ -86,8 +87,8 @@ export default function LandingPage({ settings, onSettingsChange, onStart, onExp
         transition={{ duration: 0.5, delay: 0.3 }}
       >
         {/* Wordmark */}
-        <span className="select-none text-sm font-black tracking-tight text-white/20">
-          Pulse<span className="text-neon-violet/40">Quizz</span>
+        <span className="select-none text-sm font-black tracking-tight text-white/70">
+          Pulse<span className="text-neon-violet">Quizz</span>
         </span>
 
         {/* Actions */}
@@ -95,7 +96,7 @@ export default function LandingPage({ settings, onSettingsChange, onStart, onExp
           <button
             onClick={() => onShowStats('leaderboard')}
             aria-label="Voir le classement"
-            className="group flex h-8 items-center overflow-hidden rounded-full border border-white/10 bg-white/5 pl-[9px] pr-[9px] text-white/30 transition-[border-color,color,padding] duration-300 ease-in-out hover:border-white/20 hover:pr-3 hover:text-white/60"
+            className="group flex h-8 items-center overflow-hidden rounded-full border border-white/20 bg-white/[0.08] pl-[9px] pr-[9px] text-white/60 transition-[border-color,color,padding] duration-300 ease-in-out hover:border-white/35 hover:pr-3 hover:text-white/80"
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
               <path d="M8 6h8M8 12h8M8 18h8M3 6h.01M3 12h.01M3 18h.01"/>
@@ -107,7 +108,7 @@ export default function LandingPage({ settings, onSettingsChange, onStart, onExp
           <button
             onClick={() => onShowStats('stats')}
             aria-label="Voir les statistiques"
-            className="group flex h-8 items-center overflow-hidden rounded-full border border-white/10 bg-white/5 pl-[9px] pr-[9px] text-white/30 transition-[border-color,color,padding] duration-300 ease-in-out hover:border-white/20 hover:pr-3 hover:text-white/60"
+            className="group flex h-8 items-center overflow-hidden rounded-full border border-white/20 bg-white/[0.08] pl-[9px] pr-[9px] text-white/60 transition-[border-color,color,padding] duration-300 ease-in-out hover:border-white/35 hover:pr-3 hover:text-white/80"
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
               <rect x="18" y="3" width="4" height="18" rx="1"/>
@@ -125,11 +126,16 @@ export default function LandingPage({ settings, onSettingsChange, onStart, onExp
           {/* Auth */}
           {user ? (
             <div className="flex items-center gap-2">
-              <span className="select-none text-xs font-semibold text-white/40">@{profile?.username}</span>
+              <button
+                onClick={onShowProfile}
+                className="select-none cursor-pointer text-xs font-semibold text-white/70 transition-colors hover:text-white"
+              >
+                @{profile?.username}
+              </button>
               <button
                 onClick={() => signOut().then(() => toast.success('Déconnecté'))}
                 aria-label="Se déconnecter"
-                className="flex h-7 w-7 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/30 transition-colors hover:border-white/20 hover:text-white/60"
+                className="flex h-7 w-7 items-center justify-center rounded-full border border-white/20 bg-white/5 text-white/60 transition-colors hover:border-white/35 hover:text-white/80"
               >
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
@@ -142,7 +148,7 @@ export default function LandingPage({ settings, onSettingsChange, onStart, onExp
             <button
               onClick={onOpenAuth}
               aria-label="Se connecter"
-              className="flex items-center gap-1.5 rounded-full border border-white/[0.07] bg-white/[0.03] px-3 py-1.5 text-xs font-semibold text-white/40 transition-colors hover:border-white/10 hover:text-white/60"
+              className="flex items-center gap-1.5 rounded-full border border-white/15 bg-white/[0.06] px-3 py-1.5 text-xs font-semibold text-white/65 transition-colors hover:border-white/25 hover:text-white/80"
             >
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
