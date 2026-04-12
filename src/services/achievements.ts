@@ -50,7 +50,7 @@ export async function checkAndUnlockAchievements(
   const [profileResult, globalStatsResult, compResult] = await Promise.all([
     supabase.from('profiles').select('created_at').eq('id', userId).maybeSingle(),
     supabase.from('user_global_stats').select('games_played').eq('user_id', userId).maybeSingle(),
-    supabase.from('comp_leaderboard').select('id').eq('user_id', userId).limit(1),
+    supabase.from('leaderboard').select('id').eq('user_id', userId).eq('mode', 'compétitif').limit(1),
   ])
 
   const gamesPlayed = (globalStatsResult.data as { games_played: number } | null)?.games_played ?? 0

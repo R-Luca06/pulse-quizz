@@ -74,8 +74,10 @@ export function useGameOrchestration(params: UseGameOrchestrationParams) {
     if (!user || mode !== 'compétitif' || !profile) {
       if (user && mode === 'normal') {
         incrementCategoryStats(user.id, mode, difficulty, category, score, results).catch(console.error)
-        incrementGlobalStats(user.id, results, score, mode).catch(console.error)
-        checkAndUnlockAchievements(user.id, { maxStreak, score, mode })
+        // Chaîner le check achievements APRÈS l'incrément des stats globales pour éviter
+        // la race condition sur games_played (ex: Centenaire lu à 99 au lieu de 100)
+        incrementGlobalStats(user.id, results, score, mode)
+          .then(() => checkAndUnlockAchievements(user.id, { maxStreak, score, mode }))
           .then(newlyUnlocked => { if (newlyUnlocked.length > 0) setNewAchievements(newlyUnlocked) })
           .catch(console.error)
       }

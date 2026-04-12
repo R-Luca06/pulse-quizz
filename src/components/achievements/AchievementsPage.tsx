@@ -110,7 +110,9 @@ function AchievementCard({ achievement, pendingId, onBadgeReady }: { achievement
           ? { borderColor: `${hex}90`, boxShadow: `0 0 22px ${hex}70, 0 0 45px ${hex}28` }
           : status === 'unlocked'
             ? { borderColor: `${hex}55` }
-            : {}),
+            : status === 'in_progress'
+              ? { borderColor: `${hex}40` }
+              : {}),
       }}
       className={[
         'relative flex min-h-[160px] flex-col items-center gap-3 rounded-xl border p-4 text-center transition-colors',
@@ -118,7 +120,7 @@ function AchievementCard({ achievement, pendingId, onBadgeReady }: { achievement
           ? 'border-white/[0.06] bg-white/[0.02]'
           : status === 'unlocked'
             ? `bg-game-card shadow-md ${colors.glow}`
-            : 'border-white/[0.07] bg-game-card/50',
+            : 'bg-game-card/70',
       ].join(' ')}
     >
       {/* Anneau de pulse pendant la phase réceptive */}
@@ -224,7 +226,11 @@ function AchievementCard({ achievement, pendingId, onBadgeReady }: { achievement
 
       {/* Bas de card */}
       <div className="w-full">
-        {achievement.progress !== null ? (
+        {status === 'unlocked' ? (
+          <span className={`inline-block rounded-full px-2 py-0.5 text-[9px] font-semibold ${colors.text} bg-white/5`}>
+            Accompli
+          </span>
+        ) : achievement.progress !== null ? (
           <div className="flex flex-col gap-1">
             <div className="h-0.5 w-full overflow-hidden rounded-full bg-white/10">
               <div
@@ -236,10 +242,6 @@ function AchievementCard({ achievement, pendingId, onBadgeReady }: { achievement
               {achievement.progress.current} / {achievement.progress.total}
             </p>
           </div>
-        ) : status === 'unlocked' ? (
-          <span className={`inline-block rounded-full px-2 py-0.5 text-[9px] font-semibold ${colors.text} bg-white/5`}>
-            Accompli
-          </span>
         ) : (
           <span className="inline-block rounded-full bg-white/5 px-2 py-0.5 text-[9px] font-semibold text-white/18">
             Non débuté

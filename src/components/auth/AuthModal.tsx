@@ -9,12 +9,16 @@ interface Props {
 }
 
 function getAuthError(err: unknown): string {
-  if (typeof err === 'object' && err !== null && 'message' in err) {
-    const msg = (err as { message: string }).message
-    if (msg.includes('Email already') || msg.includes('User already registered')) return 'Email déjà utilisé'
+  if (typeof err === 'object' && err !== null) {
+    const e = err as { message?: string; status?: number; code?: string }
+    const msg = e.message ?? ''
+    const code = e.code ?? ''
+    if (msg.includes('Email already') || msg.includes('User already registered') || code === 'email_exists') return 'Email déjà utilisé'
     if (msg.includes('Invalid login') || msg.includes('Invalid email or password')) return 'Identifiants incorrects'
-    if (msg.includes('Password should') || msg.includes('at least 6')) return 'Mot de passe trop court (6 car. min.)'
+    if (msg.includes('Password should') || msg.includes('at least 6') || code === 'weak_password') return 'Mot de passe trop court (6 car. min.)'
     if (msg.includes('duplicate key') && msg.includes('username')) return 'Pseudo déjà pris'
+    if (code === 'email_address_not_authorized') return 'Adresse email non autorisée'
+    if (e.status === 422) return 'Données invalides — vérifie ton email et ton mot de passe'
   }
   return 'Une erreur est survenue — réessaie'
 }

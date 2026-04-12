@@ -80,12 +80,13 @@ export default function AchievementUnlockOverlay({ achievements, onDone, onNavig
       onNavigateRef.current(current.id)
       setPhase('exiting') // backdrop se dissout (transition CSS 0.9s)
 
-      // Poll jusqu'à ce que la card signale sa position (max 800ms)
+      // Poll jusqu'à ce que la card signale sa position (max 2000ms)
+      // Délai plus long pour couvrir le chargement Supabase + timer animation de la card (650ms)
       await new Promise<void>(resolve => {
         let elapsed = 0
         const poll = setInterval(() => {
           elapsed += 50
-          if (pendingBadgeRectRef.current || elapsed >= 800) {
+          if (pendingBadgeRectRef.current || elapsed >= 2000) {
             clearInterval(poll)
             resolve()
           }
@@ -110,6 +111,13 @@ export default function AchievementUnlockOverlay({ achievements, onDone, onNavig
         await animateBadge(badgeRef.current,
           { x: dx, y: dy, scale: targetScale },
           { duration: 0.75, ease: [0.2, 0, 0.55, 1] }
+        )
+        if (cancelled) return
+
+        // Shake synchronisé avec la card (même pattern que pendingPhase === 'inserted')
+        await animateBadge(badgeRef.current,
+          { x: [dx, dx - 7, dx + 7, dx - 5, dx + 5, dx - 3, dx + 3, dx], scale: [targetScale * 1.08, targetScale] },
+          { duration: 0.55 }
         )
       } else {
         // Fallback : réduction sur place si le rect n'est pas disponible
