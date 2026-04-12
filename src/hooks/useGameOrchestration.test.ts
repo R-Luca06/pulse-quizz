@@ -15,6 +15,10 @@ vi.mock('../services/leaderboard', () => ({
   submitScore: vi.fn().mockResolvedValue(undefined),
 }))
 
+vi.mock('../services/achievements', () => ({
+  checkAndUnlockAchievements: vi.fn().mockResolvedValue([]),
+}))
+
 import { getCloudBestScore, incrementCategoryStats, incrementGlobalStats } from '../services/cloudStats'
 import { getUserBestScore, getUserRank, submitScore } from '../services/leaderboard'
 
@@ -47,6 +51,7 @@ function makeParams(overrides: Partial<Parameters<typeof useGameOrchestration>[0
     setScreen,
     setGameResult,
     setRankingData,
+    setNewAchievements: vi.fn(),
     ...overrides,
   }
 }
