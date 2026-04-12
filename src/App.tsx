@@ -1,18 +1,19 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, lazy, Suspense } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import LandingPage from './components/landing/LandingPage'
-import QuizContainer from './components/quiz/QuizContainer'
-import ResultScreen from './components/result/ResultScreen'
-import RankingRevealScreen from './components/ranking/RankingRevealScreen'
-import StatsPage from './components/stats/StatsPage'
-import AuthModal from './components/auth/AuthModal'
-import ProfilePage from './components/profile/ProfilePage'
-import AchievementsPage from './components/achievements/AchievementsPage'
 import AchievementUnlockOverlay from './components/achievements/AchievementUnlockOverlay'
 import { useSettings } from './hooks/useSettings'
 import { useAuth } from './hooks/useAuth'
 import { useGameOrchestration } from './hooks/useGameOrchestration'
 import type { Language, GameResult, RankingData, AchievementWithStatus, AchievementId } from './types/quiz'
+
+const QuizContainer = lazy(() => import('./components/quiz/QuizContainer'))
+const ResultScreen = lazy(() => import('./components/result/ResultScreen'))
+const RankingRevealScreen = lazy(() => import('./components/ranking/RankingRevealScreen'))
+const StatsPage = lazy(() => import('./components/stats/StatsPage'))
+const AuthModal = lazy(() => import('./components/auth/AuthModal'))
+const ProfilePage = lazy(() => import('./components/profile/ProfilePage'))
+const AchievementsPage = lazy(() => import('./components/achievements/AchievementsPage'))
 
 export type AppScreen = 'landing' | 'launching' | 'quiz' | 'ranking' | 'result' | 'stats' | 'profile' | 'achievements'
 
@@ -115,6 +116,7 @@ export default function App() {
   return (
     <>
       <div className="min-h-screen bg-game-bg font-game">
+        <Suspense fallback={<div className="absolute inset-0 bg-game-bg" />}>
         <AnimatePresence mode="sync">
           {(screen === 'landing' || screen === 'launching') && (
             <motion.div
@@ -249,13 +251,16 @@ export default function App() {
             </motion.div>
           )}
         </AnimatePresence>
+        </Suspense>
       </div>
 
-      <AnimatePresence>
-        {authModalOpen && (
-          <AuthModal key="auth-modal" onClose={() => setAuthModalOpen(false)} />
-        )}
-      </AnimatePresence>
+      <Suspense fallback={null}>
+        <AnimatePresence>
+          {authModalOpen && (
+            <AuthModal key="auth-modal" onClose={() => setAuthModalOpen(false)} />
+          )}
+        </AnimatePresence>
+      </Suspense>
 
       <AnimatePresence>
         {newAchievements.length > 0 && screen !== 'quiz' && screen !== 'launching' && screen !== 'ranking' && (
