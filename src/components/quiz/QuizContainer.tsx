@@ -83,8 +83,10 @@ export default function QuizContainer({ onFinished, onQuit, gameMode, difficulty
     const prev = prevStreakRef.current
     prevStreakRef.current = streak
     if (streak > prev && COMBO_MILESTONES.includes(streak)) {
-      setComboValue(streak)
-      setComboVisible(true)
+      queueMicrotask(() => {
+        setComboValue(streak)
+        setComboVisible(true)
+      })
       const id = setTimeout(() => setComboVisible(false), 900)
       return () => clearTimeout(id)
     }

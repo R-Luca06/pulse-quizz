@@ -16,12 +16,9 @@ export function useTimer(
   const onTimeoutRef = useRef(onTimeout)
   useEffect(() => { onTimeoutRef.current = onTimeout })
 
-  // Reset elapsed when the question changes
   useEffect(() => {
-    setElapsed(0)
-  }, [questionKey])
-
-  useEffect(() => {
+    // Reset via microtask — runs before first interval tick
+    queueMicrotask(() => setElapsed(0))
     if (!active) return
 
     const id = setInterval(() => {

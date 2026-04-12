@@ -30,8 +30,6 @@ export default function RankingRevealScreen({
   userRank,
   rankDelta,
   userId,
-  username: _username,
-  userScore: _userScore,
   language,
   onDone,
 }: Props) {
@@ -55,7 +53,7 @@ export default function RankingRevealScreen({
 
   // Fetch page data when page changes
   useEffect(() => {
-    setLoading(true)
+    queueMicrotask(() => setLoading(true))
     getCompLeaderboardPage(language, page, PAGE_SIZE)
       .then(data => {
         setEntries(data)

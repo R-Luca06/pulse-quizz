@@ -36,10 +36,10 @@ export default function LandingPage({ settings, onSettingsChange, onStart, onExp
 
   useEffect(() => {
     if (!isLaunching) {
-      setLaunchPhase('idle')
+      queueMicrotask(() => setLaunchPhase('idle'))
       return
     }
-    setLaunchPhase('converging')
+    queueMicrotask(() => setLaunchPhase('converging'))
     const t = setTimeout(async () => {
       setLaunchPhase('shaking')
       await shakeControls.start({
@@ -50,7 +50,7 @@ export default function LandingPage({ settings, onSettingsChange, onStart, onExp
       onExplosion()
     }, 380)
     return () => clearTimeout(t)
-  }, [isLaunching, shakeControls])
+  }, [isLaunching, shakeControls, onExplosion])
 
   function handleLaunch() {
     setOpenSettings(false)

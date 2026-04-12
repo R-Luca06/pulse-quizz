@@ -47,14 +47,15 @@ export function useQuiz(
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null)
   const [answerState, setAnswerState] = useState<AnswerState>('idle')
   const [currentMultiplier, setCurrentMultiplier] = useState(COMP_SPEED_TIERS[0].multiplier)
+  const [totalAnswered, setTotalAnswered] = useState(0)
   const feedbackTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const multiplierTimer = useRef<ReturnType<typeof setInterval> | null>(null)
   const resultsRef = useRef<QuestionResult[]>([])
-  const questionStartTime = useRef<number>(Date.now())
+  const questionStartTime = useRef<number>(0)
   const isPrefetching = useRef(false)
   const loadAbortRef = useRef<AbortController | null>(null)
-  // Snapshot des settings à l'init — pour le prefetch compétitif
   const settingsRef = useRef(settings)
+  const loadQuestionsRef = useRef<() => void>(() => {})
 
   const loadQuestions = useCallback(async () => {
     // Cancel any previous in-flight request (prevents double-fetch from StrictMode remount)
@@ -64,13 +65,15 @@ export function useQuiz(
 
     setPhase('loading')
     resultsRef.current = []
+    setTotalAnswered(0)
     try {
-      const qs = settings.gameMode === 'compétitif'
-        ? await fetchCompetitifBatch(settings.language, controller.signal)
+      const s = settingsRef.current
+      const qs = s.gameMode === 'compétitif'
+        ? await fetchCompetitifBatch(s.language, controller.signal)
         : await fetchQuestions({
-            difficulty: settings.difficulty,
-            language: settings.language,
-            category: settings.category,
+            difficulty: s.difficulty,
+            language: s.language,
+            category: s.category,
           }, controller.signal)
       if (controller.signal.aborted) return
       setQuestions(qs)
@@ -85,19 +88,18 @@ export function useQuiz(
       if (controller.signal.aborted) return
       if (err instanceof ApiError && err.code === 'rate_limit') {
         setIsRetrying(true)
-        setTimeout(() => { setIsRetrying(false); loadQuestions() }, 5000)
+        setTimeout(() => { setIsRetrying(false); loadQuestionsRef.current() }, 5000)
       } else {
         setPhase('error')
       }
     }
   }, [])
 
-  useEffect(() => {
-    settingsRef.current = settings
-  })
+  useEffect(() => { settingsRef.current = settings }, [settings])
+  useEffect(() => { loadQuestionsRef.current = loadQuestions }, [loadQuestions])
 
   useEffect(() => {
-    loadQuestions()
+    queueMicrotask(() => loadQuestions())
     return () => {
       loadAbortRef.current?.abort()
       if (feedbackTimer.current) clearTimeout(feedbackTimer.current)
@@ -110,7 +112,7 @@ export function useQuiz(
     if (phase === 'playing') {
       questionStartTime.current = Date.now()
       if (settingsRef.current.gameMode === 'compétitif') {
-        setCurrentMultiplier(COMP_SPEED_TIERS[0].multiplier)
+        queueMicrotask(() => setCurrentMultiplier(COMP_SPEED_TIERS[0].multiplier))
         if (multiplierTimer.current) clearInterval(multiplierTimer.current)
         multiplierTimer.current = setInterval(() => {
           const elapsed = (Date.now() - questionStartTime.current) / 1000
@@ -216,6 +218,7 @@ export function useQuiz(
         ...(pointsEarned !== undefined && { pointsEarned }),
         ...(multiplier !== undefined && { multiplier }),
       })
+      setTotalAnswered(prev => prev + 1)
 
       setSelectedAnswer(answer)
       setAnswerState(isCorrect ? 'correct' : 'wrong')
@@ -245,6 +248,7 @@ export function useQuiz(
       isCorrect: false,
       timeSpent,
     })
+    setTotalAnswered(prev => prev + 1)
 
     setSelectedAnswer(null)
     setAnswerState('timeout')
@@ -264,7 +268,7 @@ export function useQuiz(
     streak,
     selectedAnswer,
     answerState,
-    totalAnswered: resultsRef.current.length,
+    totalAnswered,
     currentMultiplier,
     handleAnswer,
     handleTimeout,

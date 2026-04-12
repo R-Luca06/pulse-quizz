@@ -139,7 +139,7 @@ export default function StatsPage({ onBack, defaultTab = 'stats', initialDiff, i
       })
       .catch(console.error)
       .finally(() => setCloudLoading(false))
-  }, [user?.id])
+  }, [user])
 
   useEffect(() => {
     if (activeTab !== 'leaderboard') return
