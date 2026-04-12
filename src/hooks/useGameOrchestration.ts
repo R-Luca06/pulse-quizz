@@ -87,7 +87,8 @@ export function useGameOrchestration(params: UseGameOrchestrationParams) {
 
     // Competitive + authenticated — await all data then show ranking reveal
     try {
-      checkAndUnlockAchievements(user.id, { maxStreak, score, mode })
+      incrementGlobalStats(user.id, results, score, mode)
+        .then(() => checkAndUnlockAchievements(user.id, { maxStreak, score, mode }))
         .then(newlyUnlocked => { if (newlyUnlocked.length > 0) setNewAchievements(newlyUnlocked) })
         .catch(console.error)
 

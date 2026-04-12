@@ -11,6 +11,7 @@ export interface CloudCategoryStatRow {
   games_played: number
   total_questions: number
   total_correct: number
+  total_time: number
   best_score: number
   best_streak: number
   fastest_perfect: number | null
@@ -23,6 +24,7 @@ export interface CloudGlobalStatRow {
   total_correct: number
   best_streak: number
   fastest_perfect: number | null
+  comp_total_score: number
 }
 
 export async function incrementCategoryStats(
@@ -48,7 +50,7 @@ export async function incrementCategoryStats(
 
   const prev = existing ?? {
     games_played: 0, total_questions: 0, total_correct: 0,
-    best_score: 0, best_streak: 0, fastest_perfect: null,
+    total_time: 0, best_score: 0, best_streak: 0, fastest_perfect: null,
   }
 
   await supabase.from('user_stats').upsert({
@@ -59,6 +61,7 @@ export async function incrementCategoryStats(
     games_played:    prev.games_played + 1,
     total_questions: prev.total_questions + results.length,
     total_correct:   prev.total_correct + gameScore,
+    total_time:      Math.round(((prev.total_time ?? 0) + totalTime) * 10) / 10,
     best_score:      Math.max(prev.best_score, gameScore),
     best_streak:     Math.max(prev.best_streak, streak),
     fastest_perfect: isPerfect
@@ -86,18 +89,23 @@ export async function incrementGlobalStats(
 
   const prev = existing ?? {
     games_played: 0, total_questions: 0, total_correct: 0,
-    best_streak: 0, fastest_perfect: null,
+    best_streak: 0, fastest_perfect: null, comp_total_score: 0,
   }
+
+  const correctCount = results.filter(r => r.isCorrect).length
 
   await supabase.from('user_global_stats').upsert({
     user_id: userId,
-    games_played:    prev.games_played + 1,
-    total_questions: prev.total_questions + results.length,
-    total_correct:   prev.total_correct + gameScore,
-    best_streak:     Math.max(prev.best_streak, streak),
-    fastest_perfect: isPerfect
+    games_played:      prev.games_played + 1,
+    total_questions:   prev.total_questions + results.length,
+    total_correct:     prev.total_correct + correctCount,
+    best_streak:       Math.max(prev.best_streak, streak),
+    fastest_perfect:   isPerfect
       ? prev.fastest_perfect === null ? totalTime : Math.min(prev.fastest_perfect, totalTime)
       : prev.fastest_perfect,
+    comp_total_score:  mode === 'compétitif'
+      ? (prev.comp_total_score ?? 0) + gameScore
+      : (prev.comp_total_score ?? 0),
     updated_at: new Date().toISOString(),
   }, { onConflict: 'user_id' })
 }

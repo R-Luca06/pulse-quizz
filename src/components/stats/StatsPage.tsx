@@ -39,12 +39,21 @@ const fadeUp = { hidden: { opacity: 0, y: 16 }, show: { opacity: 1, y: 0 } }
 
 const EMPTY_CAT_STATS: CategoryStats = {
   version: 1, gamesPlayed: 0, totalQuestions: 0, totalCorrect: 0,
-  bestScore: 0, bestStreak: 0, fastestPerfect: null,
+  totalTime: 0, bestScore: 0, bestStreak: 0, fastestPerfect: null,
+}
+
+function formatTotalTime(seconds: number): string {
+  if (seconds <= 0) return '0s'
+  const s = Math.round(seconds)
+  if (s < 60) return `${s}s`
+  const m = Math.floor(s / 60)
+  const rem = s % 60
+  return rem > 0 ? `${m}m ${rem}s` : `${m}m`
 }
 
 const EMPTY_GLOBAL_STATS: GlobalStats = {
   version: 1, gamesPlayed: 0, totalQuestions: 0, totalCorrect: 0,
-  bestStreak: 0, fastestPerfect: null,
+  bestStreak: 0, fastestPerfect: null, comp_total_score: 0,
 }
 
 function cloudRowToCatStats(row: CloudCategoryStatRow): CategoryStats {
@@ -53,6 +62,7 @@ function cloudRowToCatStats(row: CloudCategoryStatRow): CategoryStats {
     gamesPlayed: row.games_played,
     totalQuestions: row.total_questions,
     totalCorrect: row.total_correct,
+    totalTime: row.total_time ?? 0,
     bestScore: row.best_score,
     bestStreak: row.best_streak,
     fastestPerfect: row.fastest_perfect,
@@ -67,14 +77,34 @@ function cloudRowToGlobalStats(row: CloudGlobalStatRow): GlobalStats {
     totalCorrect: row.total_correct,
     bestStreak: row.best_streak,
     fastestPerfect: row.fastest_perfect,
+    comp_total_score: row.comp_total_score,
   }
 }
+
+function aggregateCatStats(rows: CloudCategoryStatRow[]): CategoryStats {
+  if (rows.length === 0) return { ...EMPTY_CAT_STATS }
+  const fps = rows.map(r => r.fastest_perfect).filter((v): v is number => v !== null)
+  return {
+    version: 1,
+    gamesPlayed: rows.reduce((s, r) => s + r.games_played, 0),
+    totalQuestions: rows.reduce((s, r) => s + r.total_questions, 0),
+    totalCorrect: rows.reduce((s, r) => s + r.total_correct, 0),
+    totalTime: rows.reduce((s, r) => s + (r.total_time ?? 0), 0),
+    bestScore: Math.max(...rows.map(r => r.best_score)),
+    bestStreak: Math.max(...rows.map(r => r.best_streak)),
+    fastestPerfect: fps.length > 0 ? Math.min(...fps) : null,
+  }
+}
+
+const STATS_DIFFICULTIES: { value: Difficulty; label: string }[] = [
+  { value: 'mixed', label: 'Mixte' },
+  ...DIFFICULTIES,
+]
 
 export default function StatsPage({ onBack, defaultTab = 'stats', initialDiff, initialLang, hideNav = false }: Props) {
   const { user } = useAuth()
   const [activeTab, setActiveTab] = useState<'stats' | 'leaderboard'>(defaultTab)
-  const validInitialDiff = initialDiff && initialDiff !== 'mixed' ? initialDiff : 'easy'
-  const [filterDiff, setFilterDiff] = useState<Difficulty>(validInitialDiff)
+  const [filterDiff, setFilterDiff] = useState<Difficulty>(initialDiff ?? 'mixed')
   const [filterLang, setFilterLang] = useState<Language>(initialLang ?? 'fr')
   const [statsLang, setStatsLang] = useState<Language>(initialLang ?? 'fr')
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([])
@@ -172,27 +202,43 @@ export default function StatsPage({ onBack, defaultTab = 'stats', initialDiff, i
     return cloudGlobal ? cloudRowToGlobalStats(cloudGlobal) : EMPTY_GLOBAL_STATS
   }, [user, cloudGlobal, cloudLoading])
 
-  const globalRate = effectiveGlobal.totalQuestions > 0
-    ? Math.round((effectiveGlobal.totalCorrect / effectiveGlobal.totalQuestions) * 100)
-    : 0
-
   const sorted = useMemo(() => {
     if (!user) return []
+
     const getStats = (catValue: string | number): CategoryStats => {
       if (cloudLoading) return { ...EMPTY_CAT_STATS }
+      if (filterDiff === 'mixed') {
+        const rows = cloudCats.filter(r => r.mode === 'normal' && r.category === String(catValue))
+        return aggregateCatStats(rows)
+      }
       const row = cloudCats.find(
         r => r.mode === 'normal' && r.difficulty === filterDiff && r.category === String(catValue)
       )
       return row ? cloudRowToCatStats(row) : { ...EMPTY_CAT_STATS }
     }
 
-    const catList = FR_CATEGORIES.filter(c => c.value !== 'all')
+    // Bloc "Toutes catégories" — agrégat de toutes les lignes selon le filtre courant
+    const allRows = cloudLoading
+      ? []
+      : filterDiff === 'mixed'
+        ? cloudCats.filter(r => r.mode === 'normal')
+        : cloudCats.filter(r => r.mode === 'normal' && r.difficulty === filterDiff)
+    const allCatItem = {
+      value: 'all' as const,
+      label: 'Toutes catégories',
+      stats: aggregateCatStats(allRows),
+      isAll: true,
+    }
 
+    const catList = FR_CATEGORIES.filter(c => c.value !== 'all')
     const catsWithStats = catList.map(cat => ({
       ...cat,
       stats: getStats(cat.value),
+      isAll: false,
     }))
+
     return [
+      allCatItem,
       ...catsWithStats.filter(c => c.stats.gamesPlayed > 0),
       ...catsWithStats.filter(c => c.stats.gamesPlayed === 0),
     ]
@@ -263,12 +309,12 @@ export default function StatsPage({ onBack, defaultTab = 'stats', initialDiff, i
                 </p>
                 <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-2">
                   <StatTile label="Parties" value={effectiveGlobal.gamesPlayed} />
-                  <StatTile label="Réussite" value={`${globalRate}%`} accent="text-neon-violet" />
+                  <StatTile label="Questions Justes" value={effectiveGlobal.totalCorrect} accent="text-neon-violet" />
                   <StatTile label="Série max" value={`${effectiveGlobal.bestStreak}×`} accent="text-yellow-400" />
                   <StatTile
-                    label="Parfait en"
-                    value={effectiveGlobal.fastestPerfect !== null ? `${effectiveGlobal.fastestPerfect.toFixed(1)}s` : '—'}
-                    accent={effectiveGlobal.fastestPerfect !== null ? 'text-game-success' : 'text-white/30'}
+                    label="Score Compétitif"
+                    value={effectiveGlobal.comp_total_score > 0 ? effectiveGlobal.comp_total_score.toLocaleString('fr-FR') + ' pts' : '—'}
+                    accent={effectiveGlobal.comp_total_score > 0 ? 'text-orange-400' : 'text-white/30'}
                   />
                 </div>
               </motion.div>
@@ -306,7 +352,7 @@ export default function StatsPage({ onBack, defaultTab = 'stats', initialDiff, i
                       ))}
                     </div>
                     <div className="flex gap-2">
-                      {DIFFICULTIES.map(d => (
+                      {STATS_DIFFICULTIES.map(d => (
                         <button
                           key={d.value}
                           onClick={() => setFilterDiff(d.value)}
@@ -335,7 +381,9 @@ export default function StatsPage({ onBack, defaultTab = 'stats', initialDiff, i
               </div>
             ) : activeTab === 'stats' ? (
               <>
-                <p className="mb-3 text-[10px] font-bold uppercase tracking-widest text-white/30">Par catégorie</p>
+                <p className="mb-3 text-[10px] font-bold uppercase tracking-widest text-white/30">
+                  Par catégorie <span className="text-white/25">· Mode Normal</span>
+                </p>
                 <div className="flex flex-col gap-2 lg:grid lg:grid-cols-2 lg:gap-3">
                   {sorted.map((cat, i) => {
                     const s = cat.stats
@@ -352,7 +400,7 @@ export default function StatsPage({ onBack, defaultTab = 'stats', initialDiff, i
                         transition={{ duration: 0.3, delay: 0.2 + i * 0.04 }}
                         className={[
                           'rounded-xl border border-white/[0.08] bg-white/[0.03] p-4 transition-opacity',
-                          played ? '' : 'opacity-40',
+                          !cat.isAll && !played ? 'opacity-40' : '',
                         ].join(' ')}
                       >
                         <div className="mb-2 flex items-center justify-between">
@@ -364,17 +412,14 @@ export default function StatsPage({ onBack, defaultTab = 'stats', initialDiff, i
                           )}
                         </div>
 
-                        {!played ? (
+                        {!cat.isAll && !played ? (
                           <p className="text-xs text-white/30">Pas encore joué</p>
                         ) : (
                           <div className="grid grid-cols-2 gap-x-6 gap-y-2">
-                            <Metric label="Meilleur score" value={`${s.bestScore}/10`} />
+                            <Metric label="Questions justes" value={String(s.totalCorrect)} />
+                            <Metric label="Questions totales" value={String(s.totalQuestions)} />
                             <Metric label="Réussite" value={`${rate}%`} />
-                            <Metric label="Meilleure série" value={`${s.bestStreak}×`} />
-                            <Metric
-                              label="Parfait en"
-                              value={s.fastestPerfect !== null ? `${s.fastestPerfect.toFixed(1)}s` : '—'}
-                            />
+                            <Metric label="Temps total" value={s.totalTime > 0 ? formatTotalTime(s.totalTime) : '—'} />
                           </div>
                         )}
                       </motion.div>

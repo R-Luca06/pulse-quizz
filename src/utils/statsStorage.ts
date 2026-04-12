@@ -11,6 +11,7 @@ export interface CategoryStats {
   gamesPlayed: number
   totalQuestions: number
   totalCorrect: number
+  totalTime: number              // somme de tous les temps de réponse, en secondes
   bestScore: number
   bestStreak: number
   fastestPerfect: number | null  // secondes, null si jamais parfait en mode normal
@@ -23,6 +24,7 @@ export interface GlobalStats {
   totalCorrect: number
   bestStreak: number
   fastestPerfect: number | null
+  comp_total_score: number
 }
 
 const EMPTY_CATEGORY_STATS: CategoryStats = {
@@ -30,6 +32,7 @@ const EMPTY_CATEGORY_STATS: CategoryStats = {
   gamesPlayed: 0,
   totalQuestions: 0,
   totalCorrect: 0,
+  totalTime: 0,
   bestScore: 0,
   bestStreak: 0,
   fastestPerfect: null,
@@ -42,6 +45,7 @@ const EMPTY_GLOBAL_STATS: GlobalStats = {
   totalCorrect: 0,
   bestStreak: 0,
   fastestPerfect: null,
+  comp_total_score: 0,
 }
 
 // ─── Migrations ───────────────────────────────────────────────────────────────
@@ -56,12 +60,13 @@ function migrateCategory(raw: any): CategoryStats {
       gamesPlayed:    raw.gamesPlayed    ?? 0,
       totalQuestions: raw.totalQuestions ?? 0,
       totalCorrect:   raw.totalCorrect   ?? 0,
+      totalTime:      raw.totalTime      ?? 0,
       bestScore:      raw.bestScore      ?? 0,
       bestStreak:     raw.bestStreak     ?? 0,
       fastestPerfect: raw.fastestPerfect ?? null,
     }
   }
-  return raw as CategoryStats
+  return { ...raw, totalTime: raw.totalTime ?? 0 } as CategoryStats
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -70,14 +75,15 @@ function migrateGlobal(raw: any): GlobalStats {
   if (v === 0) {
     return {
       version: STATS_VERSION,
-      gamesPlayed:    raw.gamesPlayed    ?? 0,
-      totalQuestions: raw.totalQuestions ?? 0,
-      totalCorrect:   raw.totalCorrect   ?? 0,
-      bestStreak:     raw.bestStreak     ?? 0,
-      fastestPerfect: raw.fastestPerfect ?? null,
+      gamesPlayed:      raw.gamesPlayed    ?? 0,
+      totalQuestions:   raw.totalQuestions ?? 0,
+      totalCorrect:     raw.totalCorrect   ?? 0,
+      bestStreak:       raw.bestStreak     ?? 0,
+      fastestPerfect:   raw.fastestPerfect ?? null,
+      comp_total_score: raw.comp_total_score ?? 0,
     }
   }
-  return raw as GlobalStats
+  return { ...raw, comp_total_score: raw.comp_total_score ?? 0 } as GlobalStats
 }
 
 // ─── Keys ─────────────────────────────────────────────────────────────────────
@@ -136,6 +142,7 @@ export function updateStats(
     gamesPlayed:    cat.gamesPlayed + 1,
     totalQuestions: cat.totalQuestions + results.length,
     totalCorrect:   cat.totalCorrect + score,
+    totalTime:      Math.round((cat.totalTime + totalTime) * 10) / 10,
     bestScore:      Math.max(cat.bestScore, score),
     bestStreak:     Math.max(cat.bestStreak, streak),
     fastestPerfect: isPerfect
@@ -147,14 +154,15 @@ export function updateStats(
   // --- Global stats ---
   const global = getGlobalStats()
   const newGlobal: GlobalStats = {
-    version:        STATS_VERSION,
-    gamesPlayed:    global.gamesPlayed + 1,
-    totalQuestions: global.totalQuestions + results.length,
-    totalCorrect:   global.totalCorrect + score,
-    bestStreak:     Math.max(global.bestStreak, streak),
-    fastestPerfect: isPerfect
+    version:          STATS_VERSION,
+    gamesPlayed:      global.gamesPlayed + 1,
+    totalQuestions:   global.totalQuestions + results.length,
+    totalCorrect:     global.totalCorrect + score,
+    bestStreak:       Math.max(global.bestStreak, streak),
+    fastestPerfect:   isPerfect
       ? global.fastestPerfect === null ? totalTime : Math.min(global.fastestPerfect, totalTime)
       : global.fastestPerfect,
+    comp_total_score: global.comp_total_score,
   }
   localStorage.setItem('pulse_stats_global', JSON.stringify(newGlobal))
 }
