@@ -1,14 +1,31 @@
 import type { User } from '@supabase/supabase-js'
 import type { AppScreen } from '../App'
 import type { GameSettings } from './useSettings'
-import type { QuestionResult, GameResult, RankingData } from '../types/quiz'
+import type { QuestionResult, GameResult, RankingData, AchievementWithStatus } from '../types/quiz'
+
+type OnNewAchievements = (achievements: AchievementWithStatus[]) => void
 import { getCloudBestScore } from '../services/cloudStats'
 import { incrementCategoryStats, incrementGlobalStats } from '../services/cloudStats'
 import { submitScore, getUserBestScore, getUserRank } from '../services/leaderboard'
+import { checkAndUnlockAchievements } from '../services/achievements'
 import type React from 'react'
 
 interface Profile {
   username: string
+}
+
+function computeMaxStreak(results: QuestionResult[]): number {
+  let max = 0
+  let current = 0
+  for (const r of results) {
+    if (r.isCorrect) {
+      current++
+      if (current > max) max = current
+    } else {
+      current = 0
+    }
+  }
+  return max
 }
 
 interface UseGameOrchestrationParams {
@@ -18,13 +35,15 @@ interface UseGameOrchestrationParams {
   setScreen: (s: AppScreen) => void
   setGameResult: React.Dispatch<React.SetStateAction<GameResult>>
   setRankingData: React.Dispatch<React.SetStateAction<RankingData | null>>
+  setNewAchievements: OnNewAchievements
 }
 
 export function useGameOrchestration(params: UseGameOrchestrationParams) {
-  const { settings, user, profile, setScreen, setGameResult, setRankingData } = params
+  const { settings, user, profile, setScreen, setGameResult, setRankingData, setNewAchievements } = params
 
   async function handleFinished(score: number, results: QuestionResult[]): Promise<void> {
     const { mode, difficulty, category, language } = settings
+    const maxStreak = computeMaxStreak(results)
 
     // Fetch previous best from cloud (0 if not logged in or no entry)
     let prevBest = 0
@@ -56,6 +75,9 @@ export function useGameOrchestration(params: UseGameOrchestrationParams) {
       if (user && mode === 'normal') {
         incrementCategoryStats(user.id, mode, difficulty, category, score, results).catch(console.error)
         incrementGlobalStats(user.id, results, score, mode).catch(console.error)
+        checkAndUnlockAchievements(user.id, { maxStreak, score, mode })
+          .then(newlyUnlocked => { if (newlyUnlocked.length > 0) setNewAchievements(newlyUnlocked) })
+          .catch(console.error)
       }
       setScreen('result')
       return
@@ -63,6 +85,10 @@ export function useGameOrchestration(params: UseGameOrchestrationParams) {
 
     // Competitive + authenticated — await all data then show ranking reveal
     try {
+      checkAndUnlockAchievements(user.id, { maxStreak, score, mode })
+        .then(newlyUnlocked => { if (newlyUnlocked.length > 0) setNewAchievements(newlyUnlocked) })
+        .catch(console.error)
+
       await submitScore({
         userId: user.id,
         username: profile.username,

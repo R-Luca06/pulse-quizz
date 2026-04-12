@@ -40,3 +40,31 @@ export interface RankingData {
   username: string
   userScore: number
 }
+
+// ─── Achievements ─────────────────────────────────────────────────────────────
+
+export type AchievementId =
+  | 'premiers_pas'
+  | 'premier_competiteur'
+  | 'serie_de_feu'
+  | 'perfectionniste'
+  | 'centenaire'
+
+export interface Achievement {
+  id: AchievementId
+  name: string
+  description: string
+  icon: string  // emoji unicode
+  progressTotal: number | null  // null = pas de progression trackable
+}
+
+export interface UserAchievement {
+  achievement_id: AchievementId
+  unlocked_at: string  // ISO timestamp
+}
+
+export interface AchievementWithStatus extends Achievement {
+  unlocked: boolean
+  unlocked_at: string | null
+  progress: { current: number; total: number } | null
+}

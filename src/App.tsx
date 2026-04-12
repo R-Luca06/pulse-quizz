@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import LandingPage from './components/landing/LandingPage'
 import QuizContainer from './components/quiz/QuizContainer'
@@ -7,36 +7,93 @@ import RankingRevealScreen from './components/ranking/RankingRevealScreen'
 import StatsPage from './components/stats/StatsPage'
 import AuthModal from './components/auth/AuthModal'
 import ProfilePage from './components/profile/ProfilePage'
+import AchievementsPage from './components/achievements/AchievementsPage'
+import AchievementUnlockOverlay from './components/achievements/AchievementUnlockOverlay'
 import { useSettings } from './hooks/useSettings'
 import { useAuth } from './hooks/useAuth'
 import { useGameOrchestration } from './hooks/useGameOrchestration'
-import type { Language, GameResult, RankingData } from './types/quiz'
+import type { Language, GameResult, RankingData, AchievementWithStatus, AchievementId } from './types/quiz'
 
-export type AppScreen = 'landing' | 'launching' | 'quiz' | 'ranking' | 'result' | 'stats' | 'profile'
+export type AppScreen = 'landing' | 'launching' | 'quiz' | 'ranking' | 'result' | 'stats' | 'profile' | 'achievements'
+
+// Écrans pendant lesquels l'overlay d'achievement doit être mis en attente
+const GAME_SCREENS: AppScreen[] = ['quiz', 'launching', 'ranking']
 
 export default function App() {
   const { settings, update } = useSettings()
-  const { user, profile } = useAuth()
+  const { user, profile, pendingAchievements, clearPendingAchievements } = useAuth()
 
   const [screen, setScreen] = useState<AppScreen>('landing')
   const [gameResult, setGameResult] = useState<GameResult>({ score: 0, results: [], bestScore: 0, isNewBest: false, userRank: null, rankDelta: null })
   const [rankingData, setRankingData] = useState<RankingData | null>(null)
+  const [newAchievements, setNewAchievements] = useState<AchievementWithStatus[]>([])
+  const [pendingAchievementId, setPendingAchievementId] = useState<AchievementId | null>(null)
+  const [pendingBadgeRect, setPendingBadgeRect] = useState<DOMRect | null>(null)
 
-  const { handleFinished } = useGameOrchestration({ settings, user, profile, setScreen, setGameResult, setRankingData })
+  // Capture la page active au moment où les achievements sont débloqués
+  // (pour y revenir après l'animation, quel que soit le screen parcouru)
+  const screenRef = useRef<AppScreen>('landing')
+  useEffect(() => { screenRef.current = screen }, [screen])
+  const overlayOriginRef = useRef<AppScreen>('result')
+
+  function handleNewAchievements(unlocked: AchievementWithStatus[]) {
+    if (unlocked.length > 0) {
+      // Si les achievements arrivent pendant une partie, l'overlay apparaîtra sur 'result'
+      const origin = screenRef.current
+      overlayOriginRef.current = GAME_SCREENS.includes(origin) ? 'result' : origin
+    }
+    setNewAchievements(unlocked)
+  }
+
+  // Achievements débloqués depuis AuthContext (ex: inscription → premiers_pas)
+  useEffect(() => {
+    if (pendingAchievements.length > 0) {
+      handleNewAchievements(pendingAchievements)
+      clearPendingAchievements()
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingAchievements])
+
+  const { handleFinished } = useGameOrchestration({ settings, user, profile, setScreen, setGameResult, setRankingData, setNewAchievements: handleNewAchievements })
   const [returnToSettings, setReturnToSettings] = useState(false)
   const [statsOrigin, setStatsOrigin] = useState<'landing' | 'result'>('landing')
   const [statsDefaultTab, setStatsDefaultTab] = useState<'stats' | 'leaderboard'>('stats')
   const [statsInitialDiff, setStatsInitialDiff] = useState<typeof settings.difficulty | undefined>(undefined)
   const [statsInitialLang, setStatsInitialLang] = useState<Language | undefined>(undefined)
   const [authModalOpen, setAuthModalOpen] = useState(false)
+  const [achievementsOrigin, setAchievementsOrigin] = useState<'landing' | 'profile' | 'result'>('landing')
+
+  function handleShowAchievements(from: 'landing' | 'profile' = 'landing') {
+    setAchievementsOrigin(from)
+    setScreen('achievements')
+  }
+
+  function handleBackFromAchievements() {
+    setScreen(achievementsOrigin === 'result' ? 'result' : achievementsOrigin)
+  }
+
+  function handleNavigateToAchievements(id: AchievementId) {
+    setPendingBadgeRect(null) // reset avant navigation pour que le poll de l'overlay parte de zéro
+    setPendingAchievementId(id)
+    setAchievementsOrigin('result')
+    setScreen('achievements')
+  }
+
+  function handleAchievementsDone() {
+    setNewAchievements([])
+    setPendingAchievementId(null)
+    setPendingBadgeRect(null)
+    // Retour sur la page où on était avant l'animation (pas forcément 'result')
+    setScreen(overlayOriginRef.current)
+  }
 
   function handleStart() { setScreen('launching') }
 
   function handleExplosion() { setScreen('quiz') }
 
-  function handleQuit() { setReturnToSettings(false); setScreen('landing') }
+  function handleQuit() { setReturnToSettings(false); setNewAchievements([]); setPendingAchievementId(null); setScreen('landing') }
 
-  function handleReplay() { setScreen('quiz') }
+  function handleReplay() { setNewAchievements([]); setPendingAchievementId(null); setScreen('quiz') }
 
   function handleShowStats(from: 'landing' | 'result', tab: 'stats' | 'leaderboard' = 'stats') {
     setStatsOrigin(from)
@@ -75,6 +132,7 @@ export default function App() {
                 onShowStats={(tab) => handleShowStats('landing', tab)}
                 onOpenAuth={() => setAuthModalOpen(true)}
                 onShowProfile={handleShowProfile}
+                onShowAchievements={() => handleShowAchievements('landing')}
               />
             </motion.div>
           )}
@@ -150,7 +208,27 @@ export default function App() {
               exit={{ opacity: 0, transition: { duration: 0.25 } }}
               className="absolute inset-0"
             >
-              <ProfilePage onBack={() => setScreen('landing')} />
+              <ProfilePage
+                onBack={() => setScreen('landing')}
+                onShowAchievements={() => handleShowAchievements('profile')}
+              />
+            </motion.div>
+          )}
+
+          {screen === 'achievements' && (
+            <motion.div
+              key="achievements"
+              initial={{ opacity: 0, y: 40 }}
+              animate={{ opacity: 1, y: 0, transition: { duration: 0.5, delay: 0.1, ease: 'easeOut' } }}
+              exit={{ opacity: 0, transition: { duration: 0.25 } }}
+              className="absolute inset-0"
+            >
+              <AchievementsPage
+                onBack={handleBackFromAchievements}
+                hideBack={achievementsOrigin === 'result' && newAchievements.length > 0}
+                pendingAchievementId={pendingAchievementId}
+                onBadgeReady={setPendingBadgeRect}
+              />
             </motion.div>
           )}
 
@@ -176,6 +254,18 @@ export default function App() {
       <AnimatePresence>
         {authModalOpen && (
           <AuthModal key="auth-modal" onClose={() => setAuthModalOpen(false)} />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {newAchievements.length > 0 && screen !== 'quiz' && screen !== 'launching' && screen !== 'ranking' && (
+          <AchievementUnlockOverlay
+            key="achievement-overlay"
+            achievements={newAchievements}
+            onNavigateToAchievements={handleNavigateToAchievements}
+            onDone={handleAchievementsDone}
+            pendingBadgeRect={pendingBadgeRect}
+          />
         )}
       </AnimatePresence>
     </>
