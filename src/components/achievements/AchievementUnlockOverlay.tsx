@@ -1,14 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion, useAnimate } from 'framer-motion'
 import type { AchievementId, AchievementWithStatus } from '../../types/quiz'
-
-const GLOW: Record<AchievementId, string> = {
-  premiers_pas:        '#10b981',
-  premier_competiteur: '#0ea5e9',
-  serie_de_feu:        '#f97316',
-  perfectionniste:     '#8b5cf6',
-  centenaire:          '#f59e0b',
-}
+import { BADGE_COLOR_HEX as GLOW } from '../../constants/achievementColors'
 
 type OverlayPhase = 'idle' | 'entering' | 'holding' | 'exiting'
 

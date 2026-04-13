@@ -2,7 +2,9 @@ import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence, type Transition } from 'framer-motion'
 import { useAuth } from '../../hooks/useAuth'
 import { getUserAchievements } from '../../services/achievements'
+import { updateFeaturedBadges } from '../../services/profile'
 import { supabase } from '../../services/supabase'
+import { BADGE_COLOR_HEX } from '../../constants/achievementColors'
 import type { AchievementId, AchievementWithStatus } from '../../types/quiz'
 
 interface Props {
@@ -29,19 +31,78 @@ const STATUS_ORDER: Record<AchievementStatus, number> = { unlocked: 0, in_progre
 // ─── Couleurs par achievement ──────────────────────────────────────────────────
 
 const ACHIEVEMENT_COLORS: Record<AchievementId, { text: string; progress: string; glow: string }> = {
-  premiers_pas:        { text: 'text-emerald-400', progress: 'bg-emerald-500', glow: 'shadow-emerald-500/20' },
-  premier_competiteur: { text: 'text-sky-400',     progress: 'bg-sky-500',     glow: 'shadow-sky-500/20'     },
-  serie_de_feu:        { text: 'text-orange-400',  progress: 'bg-orange-500',  glow: 'shadow-orange-500/20'  },
-  perfectionniste:     { text: 'text-violet-400',  progress: 'bg-violet-500',  glow: 'shadow-violet-500/20'  },
-  centenaire:          { text: 'text-amber-400',   progress: 'bg-amber-400',   glow: 'shadow-amber-400/20'   },
+  // Compte
+  premiers_pas:          { text: 'text-emerald-400', progress: 'bg-emerald-500',  glow: 'shadow-emerald-500/20' },
+  // Volume
+  coup_d_envoi:          { text: 'text-emerald-400', progress: 'bg-emerald-500',  glow: 'shadow-emerald-500/20' },
+  pris_au_jeu:           { text: 'text-teal-400',    progress: 'bg-teal-500',     glow: 'shadow-teal-500/20'    },
+  accro:                 { text: 'text-cyan-400',    progress: 'bg-cyan-500',     glow: 'shadow-cyan-500/20'    },
+  centenaire:            { text: 'text-amber-400',   progress: 'bg-amber-400',    glow: 'shadow-amber-400/20'   },
+  marathonien:           { text: 'text-orange-400',  progress: 'bg-orange-500',   glow: 'shadow-orange-500/20'  },
+  // Compétitif
+  premier_competiteur:   { text: 'text-sky-400',     progress: 'bg-sky-500',      glow: 'shadow-sky-500/20'     },
+  combattant:            { text: 'text-orange-400',  progress: 'bg-orange-500',   glow: 'shadow-orange-500/20'  },
+  gladiateur:            { text: 'text-red-400',     progress: 'bg-red-500',      glow: 'shadow-red-500/20'     },
+  legende_de_lareme:     { text: 'text-rose-400',    progress: 'bg-rose-500',     glow: 'shadow-rose-500/20'    },
+  // Séries
+  serie_de_feu:          { text: 'text-orange-400',  progress: 'bg-orange-500',   glow: 'shadow-orange-500/20'  },
+  inferno:               { text: 'text-red-400',     progress: 'bg-red-500',      glow: 'shadow-red-500/20'     },
+  inarretable:           { text: 'text-rose-400',    progress: 'bg-rose-500',     glow: 'shadow-rose-500/20'    },
+  transcendant:          { text: 'text-violet-400',  progress: 'bg-violet-500',   glow: 'shadow-violet-500/20'  },
+  // Rapidité
+  vif:                   { text: 'text-sky-400',     progress: 'bg-sky-500',      glow: 'shadow-sky-500/20'     },
+  foudroyant:            { text: 'text-blue-400',    progress: 'bg-blue-500',     glow: 'shadow-blue-500/20'    },
+  supersonique:          { text: 'text-indigo-400',  progress: 'bg-indigo-500',   glow: 'shadow-indigo-500/20'  },
+  instinct_pur:          { text: 'text-violet-400',  progress: 'bg-violet-500',   glow: 'shadow-violet-500/20'  },
+  // Perfection
+  perfectionniste:       { text: 'text-violet-400',  progress: 'bg-violet-500',   glow: 'shadow-violet-500/20'  },
+  // Points
+  rookie:                { text: 'text-slate-400',   progress: 'bg-slate-500',    glow: 'shadow-slate-500/20'   },
+  challenger:            { text: 'text-emerald-400', progress: 'bg-emerald-500',  glow: 'shadow-emerald-500/20' },
+  performeur:            { text: 'text-teal-400',    progress: 'bg-teal-500',     glow: 'shadow-teal-500/20'    },
+  chasseur_de_points:    { text: 'text-cyan-400',    progress: 'bg-cyan-500',     glow: 'shadow-cyan-500/20'    },
+  expert:                { text: 'text-blue-400',    progress: 'bg-blue-500',     glow: 'shadow-blue-500/20'    },
+  maitre:                { text: 'text-violet-400',  progress: 'bg-violet-500',   glow: 'shadow-violet-500/20'  },
+  grand_maitre:          { text: 'text-purple-400',  progress: 'bg-purple-500',   glow: 'shadow-purple-500/20'  },
+  legende:               { text: 'text-amber-400',   progress: 'bg-amber-400',    glow: 'shadow-amber-400/20'   },
+  mythique:              { text: 'text-yellow-400',  progress: 'bg-yellow-400',   glow: 'shadow-yellow-400/20'  },
+  // Exploration
+  touche_a_tout:         { text: 'text-teal-400',    progress: 'bg-teal-500',     glow: 'shadow-teal-500/20'    },
+  polyvalent:            { text: 'text-purple-400',  progress: 'bg-purple-500',   glow: 'shadow-purple-500/20'  },
+  // Classement
+  dans_l_elite:          { text: 'text-slate-400',   progress: 'bg-slate-500',    glow: 'shadow-slate-500/20'   },
+  reconnu:               { text: 'text-sky-400',     progress: 'bg-sky-500',      glow: 'shadow-sky-500/20'     },
+  les_25:                { text: 'text-blue-400',    progress: 'bg-blue-500',     glow: 'shadow-blue-500/20'    },
+  les_meilleurs:         { text: 'text-violet-400',  progress: 'bg-violet-500',   glow: 'shadow-violet-500/20'  },
+  sur_le_podium:         { text: 'text-amber-400',   progress: 'bg-amber-400',    glow: 'shadow-amber-400/20'   },
+  sans_rival:            { text: 'text-yellow-400',  progress: 'bg-yellow-400',   glow: 'shadow-yellow-400/20'  },
+  // Personnalisation
+  premier_pin:           { text: 'text-violet-400',  progress: 'bg-violet-500',   glow: 'shadow-violet-500/20'  },
+  collectionneur:        { text: 'text-purple-400',  progress: 'bg-purple-500',   glow: 'shadow-purple-500/20'  },
+  reinvention:           { text: 'text-pink-400',    progress: 'bg-pink-500',     glow: 'shadow-pink-500/20'    },
+  nouveau_visage:        { text: 'text-rose-400',    progress: 'bg-rose-500',     glow: 'shadow-rose-500/20'    },
+  mon_histoire:          { text: 'text-fuchsia-400', progress: 'bg-fuchsia-500',  glow: 'shadow-fuchsia-500/20' },
 }
 
-const BADGE_COLOR_HEX: Record<AchievementId, string> = {
-  premiers_pas:        '#10b981',
-  premier_competiteur: '#0ea5e9',
-  serie_de_feu:        '#f97316',
-  perfectionniste:     '#8b5cf6',
-  centenaire:          '#f59e0b',
+
+// ─── IDs des achievements avec barres de progression ──────────────────────────
+
+const VOLUME_IDS   = new Set<AchievementId>(['coup_d_envoi', 'pris_au_jeu', 'accro', 'centenaire', 'marathonien'])
+const COMP_IDS     = new Set<AchievementId>(['combattant', 'gladiateur', 'legende_de_lareme'])
+const SCORE_IDS    = new Set<AchievementId>(['rookie', 'challenger', 'performeur', 'chasseur_de_points', 'expert', 'maitre', 'grand_maitre', 'legende', 'mythique'])
+
+function enrichProgress(
+  achievements: AchievementWithStatus[],
+  data: { gamesPlayed: number; compGamesPlayed: number; compBestScore: number; categoriesPlayed: number },
+): AchievementWithStatus[] {
+  return achievements.map(a => {
+    if (a.unlocked || a.progress === null) return a
+    if (VOLUME_IDS.has(a.id))  return { ...a, progress: { current: data.gamesPlayed,      total: a.progress.total } }
+    if (COMP_IDS.has(a.id))    return { ...a, progress: { current: data.compGamesPlayed,   total: a.progress.total } }
+    if (SCORE_IDS.has(a.id))   return { ...a, progress: { current: data.compBestScore,     total: a.progress.total } }
+    if (a.id === 'touche_a_tout') return { ...a, progress: { current: data.categoriesPlayed, total: a.progress.total } }
+    return a
+  })
 }
 
 function getStatus(a: AchievementWithStatus): AchievementStatus {
@@ -54,7 +115,21 @@ function getStatus(a: AchievementWithStatus): AchievementStatus {
 
 type CardPendingPhase = 'idle' | 'receptive' | 'inserted'
 
-function AchievementCard({ achievement, pendingId, onBadgeReady }: { achievement: AchievementWithStatus; pendingId?: AchievementId | null; onBadgeReady?: (rect: DOMRect) => void }) {
+const PinIcon = ({ filled }: { filled: boolean }) => (
+  <svg width="11" height="11" viewBox="0 0 24 24" fill={filled ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="12" y1="17" x2="12" y2="22"/>
+    <path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"/>
+  </svg>
+)
+
+function AchievementCard({ achievement, pendingId, onBadgeReady, isPinned, canPin, onTogglePin }: {
+  achievement: AchievementWithStatus
+  pendingId?: AchievementId | null
+  onBadgeReady?: (rect: DOMRect) => void
+  isPinned: boolean
+  canPin: boolean
+  onTogglePin: (id: AchievementId) => void
+}) {
   const colors = ACHIEVEMENT_COLORS[achievement.id]
   const status = getStatus(achievement)
   const isLocked = status === 'locked'
@@ -74,15 +149,18 @@ function AchievementCard({ achievement, pendingId, onBadgeReady }: { achievement
     return () => { clearTimeout(t0); clearTimeout(t1); clearTimeout(t2) }
   }, [pendingId, achievement.id])
 
-  // Signale la position du badge au parent — attend la fin de la transition
-  // de page (initial y:40 → y:0, delay:0.1s + duration:0.5s = 600ms)
+  // Scroll la card en vue + signale la position du badge au parent.
+  // Attend la fin de la transition de page ET du scroll smooth (750ms).
   useEffect(() => {
     if (pendingId !== achievement.id) return
+    // Centrer immédiatement la card dans la zone scrollable
+    badgeContainerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    // Lire le rect après que le scroll et la transition de page sont terminés
     const t = setTimeout(() => {
       if (badgeContainerRef.current) {
         onBadgeReady?.(badgeContainerRef.current.getBoundingClientRect())
       }
-    }, 650)
+    }, 750)
     return () => clearTimeout(t)
   }, [pendingId, achievement.id, onBadgeReady])
 
@@ -156,6 +234,26 @@ function AchievementCard({ achievement, pendingId, onBadgeReady }: { achievement
           />
         )}
       </AnimatePresence>
+
+      {/* Bouton pin — visible seulement si débloqué */}
+      {status === 'unlocked' && (
+        <motion.button
+          whileTap={{ scale: 0.85 }}
+          onClick={e => { e.stopPropagation(); onTogglePin(achievement.id) }}
+          disabled={!isPinned && !canPin}
+          title={isPinned ? 'Retirer du leaderboard' : canPin ? 'Afficher dans le leaderboard' : 'Maximum 3 badges'}
+          className={[
+            'absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full transition-colors',
+            isPinned
+              ? 'bg-neon-violet/20 text-neon-violet hover:bg-neon-violet/30'
+              : canPin
+                ? 'bg-white/5 text-white/25 hover:bg-white/10 hover:text-white/60'
+                : 'cursor-not-allowed text-white/10',
+          ].join(' ')}
+        >
+          <PinIcon filled={isPinned} />
+        </motion.button>
+      )}
 
       {/* Badge hexagone */}
       <div className="relative mt-1 shrink-0">
@@ -239,7 +337,7 @@ function AchievementCard({ achievement, pendingId, onBadgeReady }: { achievement
               />
             </div>
             <p className={`text-[9px] font-semibold tabular-nums ${isLocked ? 'text-white/20' : colors.text}`}>
-              {achievement.progress.current} / {achievement.progress.total}
+              {achievement.progress.current.toLocaleString('fr-FR')} / {achievement.progress.total.toLocaleString('fr-FR')}
             </p>
           </div>
         ) : (
@@ -255,11 +353,46 @@ function AchievementCard({ achievement, pendingId, onBadgeReady }: { achievement
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function AchievementsPage({ onBack, hideBack = false, pendingAchievementId, onBadgeReady }: Props) {
-  const { user } = useAuth()
+  const { user, profile, setLocalFeaturedBadges, triggerAchievementCheck } = useAuth()
   const [achievements, setAchievements] = useState<AchievementWithStatus[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [filter, setFilter] = useState<FilterKey>('all')
+  const [featuredBadges, setFeaturedBadges] = useState<string[]>([])
+  const [pinSaving, setPinSaving] = useState(false)
+
+  // Sync featured badges from profile
+  useEffect(() => {
+    setFeaturedBadges(profile?.featured_badges ?? [])
+  }, [profile?.featured_badges])
+
+  async function handleTogglePin(id: AchievementId) {
+    if (!user) return
+    const already = featuredBadges.includes(id)
+    const next = already
+      ? featuredBadges.filter(b => b !== id)
+      : featuredBadges.length < 3
+        ? [...featuredBadges, id]
+        : featuredBadges  // max atteint, ne rien faire
+
+    if (next === featuredBadges) return
+    // Optimistic update
+    setFeaturedBadges(next)
+    setLocalFeaturedBadges(next)
+    if (pinSaving) return
+    setPinSaving(true)
+    try {
+      await updateFeaturedBadges(user.id, next)
+      // Vérifier les achievements liés au pin (premier_pin, collectionneur)
+      triggerAchievementCheck().catch(console.error)
+    } catch {
+      // Revert on error
+      setFeaturedBadges(featuredBadges)
+      setLocalFeaturedBadges(featuredBadges)
+    } finally {
+      setPinSaving(false)
+    }
+  }
 
   useEffect(() => {
     if (!user) return
@@ -269,18 +402,20 @@ export default function AchievementsPage({ onBack, hideBack = false, pendingAchi
 
     async function load() {
       try {
-        const data = await getUserAchievements(user!.id)
-        const gamesPlayedResult = await supabase
-          .from('user_global_stats')
-          .select('games_played')
-          .eq('user_id', user!.id)
-          .maybeSingle()
-        const gamesPlayed = (gamesPlayedResult.data as { games_played: number } | null)?.games_played ?? 0
-        const enriched = data.map(a =>
-          a.id === 'centenaire' && !a.unlocked && a.progress !== null
-            ? { ...a, progress: { ...a.progress, current: gamesPlayed } }
-            : a
-        )
+        const [achievementsData, globalStatsResult, compEntryResult, userStatsResult] = await Promise.all([
+          getUserAchievements(user!.id),
+          supabase.from('user_global_stats').select('games_played, comp_games_played').eq('user_id', user!.id).maybeSingle(),
+          supabase.from('leaderboard').select('score').eq('user_id', user!.id).eq('mode', 'compétitif').maybeSingle(),
+          supabase.from('user_stats').select('category').eq('user_id', user!.id).eq('mode', 'normal').neq('category', 'all').limit(20),
+        ])
+
+        type GlobalRow = { games_played: number; comp_games_played: number }
+        const gamesPlayed     = (globalStatsResult.data as GlobalRow | null)?.games_played ?? 0
+        const compGamesPlayed = (globalStatsResult.data as GlobalRow | null)?.comp_games_played ?? 0
+        const compBestScore   = (compEntryResult.data as { score: number } | null)?.score ?? 0
+        const categoriesPlayed = new Set(((userStatsResult.data ?? []) as { category: string }[]).map(r => r.category)).size
+
+        const enriched = enrichProgress(achievementsData, { gamesPlayed, compGamesPlayed, compBestScore, categoriesPlayed })
         if (!cancelled) setAchievements(enriched)
       } catch {
         if (!cancelled) setError('Impossible de charger les achievements.')
@@ -403,11 +538,42 @@ export default function AchievementsPage({ onBack, hideBack = false, pendingAchi
                 <p className="text-sm text-white/30">Aucun résultat pour ce filtre</p>
               </div>
             ) : (
+              <>
+              {/* Indicateur badges épinglés */}
+              {user && (
+                <div className="mb-3 flex items-center gap-2">
+                  <div className="flex items-center gap-1.5 rounded-lg border border-neon-violet/20 bg-neon-violet/5 px-2.5 py-1.5">
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-neon-violet/60">
+                      <line x1="12" y1="17" x2="12" y2="22"/>
+                      <path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"/>
+                    </svg>
+                    <span className="text-[10px] font-semibold text-neon-violet/70">
+                      Badges leaderboard
+                    </span>
+                    <span className={`text-[10px] font-black tabular-nums ${featuredBadges.length >= 3 ? 'text-neon-violet' : 'text-white/40'}`}>
+                      {featuredBadges.length}/3
+                    </span>
+                  </div>
+                  {pinSaving && (
+                    <div className="h-3 w-3 animate-spin rounded-full border border-neon-violet/30 border-t-neon-violet/70" />
+                  )}
+                </div>
+              )}
+
               <div className="grid grid-cols-3 gap-3">
                 {filtered.map(a => (
-                  <AchievementCard key={a.id} achievement={a} pendingId={pendingAchievementId} onBadgeReady={onBadgeReady} />
+                  <AchievementCard
+                    key={a.id}
+                    achievement={a}
+                    pendingId={pendingAchievementId}
+                    onBadgeReady={onBadgeReady}
+                    isPinned={featuredBadges.includes(a.id)}
+                    canPin={featuredBadges.length < 3}
+                    onTogglePin={handleTogglePin}
+                  />
                 ))}
               </div>
+              </>
             )}
           </div>
         </div>

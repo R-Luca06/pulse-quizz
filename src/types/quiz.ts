@@ -44,11 +44,57 @@ export interface RankingData {
 // ─── Achievements ─────────────────────────────────────────────────────────────
 
 export type AchievementId =
+  // Compte
   | 'premiers_pas'
-  | 'premier_competiteur'
-  | 'serie_de_feu'
-  | 'perfectionniste'
+  // Volume — parties jouées
+  | 'coup_d_envoi'
+  | 'pris_au_jeu'
+  | 'accro'
   | 'centenaire'
+  | 'marathonien'
+  // Compétitif — parties comp
+  | 'premier_competiteur'
+  | 'combattant'
+  | 'gladiateur'
+  | 'legende_de_lareme'
+  // Séries
+  | 'serie_de_feu'
+  | 'inferno'
+  | 'inarretable'
+  | 'transcendant'
+  // Rapidité
+  | 'vif'
+  | 'foudroyant'
+  | 'supersonique'
+  | 'instinct_pur'
+  // Perfection
+  | 'perfectionniste'
+  // Points compétitif
+  | 'rookie'
+  | 'challenger'
+  | 'performeur'
+  | 'chasseur_de_points'
+  | 'expert'
+  | 'maitre'
+  | 'grand_maitre'
+  | 'legende'
+  | 'mythique'
+  // Exploration
+  | 'touche_a_tout'
+  | 'polyvalent'
+  // Classement
+  | 'dans_l_elite'
+  | 'reconnu'
+  | 'les_25'
+  | 'les_meilleurs'
+  | 'sur_le_podium'
+  | 'sans_rival'
+  // Personnalisation
+  | 'premier_pin'
+  | 'collectionneur'
+  | 'reinvention'
+  | 'nouveau_visage'
+  | 'mon_histoire'
 
 export interface Achievement {
   id: AchievementId

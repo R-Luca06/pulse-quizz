@@ -67,7 +67,7 @@ function NotifRow({ label, description }: { label: string; description: string }
 type ActiveField = 'username' | 'email' | null
 
 export default function GeneralTab() {
-  const { user, profile, refreshProfile } = useAuth()
+  const { user, profile, refreshProfile, triggerAchievementCheck } = useAuth()
   const toast = useToast()
   const initial = (profile?.username?.[0] ?? '?').toUpperCase()
 
@@ -90,6 +90,7 @@ export default function GeneralTab() {
       await refreshProfile()
       toast.success('Pseudo mis à jour')
       setHeroEdit(false)
+      triggerAchievementCheck().catch(console.error)
     } catch (err) {
       setHeroError(err instanceof AppError ? err.message : 'Erreur inattendue')
     } finally {
@@ -135,6 +136,7 @@ export default function GeneralTab() {
       await refreshProfile()
       toast.success('Pseudo mis à jour')
       setActiveField(null)
+      triggerAchievementCheck().catch(console.error)
     } catch (err) {
       setFieldError(err instanceof AppError ? err.message : 'Erreur inattendue')
     } finally {

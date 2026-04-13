@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { getCompLeaderboardPage, getCompLeaderboardCount } from '../../services/leaderboard'
 import type { LeaderboardEntry } from '../../services/leaderboard'
 import type { Language } from '../../types/quiz'
+import MiniBadge from '../shared/MiniBadge'
 
 const PAGE_SIZE = 10
 
@@ -158,10 +159,19 @@ export default function RankingRevealScreen({
                       <span className={`w-6 shrink-0 text-center text-xs font-black ${isPlayer ? 'text-orange-400' : 'text-white/25'}`}>
                         #{rank}
                       </span>
-                      <span className="flex-1 truncate text-sm font-bold text-white">
-                        {entry.username}
-                      </span>
-                      <span className={`text-sm font-black tabular-nums ${isPlayer ? 'text-orange-400' : 'text-white/60'}`}>
+                      <div className="flex flex-1 items-center gap-1.5 min-w-0">
+                        <span className="truncate text-sm font-bold text-white">
+                          {entry.username}
+                        </span>
+                        {entry.featured_badges && entry.featured_badges.length > 0 && (
+                          <div className="flex shrink-0 items-center gap-0.5">
+                            {entry.featured_badges.map(id => (
+                              <MiniBadge key={id} achievementId={id} size={20} />
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      <span className={`shrink-0 text-sm font-black tabular-nums ${isPlayer ? 'text-orange-400' : 'text-white/60'}`}>
                         {entry.score} pts
                       </span>
                       {isPlayer && rankDelta !== null && rankDelta !== 0 && (

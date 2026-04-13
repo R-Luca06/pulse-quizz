@@ -29,6 +29,12 @@ function computeMaxStreak(results: QuestionResult[]): number {
   return max
 }
 
+function computeMinAnswerTime(results: QuestionResult[]): number {
+  const correct = results.filter(r => r.isCorrect)
+  if (correct.length === 0) return Infinity
+  return Math.min(...correct.map(r => r.timeSpent))
+}
+
 interface UseGameOrchestrationParams {
   settings: GameSettings
   user: User | null
@@ -44,7 +50,8 @@ export function useGameOrchestration(params: UseGameOrchestrationParams) {
 
   async function handleFinished(score: number, results: QuestionResult[]): Promise<void> {
     const { mode, difficulty, category, language } = settings
-    const maxStreak = computeMaxStreak(results)
+    const maxStreak    = computeMaxStreak(results)
+    const minAnswerTime = computeMinAnswerTime(results)
 
     // Fetch previous best from cloud (0 if not logged in or no entry)
     let prevBest = 0
@@ -78,7 +85,7 @@ export function useGameOrchestration(params: UseGameOrchestrationParams) {
         // Chaîner le check achievements APRÈS l'incrément des stats globales pour éviter
         // la race condition sur games_played (ex: Centenaire lu à 99 au lieu de 100)
         incrementGlobalStats(user.id, results, score, mode)
-          .then(() => checkAndUnlockAchievements(user.id, { maxStreak, score, mode }))
+          .then(() => checkAndUnlockAchievements(user.id, { maxStreak, minAnswerTime, score, mode }))
           .then(newlyUnlocked => { if (newlyUnlocked.length > 0) setNewAchievements(newlyUnlocked) })
           .catch(console.error)
       } else if (!user) {
@@ -88,13 +95,8 @@ export function useGameOrchestration(params: UseGameOrchestrationParams) {
       return
     }
 
-    // Competitive + authenticated — await all data then show ranking reveal
+    // Competitive + authenticated — submit first to get the rank, then check achievements
     try {
-      incrementGlobalStats(user.id, results, score, mode)
-        .then(() => checkAndUnlockAchievements(user.id, { maxStreak, score, mode }))
-        .then(newlyUnlocked => { if (newlyUnlocked.length > 0) setNewAchievements(newlyUnlocked) })
-        .catch(console.error)
-
       await submitScore({
         userId: user.id,
         username: profile.username,
@@ -112,8 +114,10 @@ export function useGameOrchestration(params: UseGameOrchestrationParams) {
           multiplier: r.multiplier ?? 1,
         })),
       })
+
       const newRank = await getUserRank(user.id, language)
       const delta = newRank !== null && prevRank !== null ? prevRank - newRank : null
+
       setGameResult(prev => ({ ...prev, userRank: newRank, rankDelta: delta }))
       setRankingData({
         userRank: newRank,
@@ -123,6 +127,12 @@ export function useGameOrchestration(params: UseGameOrchestrationParams) {
         userScore: score,
       })
       setScreen('ranking')
+
+      // Achievements en fire-and-forget — rank déjà connu
+      incrementGlobalStats(user.id, results, score, mode)
+        .then(() => checkAndUnlockAchievements(user.id, { maxStreak, minAnswerTime, score, mode, userRank: newRank }))
+        .then(newlyUnlocked => { if (newlyUnlocked.length > 0) setNewAchievements(newlyUnlocked) })
+        .catch(console.error)
     } catch (err) {
       console.error(err)
       setScreen('result')

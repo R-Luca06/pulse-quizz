@@ -34,13 +34,19 @@
 -- pour éviter les JOINs en lecture).
 
 CREATE TABLE IF NOT EXISTS profiles (
-  id         uuid        PRIMARY KEY REFERENCES auth.users (id) ON DELETE CASCADE,
-  username   text        NOT NULL,
-  created_at timestamptz NOT NULL DEFAULT now(),
+  id               uuid        PRIMARY KEY REFERENCES auth.users (id) ON DELETE CASCADE,
+  username         text        NOT NULL,
+  featured_badges  text[]      NOT NULL DEFAULT '{}',  -- jusqu'à 3 achievement_id épinglés sur le leaderboard
+  created_at       timestamptz NOT NULL DEFAULT now(),
 
   -- Unicité insensible à la casse (vérifié aussi côté app dans profile.ts)
   CONSTRAINT profiles_username_unique UNIQUE (username)
 );
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Migration (si la table existe déjà) :
+--   ALTER TABLE profiles ADD COLUMN IF NOT EXISTS featured_badges text[] NOT NULL DEFAULT '{}';
+-- ─────────────────────────────────────────────────────────────────────────────
 
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 
@@ -351,3 +357,29 @@ $$;
 -- Restreindre l'accès : seuls les utilisateurs connectés peuvent appeler delete_user
 REVOKE ALL ON FUNCTION delete_user() FROM public, anon;
 GRANT EXECUTE ON FUNCTION delete_user() TO authenticated;
+
+
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- Migrations (à exécuter sur une base existante)
+-- ═══════════════════════════════════════════════════════════════════════════════
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- user_global_stats : compteur de parties compétitives
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Incrémenté dans cloudStats.incrementGlobalStats() quand mode = 'compétitif'.
+-- Utilisé par les achievements Combattant (50), Gladiateur (100), Légende (1000).
+
+ALTER TABLE user_global_stats
+  ADD COLUMN IF NOT EXISTS comp_games_played integer NOT NULL DEFAULT 0;
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- profiles : flags de personnalisation pour les achievements
+-- ─────────────────────────────────────────────────────────────────────────────
+-- username_changed  → achievement "Réinvention"  (mis à true dans profile.ts)
+-- avatar_changed    → achievement "Nouveau Visage" (à connecter quand la feature avatar existe)
+-- description_changed → achievement "Mon Histoire" (à connecter quand la feature description existe)
+
+ALTER TABLE profiles
+  ADD COLUMN IF NOT EXISTS username_changed    boolean NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS avatar_changed      boolean NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS description_changed boolean NOT NULL DEFAULT false;

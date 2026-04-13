@@ -20,6 +20,7 @@ export interface CloudCategoryStatRow {
 export interface CloudGlobalStatRow {
   user_id: string
   games_played: number
+  comp_games_played: number
   total_questions: number
   total_correct: number
   best_streak: number
@@ -88,7 +89,7 @@ export async function incrementGlobalStats(
     .maybeSingle()
 
   const prev = existing ?? {
-    games_played: 0, total_questions: 0, total_correct: 0,
+    games_played: 0, comp_games_played: 0, total_questions: 0, total_correct: 0,
     best_streak: 0, fastest_perfect: null, comp_total_score: 0,
   }
 
@@ -97,6 +98,9 @@ export async function incrementGlobalStats(
   await supabase.from('user_global_stats').upsert({
     user_id: userId,
     games_played:      prev.games_played + 1,
+    comp_games_played: mode === 'compétitif'
+      ? (prev.comp_games_played ?? 0) + 1
+      : (prev.comp_games_played ?? 0),
     total_questions:   prev.total_questions + results.length,
     total_correct:     prev.total_correct + correctCount,
     best_streak:       Math.max(prev.best_streak, streak),

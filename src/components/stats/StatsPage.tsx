@@ -8,6 +8,7 @@ import type { LeaderboardEntry, CompGameData } from '../../services/leaderboard'
 import { FR_CATEGORIES, DIFFICULTIES, LANGUAGES, btnBaseSm, btnSelected, btnIdleSm } from '../../constants/quiz'
 import { useAuth } from '../../hooks/useAuth'
 import type { Difficulty, Language } from '../../types/quiz'
+import MiniBadge from '../shared/MiniBadge'
 
 interface Props {
   onBack: () => void
@@ -511,8 +512,17 @@ export default function StatsPage({ onBack, defaultTab = 'stats', initialDiff, i
                                 <span className={`w-6 shrink-0 text-center text-xs font-black ${isPlayer ? 'text-orange-400' : 'text-white/25'}`}>
                                   #{rank}
                                 </span>
-                                <span className="flex-1 truncate text-sm font-bold text-white">{entry.username}</span>
-                                <span className={`text-sm font-black tabular-nums ${isPlayer ? 'text-orange-400' : 'text-orange-400'}`}>
+                                <div className="flex flex-1 items-center gap-1.5 min-w-0">
+                                  <span className="truncate text-sm font-bold text-white">{entry.username}</span>
+                                  {entry.featured_badges && entry.featured_badges.length > 0 && (
+                                    <div className="flex shrink-0 items-center gap-0.5">
+                                      {entry.featured_badges.map(id => (
+                                        <MiniBadge key={id} achievementId={id} size={20} />
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                                <span className={`shrink-0 text-sm font-black tabular-nums ${isPlayer ? 'text-orange-400' : 'text-orange-400'}`}>
                                   {entry.score} pts
                                 </span>
                                 <span className="text-[10px] text-white/20">

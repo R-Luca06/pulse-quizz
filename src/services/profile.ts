@@ -23,6 +23,17 @@ export async function updateEmail(newEmail: string): Promise<void> {
   if (error) throw new AppError('auth_error', error.message)
 }
 
+export async function updateFeaturedBadges(userId: string, badges: string[]): Promise<void> {
+  if (badges.length > 3) {
+    throw new AppError('validation_error', 'Maximum 3 badges en vedette')
+  }
+  const { error } = await supabase
+    .from('profiles')
+    .update({ featured_badges: badges })
+    .eq('id', userId)
+  if (error) throw new AppError('db_error', error.message)
+}
+
 export async function updateUsername(userId: string, username: string): Promise<void> {
   const trimmed = username.trim()
   if (trimmed.length < 3 || trimmed.length > 20) {
@@ -42,7 +53,7 @@ export async function updateUsername(userId: string, username: string): Promise<
 
   const { error } = await supabase
     .from('profiles')
-    .update({ username: trimmed })
+    .update({ username: trimmed, username_changed: true })
     .eq('id', userId)
   if (error) {
     const msg = error.message.toLowerCase().includes('duplicate') || error.message.toLowerCase().includes('unique')

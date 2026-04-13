@@ -33,7 +33,8 @@ export interface LeaderboardEntry {
   language: Language
   updated_at: string
   game_data?: CompGameData[]
-  rank?: number // computed client-side: same rank for tied scores
+  rank?: number          // computed client-side: same rank for tied scores
+  featured_badges?: string[]  // depuis profiles.featured_badges
 }
 
 export interface SubmitParams {
@@ -173,11 +174,23 @@ export async function getCompLeaderboardPage(
 
   const baseRank = (higherCount ?? 0) + 1
 
+  // Fetch featured_badges for all users on this page in one shot
+  const userIds = entries.map(e => e.user_id)
+  const { data: profileData } = await supabase
+    .from('profiles')
+    .select('id, featured_badges')
+    .in('id', userIds)
+  const badgesMap = new Map(
+    ((profileData ?? []) as { id: string; featured_badges: string[] }[])
+      .map(p => [p.id, p.featured_badges ?? []])
+  )
+
   // Each entry's rank = baseRank + number of entries on this page with a strictly higher score.
   // Entries with the same score get the same rank.
   return entries.map(entry => ({
     ...entry,
     rank: baseRank + entries.filter(e => e.score > entry.score).length,
+    featured_badges: badgesMap.get(entry.user_id) ?? [],
   }))
 }
 
