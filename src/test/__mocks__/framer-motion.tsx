@@ -27,7 +27,7 @@ function makePassthrough(tag: string) {
     for (const [k, v] of Object.entries(props)) {
       if (!MOTION_PROPS.has(k)) htmlProps[k] = v
     }
-    return React.createElement(tag, { ...htmlProps, ref }, children)
+    return React.createElement(tag, { ...htmlProps, ref }, children as React.ReactNode)
   })
   Component.displayName = `motion.${tag}`
   return Component
