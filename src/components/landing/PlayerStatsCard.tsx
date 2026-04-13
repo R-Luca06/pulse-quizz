@@ -6,7 +6,7 @@ import { getUserAchievements } from '../../services/achievements'
 import type { AchievementWithStatus, AchievementId } from '../../types/quiz'
 
 // Couleurs des badges hexagonaux (identiques à AchievementsPage)
-const BADGE_COLOR: Record<AchievementId, string> = {
+const BADGE_COLOR: Partial<Record<AchievementId, string>> = {
   premiers_pas:        '#10b981',
   premier_competiteur: '#0ea5e9',
   serie_de_feu:        '#f97316',
