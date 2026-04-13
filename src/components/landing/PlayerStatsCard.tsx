@@ -55,7 +55,7 @@ function BadgeHex({ achievement }: { achievement: AchievementWithStatus }) {
 }
 
 export default function PlayerStatsCard({ onShowStats }: Props) {
-  const { user } = useAuth()
+  const { user, statsRefreshKey } = useAuth()
   const [loading, setLoading] = useState(true)
   const [data, setData] = useState<StatsData | null>(null)
 
@@ -91,7 +91,7 @@ export default function PlayerStatsCard({ onShowStats }: Props) {
       })
 
     return () => { cancelled = true }
-  }, [user])
+  }, [user, statsRefreshKey])
 
   return (
     <div

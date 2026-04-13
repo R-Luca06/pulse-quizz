@@ -22,7 +22,7 @@ const GAME_SCREENS: AppScreen[] = ['quiz', 'launching', 'ranking']
 
 export default function App() {
   const { settings, update } = useSettings()
-  const { user, profile, pendingAchievements, clearPendingAchievements } = useAuth()
+  const { user, profile, pendingAchievements, clearPendingAchievements, refreshStats } = useAuth()
 
   const [screen, setScreen] = useState<AppScreen>('landing')
   const [gameResult, setGameResult] = useState<GameResult>({ score: 0, results: [], bestScore: 0, isNewBest: false, userRank: null, rankDelta: null })
@@ -87,6 +87,7 @@ export default function App() {
     setNewAchievements([])
     setPendingAchievementId(null)
     setPendingBadgeRect(null)
+    refreshStats()
     // Retour sur la page où on était avant l'animation (pas forcément 'result')
     setScreen(overlayOriginRef.current)
   }
@@ -125,7 +126,7 @@ export default function App() {
             <motion.div
               key="landing"
               exit={{ opacity: 0, transition: { duration: 0.35 } }}
-              className="absolute inset-0"
+              className="absolute inset-0 z-0"
             >
               <LandingPage
                 settings={settings}
@@ -149,7 +150,7 @@ export default function App() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1, transition: { duration: 0.4 } }}
               exit={{ opacity: 0, scale: 0.96, y: -16, transition: { duration: 0.3, ease: 'easeIn' } }}
-              className="absolute inset-0"
+              className="absolute inset-0 z-10"
             >
               <QuizContainer
                 onFinished={handleFinished}
@@ -168,7 +169,7 @@ export default function App() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1, transition: { duration: 0.4 } }}
               exit={{ opacity: 0, transition: { duration: 0.4 } }}
-              className="absolute inset-0"
+              className="absolute inset-0 z-10"
             >
               <RankingRevealScreen
                 {...rankingData}
@@ -184,7 +185,7 @@ export default function App() {
               initial={{ opacity: 0, y: 40 }}
               animate={{ opacity: 1, y: 0, transition: { duration: 0.5, delay: 0.1, ease: 'easeOut' } }}
               exit={{ opacity: 0, transition: { duration: 0.25 } }}
-              className="absolute inset-0"
+              className="absolute inset-0 z-10"
             >
               <ResultScreen
                 score={gameResult.score}
@@ -213,7 +214,7 @@ export default function App() {
               initial={{ opacity: 0, y: 40 }}
               animate={{ opacity: 1, y: 0, transition: { duration: 0.5, delay: 0.1, ease: 'easeOut' } }}
               exit={{ opacity: 0, transition: { duration: 0.25 } }}
-              className="absolute inset-0"
+              className="absolute inset-0 z-10"
             >
               <ProfilePage
                 onBack={() => setScreen('landing')}
@@ -228,7 +229,7 @@ export default function App() {
               initial={{ opacity: 0, y: 40 }}
               animate={{ opacity: 1, y: 0, transition: { duration: 0.5, delay: 0.1, ease: 'easeOut' } }}
               exit={{ opacity: 0, transition: { duration: 0.25 } }}
-              className="absolute inset-0"
+              className="absolute inset-0 z-10"
             >
               <AchievementsPage
                 onBack={handleBackFromAchievements}
@@ -245,7 +246,7 @@ export default function App() {
               initial={{ opacity: 0, y: 40 }}
               animate={{ opacity: 1, y: 0, transition: { duration: 0.5, delay: 0.1, ease: 'easeOut' } }}
               exit={{ opacity: 0, transition: { duration: 0.25 } }}
-              className="absolute inset-0"
+              className="absolute inset-0 z-10"
             >
               <StatsPage
                 onBack={handleBackFromStats}

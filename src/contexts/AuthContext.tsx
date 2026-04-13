@@ -14,6 +14,8 @@ interface AuthContextValue {
   loading: boolean
   pendingAchievements: AchievementWithStatus[]
   clearPendingAchievements: () => void
+  statsRefreshKey: number
+  refreshStats: () => void
   signUp: (email: string, password: string, username: string) => Promise<void>
   signIn: (email: string, password: string) => Promise<void>
   signOut: () => Promise<void>
@@ -27,6 +29,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
   const [pendingAchievements, setPendingAchievements] = useState<AchievementWithStatus[]>([])
+  const [statsRefreshKey, setStatsRefreshKey] = useState(0)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -43,23 +46,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!user) {
-      queueMicrotask(() => setProfile(null))
-      return
+      let cancelled = false
+      queueMicrotask(() => { if (!cancelled) setProfile(null) })
+      return () => { cancelled = true }
     }
+    let cancelled = false
     supabase
       .from('profiles')
       .select('username')
       .eq('id', user.id)
       .maybeSingle()
       .then(({ data }) => {
-        if (data) setProfile({ username: data.username })
+        if (!cancelled && data) setProfile({ username: data.username })
       })
     // Vérification rétroactive silencieuse — fire and forget
     checkAndUnlockAchievements(user.id).catch(err => console.error('Achievement check failed:', err))
+    return () => { cancelled = true }
   }, [user])
 
   function clearPendingAchievements() {
     setPendingAchievements([])
+  }
+
+  function refreshStats() {
+    setStatsRefreshKey(k => k + 1)
   }
 
   async function signUp(email: string, password: string, username: string) {
@@ -118,7 +128,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, pendingAchievements, clearPendingAchievements, signUp, signIn, signOut, refreshProfile }}>
+    <AuthContext.Provider value={{ user, profile, loading, pendingAchievements, clearPendingAchievements, statsRefreshKey, refreshStats, signUp, signIn, signOut, refreshProfile }}>
       {children}
     </AuthContext.Provider>
   )
