@@ -61,7 +61,10 @@ export default function App() {
   const [statsDefaultTab, setStatsDefaultTab] = useState<'stats' | 'leaderboard'>('stats')
   const [statsInitialDiff, setStatsInitialDiff] = useState<typeof settings.difficulty | undefined>(undefined)
   const [statsInitialLang, setStatsInitialLang] = useState<Language | undefined>(undefined)
-  const [authModalOpen, setAuthModalOpen] = useState(false)
+  const [authModal, setAuthModal] = useState<{ open: boolean; tab: 'signin' | 'signup' }>({ open: false, tab: 'signin' })
+  const openSignIn = () => setAuthModal({ open: true, tab: 'signin' })
+  const openSignUp = () => setAuthModal({ open: true, tab: 'signup' })
+  const closeAuth = () => setAuthModal(a => ({ ...a, open: false }))
   const [achievementsOrigin, setAchievementsOrigin] = useState<'landing' | 'profile' | 'result'>('landing')
 
   function handleShowAchievements(from: 'landing' | 'profile' = 'landing') {
@@ -132,7 +135,8 @@ export default function App() {
                 screen={screen}
                 autoOpenSettings={returnToSettings}
                 onShowStats={(tab) => handleShowStats('landing', tab)}
-                onOpenAuth={() => setAuthModalOpen(true)}
+                onOpenSignIn={openSignIn}
+                onOpenSignUp={openSignUp}
                 onShowProfile={handleShowProfile}
                 onShowAchievements={() => handleShowAchievements('landing')}
               />
@@ -189,7 +193,8 @@ export default function App() {
                 onBack={handleQuit}
                 onShowStats={() => handleShowStats('result')}
                 onShowLeaderboard={() => handleShowStats('result', 'leaderboard')}
-                onOpenAuth={() => setAuthModalOpen(true)}
+                onOpenAuth={openSignIn}
+                onOpenSignUp={openSignUp}
                 bestScore={gameResult.bestScore}
                 isNewBest={gameResult.isNewBest}
                 gameMode={settings.mode}
@@ -256,8 +261,8 @@ export default function App() {
 
       <Suspense fallback={null}>
         <AnimatePresence>
-          {authModalOpen && (
-            <AuthModal key="auth-modal" onClose={() => setAuthModalOpen(false)} />
+          {authModal.open && (
+            <AuthModal key="auth-modal" onClose={closeAuth} defaultTab={authModal.tab} />
           )}
         </AnimatePresence>
       </Suspense>

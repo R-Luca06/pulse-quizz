@@ -12,6 +12,7 @@ export default {
           blue: '#3B82F6',
           cyan: '#06B6D4',
           pink: '#EC4899',
+          gold: '#EAB308',
         },
         game: {
           bg: '#0A0A0F',

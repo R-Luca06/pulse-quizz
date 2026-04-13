@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { getMuted, setMuted } from '../../utils/sounds'
 import { FR_CATEGORIES, MODES, DIFFICULTIES, LANGUAGES, btnBase, btnSelected, btnIdle } from '../../constants/quiz'
+import { useAuth } from '../../hooks/useAuth'
 import type { GameSettings } from '../../hooks/useSettings'
 
 interface Props {
@@ -10,12 +11,29 @@ interface Props {
   onLaunch: () => void
   onClose: () => void
   onShowRules: () => void
+  onRequireAuth?: () => void
 }
 
-export default function SettingsModal({ settings, onSettingsChange, onLaunch, onClose, onShowRules }: Props) {
+export default function SettingsModal({ settings, onSettingsChange, onLaunch, onClose, onShowRules, onRequireAuth }: Props) {
+  const { user } = useAuth()
+  const isGuest = !user
   const { mode, difficulty, language, category } = settings
   const isCompetitif = mode === 'compétitif'
   const [muted, setMutedState] = useState(getMuted)
+
+  useEffect(() => {
+    if (isGuest && mode === 'compétitif') {
+      onSettingsChange({ mode: 'normal', difficulty: 'easy', category: 'all' })
+    }
+  }, [isGuest, mode, onSettingsChange])
+
+  function handleLaunch() {
+    if (isCompetitif && isGuest) {
+      onRequireAuth?.()
+      return
+    }
+    onLaunch()
+  }
 
   function handleMuteToggle() {
     const next = !muted
@@ -115,10 +133,11 @@ export default function SettingsModal({ settings, onSettingsChange, onLaunch, on
                   {MODES.map(m => {
                     const isComp = m.value === 'compétitif'
                     const isSelected = mode === m.value
+                    const isLocked = isComp && isGuest
                     return (
                       <motion.div
                         key={m.value}
-                        animate={isComp ? {
+                        animate={isComp && !isLocked ? {
                           boxShadow: isSelected
                             ? ['0 0 10px rgba(249,115,22,0.3)', '0 0 24px rgba(249,115,22,0.65)', '0 0 10px rgba(249,115,22,0.3)']
                             : ['0 0 4px rgba(249,115,22,0.08)', '0 0 12px rgba(249,115,22,0.2)', '0 0 4px rgba(249,115,22,0.08)'],
@@ -127,10 +146,20 @@ export default function SettingsModal({ settings, onSettingsChange, onLaunch, on
                         className="relative flex-1 rounded-xl"
                       >
                         <button
-                          onClick={() => handleModeChange(m.value)}
+                          onClick={() => {
+                            if (isLocked) {
+                              onRequireAuth?.()
+                            } else {
+                              handleModeChange(m.value)
+                            }
+                          }}
+                          aria-disabled={isLocked}
+                          title={isLocked ? 'Connexion requise' : undefined}
                           className={[
                             'w-full rounded-xl border px-4 py-3 text-sm font-semibold transition-all duration-150 text-left flex flex-col items-start gap-0.5',
-                            isComp && isSelected
+                            isLocked
+                              ? 'cursor-not-allowed border-orange-500/15 bg-orange-500/[0.03] text-white/40'
+                              : isComp && isSelected
                               ? 'border-orange-500/60 bg-gradient-to-br from-orange-500/20 to-red-500/10 text-white'
                               : isComp && !isSelected
                               ? 'border-orange-500/20 bg-orange-500/5 text-white/60 hover:border-orange-500/40 hover:text-white/80'
@@ -139,13 +168,21 @@ export default function SettingsModal({ settings, onSettingsChange, onLaunch, on
                               : btnIdle,
                           ].join(' ')}
                         >
-                          <span className={['font-bold', isComp ? 'text-orange-300' : ''].join(' ')}>
+                          <span className={['font-bold flex items-center gap-1.5', isComp ? (isLocked ? 'text-orange-300/50' : 'text-orange-300') : ''].join(' ')}>
+                            {isLocked && (
+                              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                                <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                              </svg>
+                            )}
                             {m.label}
                           </span>
-                          <span className="text-xs opacity-60">{m.desc}</span>
+                          <span className="text-xs opacity-60">
+                            {isLocked ? 'Connexion requise' : m.desc}
+                          </span>
                         </button>
                         {/* Info button pour le mode compétitif */}
-                        {isComp && (
+                        {isComp && !isLocked && (
                           <button
                             onClick={(e) => { e.stopPropagation(); onShowRules() }}
                             aria-label="Règles du mode Compétitif"
@@ -160,17 +197,17 @@ export default function SettingsModal({ settings, onSettingsChange, onLaunch, on
                 </div>
               </div>
 
-              {/* Niveau — grisé en mode compétitif */}
-              <div className={`flex flex-col gap-2 transition-opacity duration-200 ${isCompetitif ? 'pointer-events-none opacity-35' : ''}`}>
+              {/* Niveau — barré en mode compétitif */}
+              <div className={`flex flex-col gap-2 ${isCompetitif ? 'pointer-events-none' : ''}`}>
                 <div className="flex items-center gap-2">
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-white/30">Niveau</p>
+                  <p className={`text-[10px] font-bold uppercase tracking-widest transition-all duration-200 ${isCompetitif ? 'text-white/20 line-through' : 'text-white/30'}`}>Niveau</p>
                   {isCompetitif && (
-                    <span className="rounded-full bg-white/10 px-2 py-0.5 text-[8px] font-bold uppercase tracking-wider text-white/30">
+                    <span className="rounded-full bg-white/10 px-2 py-0.5 text-[8px] font-bold uppercase tracking-wider text-white/20">
                       Aléatoire
                     </span>
                   )}
                 </div>
-                <div className="flex gap-2">
+                <div className={`flex gap-2 transition-opacity duration-200 ${isCompetitif ? 'opacity-30' : ''}`}>
                   {DIFFICULTIES.map(d => (
                     <button
                       key={d.value}
@@ -183,17 +220,17 @@ export default function SettingsModal({ settings, onSettingsChange, onLaunch, on
                 </div>
               </div>
 
-              {/* Catégorie — grisée en mode compétitif uniquement */}
-              <div className={`flex flex-col gap-2 transition-opacity duration-200 ${categoryDisabled ? 'pointer-events-none opacity-35' : ''}`}>
+              {/* Catégorie — barrée en mode compétitif uniquement */}
+              <div className={`flex flex-col gap-2 ${categoryDisabled ? 'pointer-events-none' : ''}`}>
                 <div className="flex items-center gap-2">
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-white/30">Catégorie</p>
+                  <p className={`text-[10px] font-bold uppercase tracking-widest transition-all duration-200 ${isCompetitif ? 'text-white/20 line-through' : 'text-white/30'}`}>Catégorie</p>
                   {isCompetitif && (
-                    <span className="rounded-full bg-white/10 px-2 py-0.5 text-[8px] font-bold uppercase tracking-wider text-white/30">
+                    <span className="rounded-full bg-white/10 px-2 py-0.5 text-[8px] font-bold uppercase tracking-wider text-white/20">
                       Aléatoire
                     </span>
                   )}
                 </div>
-                <div className="relative">
+                <div className={`relative transition-opacity duration-200 ${isCompetitif ? 'opacity-30' : ''}`}>
                   <select
                     value={String(category)}
                     onChange={(e) => {
@@ -237,7 +274,7 @@ export default function SettingsModal({ settings, onSettingsChange, onLaunch, on
 
             {/* Launch */}
             <motion.button
-              onClick={onLaunch}
+              onClick={handleLaunch}
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.97 }}
               animate={isCompetitif ? {

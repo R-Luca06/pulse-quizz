@@ -3,6 +3,8 @@ stepsCompleted: [1, 2, 3, 4, 5, 6, 7, 8]
 lastStep: 8
 status: 'complete'
 completedAt: '2026-04-11'
+lastReviewedAt: '2026-04-13'
+lastReviewNote: 'Sync post-livraison Epics 1–3 (PRD 2026-04-12) — arborescence, dettes, décisions D6–D9 ajoutées'
 inputDocuments:
   - _bmad-output/project-context.md
 workflowType: 'architecture'
@@ -27,7 +29,9 @@ La navigation est entièrement pilotée par `setScreen(screen: AppScreen)` dans 
 Aucun router externe. Chaque écran est un cas dans `AnimatePresence`.
 Règle invariable : tout nouvel écran = nouvelle valeur dans `AppScreen` + cas dans `App.tsx`.
 
-Écrans actuels : `'landing' | 'launching' | 'quiz' | 'ranking' | 'result' | 'stats'`
+Écrans actuels : `'landing' | 'launching' | 'quiz' | 'ranking' | 'result' | 'stats' | 'profile' | 'achievements'`
+
+**Code splitting** : tous les écrans hors `LandingPage` sont lazy-loadés via `React.lazy()` + `Suspense` dans `App.tsx` (bundle initial ~226 KB vs 649 KB avant).
 
 **Flux de données — Questions**
 `language` détermine la source :
@@ -45,15 +49,19 @@ Ce routing est encapsulé dans `api.ts` — les consommateurs ne connaissent pas
 | Connecté, mode compétitif | Supabase `leaderboard` via `leaderboard.ts` |
 
 **Couche Service**
-Quatre services distincts. Règle stricte : composants et hooks n'appellent jamais Supabase directement.
-- `api.ts` — fetch questions (routing langue)
+Règle stricte : composants et hooks n'appellent jamais Supabase directement.
+- `api.ts` — fetch questions (routing langue, FR uniquement)
 - `leaderboard.ts` — scores compétitifs, classements, pagination
 - `cloudStats.ts` — statistiques personnelles par mode/difficulté/catégorie
+- `achievements.ts` — déblocage et lecture achievements utilisateur
+- `profile.ts` — gestion compte (username, email, password, suppression)
+- `errors.ts` — classe unifiée `AppError`
 - `supabase.ts` — singleton client (une seule instance dans toute l'app)
 
 **Auth**
-`AuthContext` expose `user` (Supabase Auth) et `profile` (table `profiles`, actuellement `username` seul).
+`AuthContext` expose `user`, `profile`, `loading`, `signUp`, `signIn`, `signOut`, `refreshProfile()`, `pendingAchievements`, `clearPendingAchievements`.
 `useAuth()` est la seule source de vérité — aucun composant n'accède au client Supabase directement.
+Le flux `pendingAchievements` permet de débloquer des achievements depuis `AuthContext` (ex: `premiers_pas` à l'inscription) et de les afficher via `AchievementUnlockOverlay` dans `App.tsx`.
 
 **Provider Tree**
 ```
@@ -62,13 +70,13 @@ ToastProvider → AuthProvider → App
 
 ### Tensions et Dettes Architecturales
 
-| # | Zone | Description |
+| # | Zone | État |
 |---|---|---|
-| 1 | `App.tsx` `handleFinished` | Mélange orchestration post-jeu et appels de service directs — candidat à l'extraction |
-| 2 | `api.ts` → `trivia.ts` | Import legacy encore actif — doit être absorbé dans `api.ts` puis supprimé |
-| 3 | `AuthContext` | Pas de `refreshProfile()` — impossible de propager une mise à jour de profil sans déconnexion |
-| 4 | `Category` type | `number \| 'all' \| string` — `string` absorbe tout, perte de sûreté de type |
-| 5 | Error boundaries | Absents — erreurs réseau en post-jeu silencieuses (fallback direct vers `result`) |
+| 1 | `App.tsx` `handleFinished` | ✅ **Résolue** — extraite dans `hooks/useGameOrchestration.ts` |
+| 2 | `api.ts` → `trivia.ts` | ✅ **Résolue** — `trivia.ts` supprimé, EN désactivé |
+| 3 | `AuthContext.refreshProfile()` | ✅ **Résolue** — exposé dans le contrat (ligne 110 du fichier) |
+| 4 | `Category` type | ⚠ Partiellement résolue — simplifié en `string \| 'all'` (plus de `number` OpenTDB) |
+| 5 | Error boundaries | ⚠ Partielle — `AvatarErrorBoundary` local existe, mais pas de `ErrorBoundary` global au niveau `App.tsx` (dossier `common/` non créé). Reste à traiter |
 
 ---
 
@@ -145,9 +153,9 @@ refreshProfile: () => Promise<void>
 
 **Décision A — ErrorBoundary :** Ajouter un composant `ErrorBoundary` au niveau `App.tsx` pour capturer les pannes inattendues et afficher un état d'erreur contrôlé.
 
-**Décision B — Tests :** Adopter Vitest comme framework de test (cohérent avec Vite).
-Priorité : hooks critiques (`useQuiz`, `useGameOrchestration` une fois extrait).
-Qualité gate actuelle conservée : `npx tsc --noEmit` + `npm run lint` + `npm run build`.
+**Décision B — Tests :** ✅ **Effectif** — Vitest + `@testing-library/react` + `jest-dom` installés. Setup : `src/test/setup.ts`. Commandes : `npm test`, `npm run test:ui`.
+Tests actifs : `useQuiz.test.ts`, `useGameOrchestration.test.ts`, `statsStorage.test.ts`, `AvatarDisplay.test.tsx`, `ConnectedLanding.test.tsx`, `LandingPage.test.tsx`, `SettingsModal.test.tsx`.
+Qualité gate actuelle : `npx tsc --noEmit` + `npm run lint` + `npm run build` + `npm test`.
 
 ---
 
@@ -257,7 +265,7 @@ pulse-quizz/
 ├── .env                          # Variables Supabase (non committé)
 ├── .env.example                  # Template variables d'environnement
 ├── package.json
-├── vite.config.ts
+├── vite.config.ts                # Inclut config Vitest
 ├── tailwind.config.js
 ├── tsconfig.json
 ├── eslint.config.js
@@ -265,9 +273,15 @@ pulse-quizz/
 ├── public/
 │   └── (assets statiques)
 │
+├── scripts/
+│   └── supabase_schema.sql       # Schéma DB + RLS (inclut blocage leaderboard anonyme)
+│
 └── src/
     ├── main.tsx                  # Provider tree : ToastProvider → AuthProvider → App
-    ├── App.tsx                   # State machine écrans, AnimatePresence, AppScreen type
+    ├── App.tsx                   # State machine 8 écrans, lazy-load, AnimatePresence
+    │
+    ├── test/
+    │   └── setup.ts              # Setup global Vitest + jest-dom
     │
     ├── types/
     │   └── quiz.ts               # TOUS les types partagés — Category : string | 'all'
@@ -277,39 +291,54 @@ pulse-quizz/
     │   └── quiz.ts               # Catégories FR, labels UI
     │
     ├── contexts/
-    │   ├── AuthContext.tsx       # AuthProvider + useAuth() — expose refreshProfile()
+    │   ├── AuthContext.tsx       # user, profile, refreshProfile, pendingAchievements
     │   └── ToastContext.tsx      # ToastProvider + useToast()
     │
     ├── hooks/
-    │   ├── useQuiz.ts            # Logique de jeu complète
-    │   ├── useQuiz.test.ts       # Tests Vitest — priorité haute
-    │   ├── useGameOrchestration.ts   # Extrait de handleFinished (App.tsx)
-    │   ├── useGameOrchestration.test.ts
-    │   ├── useTimer.ts           # Countdown 10s, 100ms tick
-    │   ├── useSettings.ts        # Persistance settings localStorage
+    │   ├── useQuiz.ts + .test.ts
+    │   ├── useGameOrchestration.ts + .test.ts
+    │   ├── useTimer.ts
+    │   ├── useSettings.ts
     │   └── useAuth.ts            # Wrapper useContext(AuthContext)
     │
     ├── services/
     │   ├── errors.ts             # AppError — classe d'erreur unifiée
     │   ├── supabase.ts           # Singleton client Supabase
-    │   ├── api.ts                # Fetch questions — routing langue (fr → Supabase)
-    │   ├── api.test.ts
+    │   ├── api.ts                # Fetch questions — FR uniquement (Supabase RPC)
     │   ├── leaderboard.ts        # Scores compétitifs, classements, pagination
-    │   └── cloudStats.ts        # Stats personnelles par mode/difficulté/catégorie
+    │   ├── cloudStats.ts         # Stats personnelles par mode/difficulté/catégorie
+    │   ├── achievements.ts       # Déblocage + lecture achievements
+    │   └── profile.ts            # Username, email, password, deleteAccount
     │
     ├── utils/
     │   ├── sounds.ts             # Web Audio API — playCorrect/Wrong/Timeout/Tick
-    │   ├── storage.ts            # getBestScore/saveBestScore localStorage (anonymes)
-    │   └── statsStorage.ts      # computeBestStreak(results)
-    │   # trivia.ts → SUPPRIMÉ
+    │   └── statsStorage.ts + .test.ts
+    │       # Best score anonymes + computeBestStreak + isReturningAnonymous()
+    │   # trivia.ts → SUPPRIMÉ | storage.ts → jamais créé (fusionné dans statsStorage.ts)
     │
     └── components/
+        ├── avatar/                   # Nouveau — Epic 1
+        │   ├── AvatarContainer.tsx   # Wrapper lazy + Suspense + ErrorBoundary
+        │   ├── AvatarDisplay.tsx + .test.tsx
+        │   ├── AvatarPlaceholder.tsx
+        │   ├── AvatarErrorBoundary.tsx
+        │   ├── types.ts              # Props customisation (future-ready)
+        │   └── index.ts
         ├── landing/
-        │   ├── LandingPage.tsx
-        │   ├── SettingsModal.tsx
+        │   ├── LandingPage.tsx + .test.tsx  # Router conditionnel user → Connected/Guest
+        │   ├── ConnectedLanding.tsx + .test.tsx
+        │   ├── GuestLanding.tsx
+        │   ├── ConnectedHeader.tsx
+        │   ├── GuestHeader.tsx
+        │   ├── ReturningAnonymousBanner.tsx  # FR13/FR14 — détection localStorage
+        │   ├── SettingsModal.tsx + .test.tsx
         │   ├── RulesModal.tsx
-        │   ├── FloatingCardsBackground.tsx
-        │   └── StartButton.tsx
+        │   ├── StartButton.tsx
+        │   ├── KnowledgeUniverse.tsx         # Backdrop avatar + floating cards
+        │   ├── ArenaBackground.tsx
+        │   ├── ConstellationBackground.tsx
+        │   ├── LibraryBackground.tsx
+        │   └── sections/                      # Sections vitrine (hero + explicatives)
         ├── quiz/
         │   ├── QuizContainer.tsx
         │   ├── QuestionCard.tsx
@@ -317,15 +346,20 @@ pulse-quizz/
         │   ├── TimerBar.tsx
         │   └── StreakIndicator.tsx
         ├── result/
-        │   └── ResultScreen.tsx
+        │   └── ResultScreen.tsx       # Inclut bloc incitation inscription (FR16)
         ├── ranking/
         │   └── RankingRevealScreen.tsx
         ├── stats/
         │   └── StatsPage.tsx
+        ├── profile/
+        │   ├── ProfilePage.tsx
+        │   └── tabs/ (GeneralTab, StatsTab, ConfidentialityTab)
+        ├── achievements/
+        │   ├── AchievementsPage.tsx
+        │   └── AchievementUnlockOverlay.tsx
         ├── auth/
-        │   └── AuthModal.tsx
-        └── common/              # Composants partagés entre plusieurs écrans
-            └── ErrorBoundary.tsx
+        │   └── AuthModal.tsx          # defaultTab: 'signin' | 'signup'
+        # common/ErrorBoundary.tsx → non créé (dette #5 restante)
 ```
 
 ### Frontières Architecturales
@@ -387,8 +421,8 @@ Settings (useSettings) ──→ App.tsx ──→ QuizContainer ──→ useQu
 |---|---|---|
 | Supabase Auth | Inscription / connexion | `AuthContext.tsx` |
 | Supabase DB | Questions FR, leaderboard, stats | `services/*.ts` |
-| Supabase Storage | Avatars (futur) | `services/profile.ts` (futur) |
-| OpenTDB | Questions EN — **désactivé** | `api.ts` (code conservé, non actif) |
+| Supabase Storage | Avatars personnalisés (Phase 2) — non actif | `services/profile.ts` |
+| OpenTDB | Questions EN — **supprimé** | `utils/trivia.ts` (fichier supprimé) |
 
 ---
 
@@ -428,11 +462,40 @@ Settings (useSettings) ──→ App.tsx ──→ QuizContainer ──→ useQu
 - [x] Frontières architecturales délimitées
 - [x] Flux de données documenté
 
-### Priorisation des Premières Implémentations
+### État d'Implémentation (au 2026-04-13)
 
-1. Supprimer `utils/trivia.ts` + désactiver anglais dans UI
-2. Créer `src/services/errors.ts` (`AppError`)
-3. Ajouter `refreshProfile()` à `AuthContext`
-4. Extraire `useGameOrchestration` depuis `App.tsx`
-5. Configurer Vitest + premiers tests sur `useQuiz`
-6. Ajouter `ErrorBoundary` dans `App.tsx`
+| # | Action | État |
+|---|---|---|
+| 1 | Supprimer `utils/trivia.ts` + désactiver anglais | ✅ Livré |
+| 2 | Créer `src/services/errors.ts` (`AppError`) | ✅ Livré |
+| 3 | Ajouter `refreshProfile()` à `AuthContext` | ✅ Livré |
+| 4 | Extraire `useGameOrchestration` depuis `App.tsx` | ✅ Livré |
+| 5 | Configurer Vitest + tests sur hooks critiques | ✅ Livré |
+| 6 | Ajouter `ErrorBoundary` global dans `App.tsx` | ⏳ Restant (seul `AvatarErrorBoundary` local existe) |
+
+**Itérations postérieures livrées (PRD 2026-04-12, Epics 1–3) :**
+- Composant `avatar/` découplé, lazy-loaded, props-driven
+- Landing bifurquée `ConnectedLanding` / `GuestLanding` selon `useAuth()`
+- Header enrichi (icônes + labels), navigation Stats/Profil/Achievements
+- Page vitrine avec hero, sections explicatives, CTA inscription/connexion
+- Blocage compétitif client + RLS Supabase
+- Détection joueur anonyme via `statsStorage.isReturningAnonymous()`
+- Incitation inscription post-partie normale (ResultScreen)
+- Code splitting par écran (`React.lazy` sur 7 écrans — bundle initial 649 KB → 226 KB)
+
+### Décisions architecturales ajoutées post-livraison
+
+**D6 — Code splitting par écran**
+Tous les écrans hors `LandingPage` sont lazy-loadés via `React.lazy()` + `Suspense`. Fallback = `bg-game-bg` vide, transitions Framer Motion masquent le flash. Ne pas importer ces écrans en statique ailleurs.
+
+**D7 — Landing bifurquée par authentification**
+`LandingPage.tsx` route vers `ConnectedLanding` ou `GuestLanding` selon `user` de `useAuth()`. Chaque branche a son header dédié (`ConnectedHeader` vs `GuestHeader`). Ne pas dupliquer la logique entre branches — extraire en composants partagés si besoin.
+
+**D8 — Autorisation : défense en profondeur**
+Accès aux fonctionnalités réservées aux comptes (compétitif, stats cloud, achievements) protégé à DEUX niveaux :
+1. **UI client** : option masquée/désactivée, CTA vers `AuthModal`
+2. **RLS Supabase** : policies sur `leaderboard`, `user_stats`, `user_global_stats`, `user_achievements` — `INSERT`/`UPDATE` rejetés si `auth.uid() IS NULL` ou `!= user_id`
+Ne jamais retirer une des deux couches. Documenté dans `scripts/supabase_schema.sql`.
+
+**D9 — Flux `pendingAchievements` via AuthContext**
+Les achievements débloqués hors partie (ex: `premiers_pas` à l'inscription) sont exposés via `AuthContext.pendingAchievements`. `App.tsx` les consomme via `useEffect`, déclenche l'overlay, puis appelle `clearPendingAchievements()`. Évite que `AuthContext` connaisse l'UI.

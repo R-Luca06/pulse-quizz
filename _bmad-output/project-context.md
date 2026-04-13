@@ -69,10 +69,13 @@ _Ce fichier contient les règles critiques et les patterns que les agents AI doi
 
 ### Règles de Tests
 
-- Aucun framework de test configuré (pas de Vitest, Jest, etc.)
-- Vérification de qualité = `npx tsc --noEmit` + `npm run lint` + `npm run build`
+- **Vitest** configuré (`npm test`, `npm run test:ui`) + `@testing-library/react` + `jest-dom`
+- Setup global : `src/test/setup.ts` (importé par `vitest.config`)
+- Tests **co-localisés** avec le fichier source : `useQuiz.test.ts`, `AvatarDisplay.test.tsx`, `ConnectedLanding.test.tsx`, etc.
+- Nommage : `{filename}.test.ts` (logique pure) / `{filename}.test.tsx` (composants)
+- Priorité des tests : hooks métier (`useQuiz`, `useGameOrchestration`), utilitaires critiques (`statsStorage`), composants à logique conditionnelle (`LandingPage`, `ConnectedLanding`)
+- Gate qualité complète = `npx tsc --noEmit` + `npm run lint` + `npm run build` + `npm test`
 - Validation UI = dev server (`npm run dev`) + test manuel dans le navigateur
-- Si des tests sont ajoutés : Vitest (cohérent avec Vite), pas Jest
 
 ### Qualité du Code & Style
 
@@ -128,15 +131,17 @@ _Ce fichier contient les règles critiques et les patterns que les agents AI doi
 - ❌ Ne jamais utiliser `window.location` pour naviguer — toujours `setScreen()`
 
 **Stockage & Auth**
-- ❌ Ne jamais écrire dans localStorage directement — passer par `useSettings` ou `storage.ts`
+- ❌ Ne jamais écrire dans localStorage directement — passer par `useSettings` ou `statsStorage.ts`
 - ❌ Ne jamais lire `user` ailleurs que via `useAuth()` — pas de contexte Supabase direct dans les composants
+- `useAuth()` expose aussi `profile`, `refreshProfile()`, `pendingAchievements`, `clearPendingAchievements`
 - Persistance des scores : localStorage (anonyme) vs Supabase (connecté) — toujours vérifier `user` avant d'appeler un service Supabase
+- Détection d'un joueur anonyme existant : `isReturningAnonymous()` dans `statsStorage.ts` (lecture seule des clés `pulse_stats_*`)
 
 **API & Données**
-- ❌ Ne pas appeler `src/utils/trivia.ts` directement — utiliser `src/services/api.ts`
-- `trivia.ts` est legacy et sera supprimé — ne pas étendre ses fonctionnalités
+- Appels API quiz → uniquement via `src/services/api.ts`
+- `trivia.ts` **supprimé** — OpenTDB n'est plus utilisé
 - Le mode compétitif ignore `difficulty` et `category` — ne pas les passer à `fetchCompetitifBatch`
-- `Language = 'fr'` route vers Supabase table `questions`, `'en'` vers OpenTDB — ne pas mélanger les sources
+- `Language = 'fr'` est la **seule langue active** (route vers Supabase RPC `get_random_questions`). `'en'` est désactivé ; réactivation future via Supabase uniquement, pas d'OpenTDB
 
 **Sons**
 - Ne pas créer de nouveaux `AudioContext` — utiliser uniquement les fonctions exportées de `sounds.ts`
@@ -144,9 +149,26 @@ _Ce fichier contient les règles critiques et les patterns que les agents AI doi
 **Mode compétitif**
 - Le score = somme des points speed-based via `COMP_SPEED_TIERS` — ne pas utiliser le compteur de bonnes réponses
 - `getSpeedTier(elapsedSeconds)` est la source de vérité pour les multiplicateurs — ne pas recalculer inline
+- **Blocage visiteurs non-connectés** : défense en profondeur — UI client (option masquée/désactivée dans `SettingsModal`) + RLS Supabase (`INSERT` sur `leaderboard` rejeté si `auth.uid() IS NULL`). Ne jamais retirer l'une des deux couches.
 
-**PRD actif**
-- 
+**Landing bifurquée**
+- `LandingPage.tsx` route vers `ConnectedLanding` (user présent) ou `GuestLanding` (visiteur) selon `useAuth()`
+- Ne pas dupliquer la logique d'affichage entre les deux branches — extraire en composants partagés si besoin
+- Header : `ConnectedHeader` (icônes + labels Stats/Profil/Achievements) vs `GuestHeader` (CTA inscription/connexion)
+
+**Avatar**
+- Composant dans `src/components/avatar/` — `AvatarDisplay` props-driven (extensible, personnalisation future)
+- Chargement via `React.lazy()` + `Suspense` avec fallback `AvatarPlaceholder`
+- Échec de chargement capturé par `AvatarErrorBoundary` local — ne remonte jamais dans `App.tsx`
+
+**Code splitting**
+- Tous les écrans hors `LandingPage` sont lazy-loadés via `React.lazy()` dans `App.tsx`
+- Fallback `Suspense` = écran vide `bg-game-bg` (pas de spinner, transition Framer Motion gère le flash)
+- Ne pas importer ces écrans en statique depuis d'autres fichiers (casserait le split)
+
+**Dernier PRD livré**
+- PRD 2026-04-12 — _Landing Connectée (avatar + Play) + Vitrine non-connectée + Transition joueurs anonymes_. Epics 1–3 livrés (stories 1.1 → 3.3, implementation-artifacts `5-1` à `7-3`).
+- Aucun PRD actif en cours — prochaine itération non démarrée.
 
 ---
 
@@ -163,4 +185,4 @@ _Ce fichier contient les règles critiques et les patterns que les agents AI doi
 - Mettre à jour lors de changements de stack technique
 - Supprimer les règles devenues évidentes avec le temps
 
-_Dernière mise à jour : 2026-04-11_
+_Dernière mise à jour : 2026-04-13_

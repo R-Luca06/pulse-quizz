@@ -8,6 +8,7 @@ import { getCloudBestScore } from '../services/cloudStats'
 import { incrementCategoryStats, incrementGlobalStats } from '../services/cloudStats'
 import { submitScore, getUserBestScore, getUserRank } from '../services/leaderboard'
 import { checkAndUnlockAchievements } from '../services/achievements'
+import { markPlayedAnonymous } from '../utils/statsStorage'
 import type React from 'react'
 
 interface Profile {
@@ -80,6 +81,8 @@ export function useGameOrchestration(params: UseGameOrchestrationParams) {
           .then(() => checkAndUnlockAchievements(user.id, { maxStreak, score, mode }))
           .then(newlyUnlocked => { if (newlyUnlocked.length > 0) setNewAchievements(newlyUnlocked) })
           .catch(console.error)
+      } else if (!user) {
+        markPlayedAnonymous()
       }
       setScreen('result')
       return

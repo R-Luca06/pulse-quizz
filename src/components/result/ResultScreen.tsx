@@ -4,6 +4,7 @@ import { CATEGORY_LABELS, DIFFICULTY_LABELS, MODE_LABELS, LANGUAGE_LABELS } from
 import { NORMAL_MODE_QUESTIONS } from '../../constants/game'
 import { computeBestStreak } from '../../utils/statsStorage'
 import { useAuth } from '../../hooks/useAuth'
+import SignupIncentiveBlock from './SignupIncentiveBlock'
 import type { QuestionResult, GameMode, Difficulty, Category, Language } from '../../types/quiz'
 
 interface Props {
@@ -14,6 +15,7 @@ interface Props {
   onShowStats: () => void
   onShowLeaderboard: () => void
   onOpenAuth: () => void
+  onOpenSignUp?: () => void
   bestScore: number
   isNewBest: boolean
   gameMode: GameMode
@@ -40,7 +42,7 @@ const COMP_TIERS = [
 
 const fadeUp = { hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0 } }
 
-export default function ResultScreen({ score, results, onReplay, onBack, onShowStats, onShowLeaderboard, onOpenAuth, bestScore, isNewBest, gameMode, difficulty, category, language, userRank, rankDelta }: Props) {
+export default function ResultScreen({ score, results, onReplay, onBack, onShowStats, onShowLeaderboard, onOpenAuth, onOpenSignUp, bestScore, isNewBest, gameMode, difficulty, category, language, userRank, rankDelta }: Props) {
   const { user } = useAuth()
   const isCompetitif = gameMode === 'compétitif'
   const tiers = isCompetitif ? COMP_TIERS : NORMAL_TIERS
@@ -221,6 +223,11 @@ export default function ResultScreen({ score, results, onReplay, onBack, onShowS
               </span>
             ))}
           </motion.div>
+
+          {/* Incitation inscription — anonyme + mode normal */}
+          {!user && !isCompetitif && (
+            <SignupIncentiveBlock onOpenSignUp={onOpenSignUp ?? onOpenAuth} />
+          )}
 
           {/* Stats */}
           {total > 0 && (

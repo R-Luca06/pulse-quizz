@@ -1,5 +1,17 @@
 import { supabase } from './supabase'
+import { AppError } from './errors'
 import type { GameMode, Difficulty, Language } from '../types/quiz'
+
+// Traduit une erreur Supabase en erreur applicative.
+// RLS deny (anonyme tentant d'écrire) → AppError('auth_error') pour distinguer
+// d'une vraie panne DB côté appelant.
+function mapSupabaseWriteError(error: { code?: string; message?: string }): Error {
+  const msg = error.message ?? 'leaderboard write failed'
+  if (error.code === '42501' || /row-level security/i.test(msg)) {
+    return new AppError('auth_error', 'Session expirée')
+  }
+  return new Error(msg)
+}
 
 export interface CompGameData {
   question: string
@@ -57,7 +69,7 @@ export async function submitScore(params: SubmitParams): Promise<void> {
             updated_at: new Date().toISOString(),
           })
           .eq('id', existing.id)
-        if (error) throw new Error(error.message)
+        if (error) throw mapSupabaseWriteError(error)
       } else {
         const { error } = await supabase
           .from('leaderboard')
@@ -71,7 +83,7 @@ export async function submitScore(params: SubmitParams): Promise<void> {
             game_data: gameData ?? null,
             updated_at: new Date().toISOString(),
           })
-        if (error) throw new Error(error.message)
+        if (error) throw mapSupabaseWriteError(error)
       }
     }
   } else {
@@ -89,12 +101,12 @@ export async function submitScore(params: SubmitParams): Promise<void> {
           .from('leaderboard')
           .update({ username, score, updated_at: new Date().toISOString() })
           .eq('id', existing.id)
-        if (error) throw new Error(error.message)
+        if (error) throw mapSupabaseWriteError(error)
       } else {
         const { error } = await supabase
           .from('leaderboard')
           .insert({ user_id: userId, username, score, mode, difficulty, language, updated_at: new Date().toISOString() })
-        if (error) throw new Error(error.message)
+        if (error) throw mapSupabaseWriteError(error)
       }
     }
   }

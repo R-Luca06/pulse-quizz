@@ -63,6 +63,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function signUp(email: string, password: string, username: string) {
+    // Pré-check case-insensitive du pseudo avant de créer le compte auth,
+    // sinon on laisse un user orphelin dans auth.users quand l'insert profiles échoue.
+    const { data: existing } = await supabase
+      .from('profiles')
+      .select('id')
+      .ilike('username', username)
+      .maybeSingle()
+    if (existing) throw new Error('duplicate key value violates unique constraint "profiles_username_unique"')
+
     const { data, error } = await supabase.auth.signUp({ email, password })
     if (error) throw error
     if (!data.user) throw new Error('Inscription échouée')
@@ -72,6 +81,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .insert({ id: data.user.id, username })
 
     if (profileError) {
+      // Filet de sécurité race condition : delete_user() supprime auth.users
+      // (SECURITY DEFINER, nécessite une session authentifiée — valide ici).
+      await supabase.rpc('delete_user').then(() => {}, err => {
+        console.error('Rollback delete_user failed:', err)
+      })
       await supabase.auth.signOut()
       throw profileError
     }

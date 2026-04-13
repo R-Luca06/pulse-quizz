@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
 import { motion, useAnimationControls, AnimatePresence } from 'framer-motion'
-import FloatingCardsBackground from './FloatingCardsBackground'
-import StartButton from './StartButton'
 import SettingsModal from './SettingsModal'
 import RulesModal from './RulesModal'
+import ConnectedLanding from './ConnectedLanding'
+import GuestLanding from './GuestLanding'
+import GameDock from './GameDock'
 import { useAuth } from '../../hooks/useAuth'
 import { useToast } from '../../contexts/ToastContext'
 import type { AppScreen } from '../../App'
@@ -19,20 +20,204 @@ interface Props {
   screen: AppScreen
   autoOpenSettings?: boolean
   onShowStats: (tab?: 'stats' | 'leaderboard') => void
-  onOpenAuth: () => void
+  onOpenSignIn: () => void
+  onOpenSignUp: () => void
   onShowProfile: () => void
   onShowAchievements: () => void
 }
 
-export default function LandingPage({ settings, onSettingsChange, onStart, onExplosion, screen, autoOpenSettings, onShowStats, onOpenAuth, onShowProfile, onShowAchievements }: Props) {
-  const { user, profile, signOut } = useAuth()
+export default function LandingPage({
+  settings,
+  onSettingsChange,
+  onStart,
+  onExplosion,
+  screen,
+  autoOpenSettings,
+  onShowStats,
+  onOpenSignIn,
+  onOpenSignUp,
+  onShowProfile,
+  onShowAchievements,
+}: Props) {
+  const { user, profile, loading, signOut } = useAuth()
   const toast = useToast()
+  const [openSettings, setOpenSettings] = useState(autoOpenSettings ?? false)
+  const [showRules, setShowRules] = useState(false)
+
+  // Loading guard : évite le flash vitrine → connectée au chargement initial
+  // pour un utilisateur déjà authentifié (AuthContext passe user=null pendant getSession).
+  if (loading) {
+    return (
+      <div className="absolute inset-0 flex items-center justify-center bg-game-bg">
+        <div
+          role="status"
+          aria-label="Chargement"
+          className="h-8 w-8 animate-spin rounded-full border-2 border-neon-violet border-t-transparent"
+        />
+      </div>
+    )
+  }
+
+  // AnimatePresence mode="wait" : bascule fluide vitrine ↔ connectée après auth (AC 3).
+  // Pas de initial={false} : il propageait blockInitialAnimation via PresenceContext et
+  // gelait les keyframes descendantes (trajectoire avatar, etc.) au reload. Le léger fade
+  // d'entrée (200 ms) est un compromis acceptable.
+  return (
+    <AnimatePresence mode="wait">
+      {user ? (
+        <motion.div
+          key="connected"
+          className="absolute inset-0"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.2 }}
+        >
+          <ConnectedBranch
+            screen={screen}
+            settings={settings}
+            onSettingsChange={onSettingsChange}
+            onStart={onStart}
+            onExplosion={onExplosion}
+            openSettings={openSettings}
+            setOpenSettings={setOpenSettings}
+            showRules={showRules}
+            setShowRules={setShowRules}
+            onShowStats={onShowStats}
+            onShowProfile={onShowProfile}
+            onShowAchievements={onShowAchievements}
+            username={profile?.username ?? ''}
+            onSignOut={() => signOut().then(() => toast.success('Déconnecté'))}
+          />
+        </motion.div>
+      ) : (
+        <motion.div
+          key="guest"
+          className="absolute inset-0"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.2 }}
+        >
+          <GuestBranch
+            settings={settings}
+            onSettingsChange={onSettingsChange}
+            onExplosion={onExplosion}
+            openSettings={openSettings}
+            setOpenSettings={setOpenSettings}
+            showRules={showRules}
+            setShowRules={setShowRules}
+            onOpenSignIn={onOpenSignIn}
+            onOpenSignUp={onOpenSignUp}
+          />
+        </motion.div>
+      )}
+    </AnimatePresence>
+  )
+}
+
+// ─── Guest branch : vitrine simple, scrollable, sans background animé ─────────
+
+interface GuestBranchProps {
+  settings: GameSettings
+  onSettingsChange: (patch: Partial<GameSettings>) => void
+  onExplosion: () => void
+  openSettings: boolean
+  setOpenSettings: (v: boolean) => void
+  showRules: boolean
+  setShowRules: (v: boolean) => void
+  onOpenSignIn: () => void
+  onOpenSignUp: () => void
+}
+
+function GuestBranch({
+  settings,
+  onSettingsChange,
+  onExplosion,
+  openSettings,
+  setOpenSettings,
+  showRules,
+  setShowRules,
+  onOpenSignIn,
+  onOpenSignUp,
+}: GuestBranchProps) {
+  function handleLaunch() {
+    setOpenSettings(false)
+    onExplosion()
+  }
+
+  function handleRequireAuth() {
+    setOpenSettings(false)
+    onOpenSignUp()
+  }
+
+  return (
+    <div className="absolute inset-0 overflow-y-auto bg-[#0B0820] text-white">
+      <GuestLanding
+        onOpenSettings={() => setOpenSettings(true)}
+        onOpenSignIn={onOpenSignIn}
+        onOpenSignUp={onOpenSignUp}
+      />
+
+      <AnimatePresence>
+        {openSettings && (
+          <SettingsModal
+            key="settings"
+            settings={settings}
+            onSettingsChange={onSettingsChange}
+            onLaunch={handleLaunch}
+            onClose={() => setOpenSettings(false)}
+            onShowRules={() => setShowRules(true)}
+            onRequireAuth={handleRequireAuth}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showRules && <RulesModal key="rules" onClose={() => setShowRules(false)} />}
+      </AnimatePresence>
+    </div>
+  )
+}
+
+// ─── Connected branch : layout original avec ArenaBackground + shake ──────────
+
+interface ConnectedBranchProps {
+  screen: AppScreen
+  settings: GameSettings
+  onSettingsChange: (patch: Partial<GameSettings>) => void
+  onStart: () => void
+  onExplosion: () => void
+  openSettings: boolean
+  setOpenSettings: (v: boolean) => void
+  showRules: boolean
+  setShowRules: (v: boolean) => void
+  onShowStats: (tab?: 'stats' | 'leaderboard') => void
+  onShowProfile: () => void
+  onShowAchievements: () => void
+  username: string
+  onSignOut: () => void
+}
+
+function ConnectedBranch({
+  screen,
+  settings,
+  onSettingsChange,
+  onStart,
+  onExplosion,
+  openSettings,
+  setOpenSettings,
+  showRules,
+  setShowRules,
+  onShowStats,
+  onShowProfile,
+  onShowAchievements,
+  username,
+  onSignOut,
+}: ConnectedBranchProps) {
   const isLaunching = screen === 'launching'
   const [launchPhase, setLaunchPhase] = useState<LaunchPhase>('idle')
   const shakeControls = useAnimationControls()
-
-  const [openSettings, setOpenSettings] = useState(autoOpenSettings ?? false)
-  const [showRules, setShowRules] = useState(false)
 
   useEffect(() => {
     if (!isLaunching) {
@@ -59,18 +244,6 @@ export default function LandingPage({ settings, onSettingsChange, onStart, onExp
 
   return (
     <div className="relative flex min-h-screen w-full flex-col items-center justify-center overflow-hidden bg-game-bg">
-      {/* Background blobs */}
-      <div className="pointer-events-none absolute inset-0">
-        <div className="absolute left-1/4 top-1/4 h-96 w-96 -translate-x-1/2 -translate-y-1/2 rounded-full bg-neon-violet/10 blur-3xl" />
-        <div className="absolute right-1/4 bottom-1/4 h-96 w-96 translate-x-1/2 translate-y-1/2 rounded-full bg-neon-blue/10 blur-3xl" />
-      </div>
-
-      {/* Cards + shake wrapper */}
-      <motion.div animate={shakeControls} className="absolute inset-0">
-        <FloatingCardsBackground launchPhase={launchPhase} />
-      </motion.div>
-
-      {/* Flash */}
       {launchPhase === 'exploding' && (
         <motion.div
           className="pointer-events-none absolute inset-0 z-20 bg-white"
@@ -80,148 +253,20 @@ export default function LandingPage({ settings, onSettingsChange, onStart, onExp
         />
       )}
 
-      {/* Top nav bar */}
-      <motion.nav
-        className="absolute inset-x-0 top-0 z-10 flex h-14 items-center justify-between px-4 sm:px-6"
-        initial={{ opacity: 0, y: -8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.3 }}
-      >
-        {/* Wordmark */}
-        <span className="select-none text-sm font-black tracking-tight text-white/70">
-          Pulse<span className="text-neon-violet">Quizz</span>
-        </span>
+      <ConnectedLanding
+        isLaunching={isLaunching}
+        onShowStats={onShowStats}
+        onShowProfile={onShowProfile}
+        onShowAchievements={onShowAchievements}
+        onSignOut={onSignOut}
+        username={username}
+        shakeControls={shakeControls}
+      />
 
-        {/* Actions */}
-        <div className="flex items-center gap-1.5">
-          <button
-            onClick={() => onShowStats('leaderboard')}
-            aria-label="Voir le classement"
-            className="group flex h-8 items-center overflow-hidden rounded-full border border-white/20 bg-white/[0.08] pl-[9px] pr-[9px] text-white/60 transition-[border-color,color,padding] duration-300 ease-in-out hover:border-white/35 hover:pr-3 hover:text-white/80"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
-              <path d="M8 6h8M8 12h8M8 18h8M3 6h.01M3 12h.01M3 18h.01"/>
-            </svg>
-            <span className="max-w-0 overflow-hidden whitespace-nowrap text-xs font-semibold transition-[max-width,margin,opacity] duration-300 ease-in-out [opacity:0] group-hover:ml-1.5 group-hover:max-w-[80px] group-hover:[opacity:1] group-hover:[transition-delay:60ms]">
-              Classement
-            </span>
-          </button>
-          <button
-            onClick={() => onShowStats('stats')}
-            aria-label="Voir les statistiques"
-            className="group flex h-8 items-center overflow-hidden rounded-full border border-white/20 bg-white/[0.08] pl-[9px] pr-[9px] text-white/60 transition-[border-color,color,padding] duration-300 ease-in-out hover:border-white/35 hover:pr-3 hover:text-white/80"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
-              <rect x="18" y="3" width="4" height="18" rx="1"/>
-              <rect x="10" y="8" width="4" height="13" rx="1"/>
-              <rect x="2" y="13" width="4" height="8" rx="1"/>
-            </svg>
-            <span className="max-w-0 overflow-hidden whitespace-nowrap text-xs font-semibold transition-[max-width,margin,opacity] duration-300 ease-in-out [opacity:0] group-hover:ml-1.5 group-hover:max-w-[80px] group-hover:[opacity:1] group-hover:[transition-delay:60ms]">
-              Statistiques
-            </span>
-          </button>
-          <button
-            onClick={onShowAchievements}
-            aria-label="Voir les achievements"
-            className="group flex h-8 items-center overflow-hidden rounded-full border border-white/20 bg-white/[0.08] pl-[9px] pr-[9px] text-white/60 transition-[border-color,color,padding] duration-300 ease-in-out hover:border-white/35 hover:pr-3 hover:text-white/80"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
-              <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/>
-              <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/>
-              <path d="M4 22h16"/>
-              <path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/>
-              <path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/>
-              <path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/>
-            </svg>
-            <span className="max-w-0 overflow-hidden whitespace-nowrap text-xs font-semibold transition-[max-width,margin,opacity] duration-300 ease-in-out [opacity:0] group-hover:ml-1.5 group-hover:max-w-[80px] group-hover:[opacity:1] group-hover:[transition-delay:60ms]">
-              Achievements
-            </span>
-          </button>
+      {!isLaunching && (
+        <GameDock settings={settings} onPlay={handleLaunch} onOpenSettings={() => setOpenSettings(true)} />
+      )}
 
-          {/* Separator */}
-          <div className="mx-1 h-4 w-px bg-white/10" />
-
-          {/* Auth */}
-          {user ? (
-            <div className="flex items-center gap-2">
-              <button
-                onClick={onShowProfile}
-                className="select-none cursor-pointer text-xs font-semibold text-white/70 transition-colors hover:text-white"
-              >
-                @{profile?.username}
-              </button>
-              <button
-                onClick={() => signOut().then(() => toast.success('Déconnecté'))}
-                aria-label="Se déconnecter"
-                className="flex h-7 w-7 items-center justify-center rounded-full border border-white/20 bg-white/5 text-white/60 transition-colors hover:border-white/35 hover:text-white/80"
-              >
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
-                  <polyline points="16 17 21 12 16 7"/>
-                  <line x1="21" y1="12" x2="9" y2="12"/>
-                </svg>
-              </button>
-            </div>
-          ) : (
-            <button
-              onClick={onOpenAuth}
-              aria-label="Se connecter"
-              className="flex items-center gap-1.5 rounded-full border border-white/15 bg-white/[0.06] px-3 py-1.5 text-xs font-semibold text-white/65 transition-colors hover:border-white/25 hover:text-white/80"
-            >
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-                <circle cx="12" cy="7" r="4"/>
-              </svg>
-              Connexion
-            </button>
-          )}
-        </div>
-      </motion.nav>
-
-      {/* Hero */}
-      <motion.div
-        className="relative z-10 flex flex-col items-center gap-8 text-center"
-        animate={
-          isLaunching
-            ? { opacity: 0, scale: 0.85, transition: { duration: 0.25 } }
-            : { opacity: 1, scale: 1 }
-        }
-      >
-        {/* Badge */}
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.2 }}
-          className="rounded-full border border-neon-violet/30 bg-neon-violet/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-widest text-neon-violet"
-        >
-          Teste tes connaissances · Ressens l'adrénaline
-        </motion.div>
-
-        {/* Title */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7, delay: 0.3 }}
-        >
-          <h1 className="text-4xl font-black tracking-tight text-white sm:text-6xl md:text-7xl lg:text-8xl">
-            Pulse
-            <span className="bg-gradient-to-r from-neon-violet to-neon-blue bg-clip-text text-transparent">
-              {' '}Quizz
-            </span>
-          </h1>
-        </motion.div>
-
-        {/* Play button */}
-        <motion.div
-          initial={{ opacity: 0, scale: 0.8 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.5, delay: 0.5, type: 'spring', stiffness: 200 }}
-        >
-          <StartButton onClick={() => setOpenSettings(true)} />
-        </motion.div>
-      </motion.div>
-
-      {/* Modals */}
       <AnimatePresence>
         {openSettings && (
           <SettingsModal
@@ -236,9 +281,7 @@ export default function LandingPage({ settings, onSettingsChange, onStart, onExp
       </AnimatePresence>
 
       <AnimatePresence>
-        {showRules && (
-          <RulesModal key="rules" onClose={() => setShowRules(false)} />
-        )}
+        {showRules && <RulesModal key="rules" onClose={() => setShowRules(false)} />}
       </AnimatePresence>
     </div>
   )

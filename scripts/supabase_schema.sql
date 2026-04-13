@@ -144,6 +144,10 @@ CREATE POLICY "leaderboard_select_public"
   USING (true);
 
 -- Insertion : uniquement ses propres scores
+-- ⚠️ Garantie serveur NFR9 (Pulse Quizz PRD) : blocage du mode compétitif pour
+-- les anonymes. auth.uid() renvoie NULL pour un client non-authentifié, donc
+-- le WITH CHECK échoue → INSERT rejeté (erreur PostgreSQL 42501).
+-- Ne pas assouplir sans revalidation sécurité.
 CREATE POLICY "leaderboard_insert_own"
   ON leaderboard FOR INSERT
   WITH CHECK (auth.uid() = user_id);

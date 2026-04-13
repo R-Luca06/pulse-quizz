@@ -112,6 +112,25 @@ export function getGlobalStats(): GlobalStats {
   }
 }
 
+// ─── Anonymous player detection ───────────────────────────────────────────────
+const PLAYED_ANONYMOUS_KEY = 'pulse_played_anonymous'
+
+export function isReturningAnonymous(): boolean {
+  try {
+    return localStorage.getItem(PLAYED_ANONYMOUS_KEY) === 'true'
+  } catch {
+    return false
+  }
+}
+
+export function markPlayedAnonymous(): void {
+  try {
+    localStorage.setItem(PLAYED_ANONYMOUS_KEY, 'true')
+  } catch {
+    // silent — detection will simply stay false this session
+  }
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 export function computeBestStreak(results: QuestionResult[]): number {
   let best = 0
