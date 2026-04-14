@@ -124,6 +124,7 @@ describe('LandingPage — bascule vitrine ↔ connectée (Story 6.5)', () => {
         onOpenSignUp={vi.fn()}
         onShowProfile={vi.fn()}
         onShowAchievements={vi.fn()}
+        onViewProfile={vi.fn()}
       />,
     )
 

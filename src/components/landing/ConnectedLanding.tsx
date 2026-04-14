@@ -45,7 +45,7 @@ export default function ConnectedLanding({
         onShowAchievements={onShowAchievements}
         onSignOut={onSignOut}
         username={username}
-        onViewProfile={onViewProfile}
+        onViewProfile={onViewProfile ?? noop}
         onShowSocial={onShowSocial}
       />
 
