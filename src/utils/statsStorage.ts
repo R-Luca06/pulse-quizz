@@ -27,7 +27,7 @@ export interface GlobalStats {
   comp_total_score: number
 }
 
-const EMPTY_CATEGORY_STATS: CategoryStats = {
+export const EMPTY_CATEGORY_STATS: CategoryStats = {
   version: STATS_VERSION,
   gamesPlayed: 0,
   totalQuestions: 0,
@@ -38,7 +38,7 @@ const EMPTY_CATEGORY_STATS: CategoryStats = {
   fastestPerfect: null,
 }
 
-const EMPTY_GLOBAL_STATS: GlobalStats = {
+export const EMPTY_GLOBAL_STATS: GlobalStats = {
   version: STATS_VERSION,
   gamesPlayed: 0,
   totalQuestions: 0,

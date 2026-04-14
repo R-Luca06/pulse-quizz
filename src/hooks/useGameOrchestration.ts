@@ -8,25 +8,11 @@ import { getCloudBestScore } from '../services/cloudStats'
 import { incrementCategoryStats, incrementGlobalStats } from '../services/cloudStats'
 import { submitScore, getUserBestScore, getUserRank } from '../services/leaderboard'
 import { checkAndUnlockAchievements } from '../services/achievements'
-import { markPlayedAnonymous } from '../utils/statsStorage'
+import { markPlayedAnonymous, computeBestStreak } from '../utils/statsStorage'
 import type React from 'react'
 
 interface Profile {
   username: string
-}
-
-function computeMaxStreak(results: QuestionResult[]): number {
-  let max = 0
-  let current = 0
-  for (const r of results) {
-    if (r.isCorrect) {
-      current++
-      if (current > max) max = current
-    } else {
-      current = 0
-    }
-  }
-  return max
 }
 
 function computeMinAnswerTime(results: QuestionResult[]): number {
@@ -50,7 +36,7 @@ export function useGameOrchestration(params: UseGameOrchestrationParams) {
 
   async function handleFinished(score: number, results: QuestionResult[]): Promise<void> {
     const { mode, difficulty, category, language } = settings
-    const maxStreak    = computeMaxStreak(results)
+    const maxStreak    = computeBestStreak(results)
     const minAnswerTime = computeMinAnswerTime(results)
 
     // Fetch previous best from cloud (0 if not logged in or no entry)

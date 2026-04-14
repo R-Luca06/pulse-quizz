@@ -10,7 +10,6 @@ type ProfileTab = 'general' | 'stats' | 'achievements' | 'confidentiality'
 interface Props {
   onBack: () => void
   defaultTab?: ProfileTab
-  onShowAchievements?: () => void
 }
 
 const TAB_LABELS: Record<ProfileTab, string> = {

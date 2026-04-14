@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { EMPTY_CATEGORY_STATS, EMPTY_GLOBAL_STATS } from '../../utils/statsStorage'
 import type { CategoryStats, GlobalStats } from '../../utils/statsStorage'
 import { fetchAllStats } from '../../services/cloudStats'
 import type { CloudCategoryStatRow, CloudGlobalStatRow } from '../../services/cloudStats'
@@ -37,11 +38,7 @@ function Metric({ label, value }: { label: string; value: string }) {
 }
 
 const fadeUp = { hidden: { opacity: 0, y: 16 }, show: { opacity: 1, y: 0 } }
-
-const EMPTY_CAT_STATS: CategoryStats = {
-  version: 1, gamesPlayed: 0, totalQuestions: 0, totalCorrect: 0,
-  totalTime: 0, bestScore: 0, bestStreak: 0, fastestPerfect: null,
-}
+const PAGE_SIZE = 10
 
 function formatTotalTime(seconds: number): string {
   if (seconds <= 0) return '0s'
@@ -50,11 +47,6 @@ function formatTotalTime(seconds: number): string {
   const m = Math.floor(s / 60)
   const rem = s % 60
   return rem > 0 ? `${m}m ${rem}s` : `${m}m`
-}
-
-const EMPTY_GLOBAL_STATS: GlobalStats = {
-  version: 1, gamesPlayed: 0, totalQuestions: 0, totalCorrect: 0,
-  bestStreak: 0, fastestPerfect: null, comp_total_score: 0,
 }
 
 function cloudRowToCatStats(row: CloudCategoryStatRow): CategoryStats {
@@ -83,7 +75,7 @@ function cloudRowToGlobalStats(row: CloudGlobalStatRow): GlobalStats {
 }
 
 function aggregateCatStats(rows: CloudCategoryStatRow[]): CategoryStats {
-  if (rows.length === 0) return { ...EMPTY_CAT_STATS }
+  if (rows.length === 0) return { ...EMPTY_CATEGORY_STATS }
   const fps = rows.map(r => r.fastest_perfect).filter((v): v is number => v !== null)
   return {
     version: 1,
@@ -119,7 +111,6 @@ export default function StatsPage({ onBack, defaultTab = 'stats', initialDiff, i
   const [expandedData, setExpandedData] = useState<Record<string, CompGameData[] | null>>({})
   const [expandLoading, setExpandLoading] = useState<string | null>(null)
 
-  const PAGE_SIZE = 10
   const lbTotalPages = Math.ceil(lbTotalCount / PAGE_SIZE)
 
   const [cloudCats, setCloudCats] = useState<CloudCategoryStatRow[]>([])
@@ -207,7 +198,7 @@ export default function StatsPage({ onBack, defaultTab = 'stats', initialDiff, i
     if (!user) return []
 
     const getStats = (catValue: string | number): CategoryStats => {
-      if (cloudLoading) return { ...EMPTY_CAT_STATS }
+      if (cloudLoading) return { ...EMPTY_CATEGORY_STATS }
       if (filterDiff === 'mixed') {
         const rows = cloudCats.filter(r => r.mode === 'normal' && r.category === String(catValue))
         return aggregateCatStats(rows)
@@ -215,7 +206,7 @@ export default function StatsPage({ onBack, defaultTab = 'stats', initialDiff, i
       const row = cloudCats.find(
         r => r.mode === 'normal' && r.difficulty === filterDiff && r.category === String(catValue)
       )
-      return row ? cloudRowToCatStats(row) : { ...EMPTY_CAT_STATS }
+      return row ? cloudRowToCatStats(row) : { ...EMPTY_CATEGORY_STATS }
     }
 
     // Bloc "Toutes catégories" — agrégat de toutes les lignes selon le filtre courant
@@ -522,7 +513,7 @@ export default function StatsPage({ onBack, defaultTab = 'stats', initialDiff, i
                                     </div>
                                   )}
                                 </div>
-                                <span className={`shrink-0 text-sm font-black tabular-nums ${isPlayer ? 'text-orange-400' : 'text-orange-400'}`}>
+                                <span className="shrink-0 text-sm font-black tabular-nums text-orange-400">
                                   {entry.score} pts
                                 </span>
                                 <span className="text-[10px] text-white/20">

@@ -222,7 +222,6 @@ export default function App() {
             >
               <ProfilePage
                 onBack={() => setScreen('landing')}
-                onShowAchievements={() => handleShowAchievements('profile')}
               />
             </motion.div>
           )}

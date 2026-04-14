@@ -113,23 +113,6 @@ export async function submitScore(params: SubmitParams): Promise<void> {
   }
 }
 
-export async function getTopScores(
-  mode: GameMode,
-  difficulty: Difficulty,
-  limit = 10,
-): Promise<LeaderboardEntry[]> {
-  const { data, error } = await supabase
-    .from('leaderboard')
-    .select('id, user_id, username, score, mode, difficulty, language, updated_at')
-    .eq('mode', mode)
-    .eq('difficulty', difficulty)
-    .order('score', { ascending: false })
-    .order('updated_at', { ascending: true })
-    .limit(limit)
-  if (error) throw new Error(error.message)
-  return data as LeaderboardEntry[]
-}
-
 export async function getCompTopScores(
   language: Language,
   limit = 10,
