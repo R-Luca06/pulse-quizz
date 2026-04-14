@@ -59,7 +59,7 @@ const AnswerButton = memo(function AnswerButton({
       whileHover={isIdle ? { scale: 1.02 } : {}}
       whileTap={isIdle ? { scale: 0.97 } : {}}
       className={[
-        'relative w-full rounded-2xl border p-3 text-left transition-colors duration-200 sm:p-4',
+        'relative h-full w-full rounded-2xl border p-3 text-left transition-colors duration-200 sm:p-4',
         'flex items-center gap-3 font-medium',
         // idle
         isIdle &&

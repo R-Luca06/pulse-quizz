@@ -49,6 +49,7 @@ function CardContent({ question, answerState, selectedAnswer, onAnswer }: CardCo
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.15 + i * 0.07, duration: 0.2, ease: [0.25, 0, 0, 1] }}
+              className="h-full"
             >
               <AnswerButton
                 label={answer}
