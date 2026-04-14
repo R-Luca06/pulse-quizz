@@ -112,10 +112,10 @@ export default function PodiumScene({ isLaunching, onShowStats, settings, onPlay
         scale: [1, 0.98, 1.02, 0.97, 1.01, 0.99, 1],
       }
   const floatTransition = {
-    x: { duration: 68, repeat: Infinity, ease: 'easeInOut' },
-    y: { duration: 32, repeat: Infinity, ease: 'easeInOut' },
-    rotate: { duration: 22, repeat: Infinity, ease: 'easeInOut' },
-    scale: { duration: 14, repeat: Infinity, ease: 'easeInOut' },
+    x: { duration: 68, repeat: Infinity, ease: 'easeInOut' as const },
+    y: { duration: 32, repeat: Infinity, ease: 'easeInOut' as const },
+    rotate: { duration: 22, repeat: Infinity, ease: 'easeInOut' as const },
+    scale: { duration: 14, repeat: Infinity, ease: 'easeInOut' as const },
   }
 
   return (

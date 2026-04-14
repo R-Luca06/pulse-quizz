@@ -3,6 +3,9 @@ import ConnectedHeader from './ConnectedHeader'
 import PodiumScene from './podium/PodiumScene'
 import type { GameSettings } from '../../hooks/useSettings'
 
+const DEFAULT_SETTINGS: GameSettings = { mode: 'normal', difficulty: 'easy', language: 'fr', category: 'all' }
+const noop = () => {}
+
 type ShakeControls = ReturnType<typeof useAnimationControls>
 
 interface Props {
@@ -13,9 +16,9 @@ interface Props {
   onSignOut: () => void
   username: string
   shakeControls?: ShakeControls
-  settings: GameSettings
-  onPlay: () => void
-  onOpenSettings: () => void
+  settings?: GameSettings
+  onPlay?: () => void
+  onOpenSettings?: () => void
 }
 
 export default function ConnectedLanding({
@@ -47,9 +50,9 @@ export default function ConnectedLanding({
         <PodiumScene
           isLaunching={isLaunching}
           onShowStats={onShowStats}
-          settings={settings}
-          onPlay={onPlay}
-          onOpenSettings={onOpenSettings}
+          settings={settings ?? DEFAULT_SETTINGS}
+          onPlay={onPlay ?? noop}
+          onOpenSettings={onOpenSettings ?? noop}
         />
       </motion.div>
     </>
