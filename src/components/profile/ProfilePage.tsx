@@ -20,6 +20,13 @@ const TAB_LABELS: Record<ProfileTab, string> = {
   confidentiality: 'Confidentialité',
 }
 
+const MOBILE_LABELS: Record<ProfileTab, string> = {
+  general: 'Général',
+  stats: 'Stats',
+  achievements: 'Badges',
+  confidentiality: 'Compte',
+}
+
 const NAV_ITEMS: { key: ProfileTab; label: string; icon: React.ReactNode }[] = [
   {
     key: 'general',
@@ -103,13 +110,31 @@ export default function ProfilePage({ onBack, defaultTab = 'general' }: Props) {
         <div className="w-20" />
       </div>
 
+      {/* Tab bar mobile (< sm) */}
+      <div className="flex items-center border-b border-game-border bg-game-bg sm:hidden">
+        {NAV_ITEMS.map(item => (
+          <button
+            key={item.key}
+            type="button"
+            onClick={() => setActiveTab(item.key)}
+            className={[
+              'flex flex-1 flex-col items-center gap-1 py-2.5 transition-colors',
+              activeTab === item.key ? 'text-neon-violet' : 'text-white/30 hover:text-white/60',
+            ].join(' ')}
+          >
+            {item.icon}
+            <span className="text-[9px] font-semibold">{MOBILE_LABELS[item.key]}</span>
+          </button>
+        ))}
+      </div>
+
       {/* Body */}
       <div className="flex flex-1 overflow-hidden">
 
-        {/* Sidebar */}
+        {/* Sidebar — desktop uniquement (sm+) */}
         <div
           className={[
-            'flex shrink-0 flex-col border-r border-game-border bg-game-bg transition-[width] duration-200 ease-in-out overflow-hidden',
+            'hidden sm:flex shrink-0 flex-col border-r border-game-border bg-game-bg transition-[width] duration-200 ease-in-out overflow-hidden',
             sidebarOpen ? 'w-44' : 'w-14',
           ].join(' ')}
         >

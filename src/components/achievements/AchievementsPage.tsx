@@ -334,12 +334,24 @@ export default function AchievementsPage({ onBack, hideBack = false, pendingAchi
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [filter, setFilter] = useState<FilterKey>('all')
+  const [filterOpen, setFilterOpen] = useState(false)
+  const filterRef = useRef<HTMLDivElement>(null)
   const [featuredBadges, setFeaturedBadges] = useState<string[]>([])
   const [pinSaving, setPinSaving] = useState(false)
 
   useEffect(() => {
     setFeaturedBadges(profile?.featured_badges ?? [])
   }, [profile?.featured_badges])
+
+  useEffect(() => {
+    function onPointerDown(e: PointerEvent) {
+      if (filterRef.current && !filterRef.current.contains(e.target as Node)) {
+        setFilterOpen(false)
+      }
+    }
+    document.addEventListener('pointerdown', onPointerDown)
+    return () => document.removeEventListener('pointerdown', onPointerDown)
+  }, [])
 
   async function handleTogglePin(id: AchievementId) {
     if (!user) return
@@ -476,9 +488,8 @@ export default function AchievementsPage({ onBack, hideBack = false, pendingAchi
         </div>
       ) : (
         <div className="flex flex-1 overflow-hidden">
-
-          {/* Sidebar filtres */}
-          <div className="flex w-36 shrink-0 flex-col gap-0.5 border-r border-game-border p-3">
+          {/* Sidebar filtres — desktop uniquement (sm+) */}
+          <div className="hidden w-36 shrink-0 flex-col gap-0.5 border-r border-game-border p-3 sm:flex">
             <p className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-widest text-white/20">
               Filtrer
             </p>
@@ -506,8 +517,95 @@ export default function AchievementsPage({ onBack, hideBack = false, pendingAchi
             })}
           </div>
 
-          {/* Grille */}
-          <div className="flex-1 overflow-y-auto p-4">
+          {/* Contenu principal */}
+          <div className="flex flex-1 flex-col overflow-y-auto p-4">
+
+            {/* Barre d'outils */}
+            <div className="mb-4 flex items-center gap-2">
+              <div className="flex items-center gap-1.5 rounded-lg border border-neon-violet/20 bg-neon-violet/5 px-2.5 py-1.5">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-neon-violet/60">
+                  <line x1="12" y1="17" x2="12" y2="22"/>
+                  <path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"/>
+                </svg>
+                <span className="text-[10px] font-semibold text-neon-violet/70">Badges leaderboard</span>
+                <span className={`text-[10px] font-black tabular-nums ${featuredBadges.length >= 3 ? 'text-neon-violet' : 'text-white/40'}`}>
+                  {featuredBadges.length}/3
+                </span>
+              </div>
+
+              {pinSaving && (
+                <div className="h-3 w-3 animate-spin rounded-full border border-neon-violet/30 border-t-neon-violet/70" />
+              )}
+
+              {/* Dropdown filtre — mobile uniquement (< sm) */}
+              <div ref={filterRef} className="relative ml-auto sm:hidden">
+                <button
+                  type="button"
+                  onClick={() => setFilterOpen(v => !v)}
+                  className={[
+                    'flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[10px] font-semibold transition-colors',
+                    filter !== 'all'
+                      ? 'border-neon-violet/30 bg-neon-violet/10 text-neon-violet'
+                      : 'border-white/10 bg-white/5 text-white/50 hover:bg-white/10 hover:text-white/70',
+                  ].join(' ')}
+                >
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="4" y1="6" x2="20" y2="6"/>
+                    <line x1="8" y1="12" x2="16" y2="12"/>
+                    <line x1="11" y1="18" x2="13" y2="18"/>
+                  </svg>
+                  <span>Filtre</span>
+                  {filter !== 'all' && (
+                    <span className="text-neon-violet/70">· {FILTERS.find(f => f.key === filter)?.label}</span>
+                  )}
+                  <svg
+                    width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"
+                    className={`transition-transform duration-150 ${filterOpen ? 'rotate-180' : ''}`}
+                  >
+                    <polyline points="6 9 12 15 18 9"/>
+                  </svg>
+                </button>
+
+                {filterOpen && (
+                  <div
+                    className="absolute right-0 top-9 z-50 min-w-[160px] overflow-hidden rounded-xl py-1.5"
+                    style={{
+                      background: 'rgba(19,19,31,0.96)',
+                      border: '1px solid rgba(255,255,255,0.1)',
+                      boxShadow: '0 8px 32px rgba(0,0,0,0.6)',
+                      backdropFilter: 'blur(20px)',
+                    }}
+                  >
+                    {FILTERS.map(f => {
+                      const count = f.key === 'all'
+                        ? achievements.length
+                        : achievements.filter(a => getStatus(a) === f.key).length
+                      const active = filter === f.key
+                      return (
+                        <button
+                          key={f.key}
+                          type="button"
+                          onClick={() => { setFilter(f.key); setFilterOpen(false) }}
+                          className={[
+                            'flex w-full items-center justify-between px-4 py-2.5 text-left text-sm transition-colors',
+                            active
+                              ? 'bg-neon-violet/10 font-semibold text-neon-violet'
+                              : 'font-medium text-white/70 hover:bg-white/5 hover:text-white',
+                          ].join(' ')}
+                        >
+                          <span>{f.label}</span>
+                          <span className={`tabular-nums text-[11px] ${active ? 'text-neon-violet/70' : 'text-white/25'}`}>
+                            {count}
+                          </span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Grille */}
             {loading ? (
               <div className="flex items-center justify-center py-16">
                 <div className="h-6 w-6 animate-spin rounded-full border-2 border-neon-violet/30 border-t-neon-violet" />
@@ -521,27 +619,7 @@ export default function AchievementsPage({ onBack, hideBack = false, pendingAchi
                 <p className="text-sm text-white/30">Aucun résultat pour ce filtre</p>
               </div>
             ) : (
-              <>
-              {/* Indicateur badges épinglés */}
-              <div className="mb-3 flex items-center gap-2">
-                <div className="flex items-center gap-1.5 rounded-lg border border-neon-violet/20 bg-neon-violet/5 px-2.5 py-1.5">
-                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-neon-violet/60">
-                    <line x1="12" y1="17" x2="12" y2="22"/>
-                    <path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"/>
-                  </svg>
-                  <span className="text-[10px] font-semibold text-neon-violet/70">
-                    Badges leaderboard
-                  </span>
-                  <span className={`text-[10px] font-black tabular-nums ${featuredBadges.length >= 3 ? 'text-neon-violet' : 'text-white/40'}`}>
-                    {featuredBadges.length}/3
-                  </span>
-                </div>
-                {pinSaving && (
-                  <div className="h-3 w-3 animate-spin rounded-full border border-neon-violet/30 border-t-neon-violet/70" />
-                )}
-              </div>
-
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                 {filtered.map(a => (
                   <AchievementCard
                     key={a.id}
@@ -554,7 +632,6 @@ export default function AchievementsPage({ onBack, hideBack = false, pendingAchi
                   />
                 ))}
               </div>
-              </>
             )}
           </div>
         </div>

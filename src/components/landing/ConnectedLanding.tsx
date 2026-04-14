@@ -1,6 +1,7 @@
 import { motion, useAnimationControls } from 'framer-motion'
 import ConnectedHeader from './ConnectedHeader'
 import PodiumScene from './podium/PodiumScene'
+import type { GameSettings } from '../../hooks/useSettings'
 
 type ShakeControls = ReturnType<typeof useAnimationControls>
 
@@ -12,6 +13,9 @@ interface Props {
   onSignOut: () => void
   username: string
   shakeControls?: ShakeControls
+  settings: GameSettings
+  onPlay: () => void
+  onOpenSettings: () => void
 }
 
 export default function ConnectedLanding({
@@ -22,6 +26,9 @@ export default function ConnectedLanding({
   onSignOut,
   username,
   shakeControls,
+  settings,
+  onPlay,
+  onOpenSettings,
 }: Props) {
   return (
     <>
@@ -40,6 +47,9 @@ export default function ConnectedLanding({
         <PodiumScene
           isLaunching={isLaunching}
           onShowStats={onShowStats}
+          settings={settings}
+          onPlay={onPlay}
+          onOpenSettings={onOpenSettings}
         />
       </motion.div>
     </>

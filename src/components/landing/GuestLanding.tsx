@@ -53,7 +53,6 @@ export default function GuestLanding({
   return (
     <div className="relative z-0 flex min-h-full w-full flex-col">
       <GuestHeader
-        onPlay={handlePlay}
         onOpenSignIn={onOpenSignIn}
         onOpenSignUp={onOpenSignUp}
       />

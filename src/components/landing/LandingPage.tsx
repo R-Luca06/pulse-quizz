@@ -261,10 +261,16 @@ function ConnectedBranch({
         onSignOut={onSignOut}
         username={username}
         shakeControls={shakeControls}
+        settings={settings}
+        onPlay={handleLaunch}
+        onOpenSettings={() => setOpenSettings(true)}
       />
 
+      {/* GameDock : desktop uniquement (lg+) — le mobile a son dock dans PodiumScene */}
       {!isLaunching && (
-        <GameDock settings={settings} onPlay={handleLaunch} onOpenSettings={() => setOpenSettings(true)} />
+        <div className="hidden lg:block">
+          <GameDock settings={settings} onPlay={handleLaunch} onOpenSettings={() => setOpenSettings(true)} />
+        </div>
       )}
 
       <AnimatePresence>

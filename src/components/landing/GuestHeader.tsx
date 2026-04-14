@@ -1,10 +1,9 @@
 interface Props {
-  onPlay: () => void
   onOpenSignIn: () => void
   onOpenSignUp: () => void
 }
 
-export default function GuestHeader({ onPlay, onOpenSignIn, onOpenSignUp }: Props) {
+export default function GuestHeader({ onOpenSignIn, onOpenSignUp }: Props) {
   return (
     <nav className="sticky top-0 z-30 w-full border-b border-white/5 bg-[#0B0820]/85 backdrop-blur-md">
       <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between px-6">
@@ -13,16 +12,6 @@ export default function GuestHeader({ onPlay, onOpenSignIn, onOpenSignUp }: Prop
         </a>
 
         <div className="flex items-center gap-2">
-          <button
-            onClick={onPlay}
-            aria-label="Jouer maintenant en mode invité"
-            className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/[0.04] px-4 py-1.5 text-xs font-semibold text-white/80 transition-colors hover:border-white/30 hover:bg-white/[0.08] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neon-violet/60"
-          >
-            <svg width="9" height="9" viewBox="0 0 10 10" fill="currentColor" aria-hidden="true">
-              <polygon points="1,0 9,5 1,10" />
-            </svg>
-            Jouer
-          </button>
           <button
             onClick={onOpenSignIn}
             aria-label="Se connecter à Pulse Quizz"

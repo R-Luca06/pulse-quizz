@@ -67,7 +67,7 @@ export default function PlayerStatsCard({ onShowStats }: Props) {
       tabIndex={0}
       onClick={() => onShowStats('stats')}
       onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && onShowStats('stats')}
-      className="w-64 cursor-pointer rounded-xl border border-game-border bg-game-card/90 px-4 py-4 backdrop-blur-sm transition-all duration-300 hover:scale-[1.02] hover:border-neon-violet/40 sm:w-72"
+      className="w-full cursor-pointer rounded-xl border border-game-border bg-game-card/90 px-4 py-4 backdrop-blur-sm transition-all duration-300 hover:scale-[1.02] hover:border-neon-violet/40"
       style={{ boxShadow: '0 0 24px rgba(139,92,246,0.12)', transition: 'box-shadow 0.3s ease, transform 0.3s ease, border-color 0.3s ease' }}
       onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = '0 0 48px rgba(139,92,246,0.3), 0 0 16px rgba(139,92,246,0.15)' }}
       onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = '0 0 24px rgba(139,92,246,0.12)' }}
