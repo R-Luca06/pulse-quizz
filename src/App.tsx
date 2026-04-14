@@ -68,7 +68,6 @@ export default function App() {
   const closeAuth = () => setAuthModal(a => ({ ...a, open: false }))
   const [achievementsOrigin, setAchievementsOrigin] = useState<'landing' | 'profile' | 'result'>('landing')
   const [viewingUsername, setViewingUsername] = useState<string | null>(null)
-  const viewProfile = (username: string) => setViewingUsername(username)
   const closeProfile = () => setViewingUsername(null)
 
   function handleShowAchievements(from: 'landing' | 'profile' = 'landing') {
