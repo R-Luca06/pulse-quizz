@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '../../../hooks/useAuth'
 import { useToast } from '../../../contexts/ToastContext'
-import { updateUsername, updateEmail } from '../../../services/profile'
+import { updateUsername, updateEmail, updateDescription } from '../../../services/profile'
 import { AppError } from '../../../services/errors'
 
 // ─── Icônes inline ───────────────────────────────────────────────────────────
@@ -64,10 +64,10 @@ function NotifRow({ label, description }: { label: string; description: string }
 
 // ─── Composant principal ──────────────────────────────────────────────────────
 
-type ActiveField = 'username' | 'email' | null
+type ActiveField = 'username' | 'email' | 'description' | null
 
 export default function GeneralTab() {
-  const { user, profile, refreshProfile, triggerAchievementCheck } = useAuth()
+  const { user, profile, refreshProfile, triggerAchievementCheck, setLocalDescription } = useAuth()
   const toast = useToast()
   const initial = (profile?.username?.[0] ?? '?').toUpperCase()
 
@@ -106,13 +106,15 @@ export default function GeneralTab() {
 
   // ── Profil section accordion ──
   const [activeField, setActiveField] = useState<ActiveField>(null)
-  const [username, setUsername] = useState(profile?.username ?? '')
-  const [email, setEmail] = useState(user?.email ?? '')
+  const [username,    setUsername]    = useState(profile?.username ?? '')
+  const [email,       setEmail]       = useState(user?.email ?? '')
+  const [description, setDescription] = useState(profile?.description ?? '')
   const [fieldLoading, setFieldLoading] = useState(false)
-  const [fieldError, setFieldError] = useState<string | null>(null)
+  const [fieldError,   setFieldError]   = useState<string | null>(null)
 
-  useEffect(() => { setUsername(profile?.username ?? '') }, [profile?.username])
-  useEffect(() => { setEmail(user?.email ?? '') }, [user?.email])
+  useEffect(() => { setUsername(profile?.username ?? '') },    [profile?.username])
+  useEffect(() => { setEmail(user?.email ?? '') },             [user?.email])
+  useEffect(() => { setDescription(profile?.description ?? '') }, [profile?.description])
 
   function toggleField(field: ActiveField) {
     if (activeField === field) {
@@ -121,8 +123,9 @@ export default function GeneralTab() {
     } else {
       setActiveField(field)
       setFieldError(null)
-      if (field === 'username') setUsername(profile?.username ?? '')
-      if (field === 'email') setEmail(user?.email ?? '')
+      if (field === 'username')    setUsername(profile?.username ?? '')
+      if (field === 'email')       setEmail(user?.email ?? '')
+      if (field === 'description') setDescription(profile?.description ?? '')
     }
   }
 
@@ -152,6 +155,23 @@ export default function GeneralTab() {
     try {
       await updateEmail(email)
       toast.success(`Confirmation envoyée à ${email}`)
+      setActiveField(null)
+    } catch (err) {
+      setFieldError(err instanceof AppError ? err.message : 'Erreur inattendue')
+    } finally {
+      setFieldLoading(false)
+    }
+  }
+
+  async function handleDescriptionSubmit(e: { preventDefault(): void }) {
+    e.preventDefault()
+    if (!user) return
+    setFieldError(null)
+    setFieldLoading(true)
+    try {
+      await updateDescription(user.id, description)
+      setLocalDescription(description.trim())
+      toast.success('Description mise à jour')
       setActiveField(null)
     } catch (err) {
       setFieldError(err instanceof AppError ? err.message : 'Erreur inattendue')
@@ -338,18 +358,58 @@ export default function GeneralTab() {
             </AnimatePresence>
           </div>
 
-          {/* Description — placeholder bientôt */}
-          <div className="flex items-center gap-3 px-4 py-3 opacity-50 cursor-not-allowed">
-            <span className="shrink-0 text-white/30">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="17" y1="10" x2="3" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="3" y2="14"/><line x1="17" y1="18" x2="3" y2="18"/>
-              </svg>
-            </span>
-            <span className="w-20 shrink-0 text-xs text-white/35">Description</span>
-            <span className="flex-1 text-sm text-white/25 italic">Non renseignée</span>
-            <span className="rounded-full bg-white/[0.06] px-2 py-0.5 text-[10px] font-semibold text-white/30">
-              Bientôt
-            </span>
+          {/* Description */}
+          <div>
+            <button
+              onClick={() => toggleField('description')}
+              className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-white/[0.02]"
+            >
+              <span className="shrink-0 text-white/30">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="17" y1="10" x2="3" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="3" y2="14"/><line x1="17" y1="18" x2="3" y2="18"/>
+                </svg>
+              </span>
+              <span className="w-20 shrink-0 text-xs text-white/35">Description</span>
+              <span className="flex-1 truncate text-sm text-white/70">
+                {profile?.description ? profile.description : <span className="italic text-white/25">Non renseignée</span>}
+              </span>
+              <ChevronIcon open={activeField === 'description'} />
+            </button>
+            <AnimatePresence initial={false}>
+              {activeField === 'description' && (
+                <motion.div
+                  key="description-form"
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.22, ease: 'easeInOut' }}
+                  className="overflow-hidden border-t border-game-border/50"
+                >
+                  <form onSubmit={handleDescriptionSubmit} className="flex flex-col gap-2 px-4 py-3">
+                    <textarea
+                      value={description}
+                      onChange={e => setDescription(e.target.value)}
+                      maxLength={120}
+                      autoFocus
+                      rows={3}
+                      className={`${inputClass} resize-none`}
+                      placeholder="Décris-toi en quelques mots…"
+                    />
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] text-white/25">{description.length}/120</span>
+                      {fieldError && activeField === 'description' && (
+                        <p className="text-xs text-game-danger">{fieldError}</p>
+                      )}
+                    </div>
+                    <InlineActions
+                      onCancel={() => { setActiveField(null); setFieldError(null) }}
+                      loading={fieldLoading}
+                      disabled={fieldLoading || description.trim() === (profile?.description ?? '')}
+                    />
+                  </form>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
 
         </div>

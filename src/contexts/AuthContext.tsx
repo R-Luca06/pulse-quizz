@@ -7,6 +7,7 @@ import type { AchievementWithStatus } from '../types/quiz'
 interface Profile {
   username: string
   featured_badges: string[]
+  description: string
 }
 
 interface AuthContextValue {
@@ -18,6 +19,7 @@ interface AuthContextValue {
   statsRefreshKey: number
   refreshStats: () => void
   setLocalFeaturedBadges: (badges: string[]) => void
+  setLocalDescription: (description: string) => void
   triggerAchievementCheck: (context?: AchievementContext) => Promise<void>
   signUp: (email: string, password: string, username: string) => Promise<void>
   signIn: (email: string, password: string) => Promise<void>
@@ -56,11 +58,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let cancelled = false
     supabase
       .from('profiles')
-      .select('username, featured_badges')
+      .select('username, featured_badges, description')
       .eq('id', user.id)
       .maybeSingle()
       .then(({ data }) => {
-        if (!cancelled && data) setProfile({ username: data.username, featured_badges: data.featured_badges ?? [] })
+        if (!cancelled && data) setProfile({ username: data.username, featured_badges: data.featured_badges ?? [], description: data.description ?? '' })
       })
     // Vérification rétroactive silencieuse — fire and forget
     checkAndUnlockAchievements(user.id).catch(err => console.error('Achievement check failed:', err))
@@ -77,6 +79,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   function setLocalFeaturedBadges(badges: string[]) {
     setProfile(prev => prev ? { ...prev, featured_badges: badges } : prev)
+  }
+
+  function setLocalDescription(description: string) {
+    setProfile(prev => prev ? { ...prev, description } : prev)
   }
 
   async function triggerAchievementCheck(context?: AchievementContext): Promise<void> {
@@ -115,7 +121,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await supabase.auth.signOut()
       throw profileError
     }
-    setProfile({ username, featured_badges: [] })
+    setProfile({ username, featured_badges: [], description: '' })
 
     // Vérification des achievements post-inscription (profile existe maintenant)
     checkAndUnlockAchievements(data.user.id)
@@ -137,14 +143,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!user) return
     const { data } = await supabase
       .from('profiles')
-      .select('username, featured_badges')
+      .select('username, featured_badges, description')
       .eq('id', user.id)
       .maybeSingle()
-    if (data) setProfile({ username: data.username, featured_badges: data.featured_badges ?? [] })
+    if (data) setProfile({ username: data.username, featured_badges: data.featured_badges ?? [], description: data.description ?? '' })
   }
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, pendingAchievements, clearPendingAchievements, statsRefreshKey, refreshStats, setLocalFeaturedBadges, triggerAchievementCheck, signUp, signIn, signOut, refreshProfile }}>
+    <AuthContext.Provider value={{ user, profile, loading, pendingAchievements, clearPendingAchievements, statsRefreshKey, refreshStats, setLocalFeaturedBadges, setLocalDescription, triggerAchievementCheck, signUp, signIn, signOut, refreshProfile }}>
       {children}
     </AuthContext.Provider>
   )

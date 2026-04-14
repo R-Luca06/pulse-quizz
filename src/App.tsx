@@ -14,6 +14,7 @@ const StatsPage = lazy(() => import('./components/stats/StatsPage'))
 const AuthModal = lazy(() => import('./components/auth/AuthModal'))
 const ProfilePage = lazy(() => import('./components/profile/ProfilePage'))
 const AchievementsPage = lazy(() => import('./components/achievements/AchievementsPage'))
+const UserProfilePanel = lazy(() => import('./pages/PublicProfilePage'))
 
 export type AppScreen = 'landing' | 'launching' | 'quiz' | 'ranking' | 'result' | 'stats' | 'profile' | 'achievements'
 
@@ -66,6 +67,9 @@ export default function App() {
   const openSignUp = () => setAuthModal({ open: true, tab: 'signup' })
   const closeAuth = () => setAuthModal(a => ({ ...a, open: false }))
   const [achievementsOrigin, setAchievementsOrigin] = useState<'landing' | 'profile' | 'result'>('landing')
+  const [viewingUsername, setViewingUsername] = useState<string | null>(null)
+  const viewProfile = (username: string) => setViewingUsername(username)
+  const closeProfile = () => setViewingUsername(null)
 
   function handleShowAchievements(from: 'landing' | 'profile' = 'landing') {
     setAchievementsOrigin(from)
@@ -280,6 +284,24 @@ export default function App() {
             onDone={handleAchievementsDone}
             pendingBadgeRect={pendingBadgeRect}
           />
+        )}
+      </AnimatePresence>
+
+      {/* ── Profil utilisateur — overlay glissant depuis la droite ────────── */}
+      <AnimatePresence>
+        {viewingUsername && (
+          <motion.div
+            key="user-profile"
+            initial={{ x: '100%' }}
+            animate={{ x: 0 }}
+            exit={{ x: '100%' }}
+            transition={{ type: 'spring', stiffness: 380, damping: 38 }}
+            className="fixed inset-0 z-40 bg-game-bg"
+          >
+            <Suspense fallback={<div className="absolute inset-0 bg-game-bg" />}>
+              <UserProfilePanel username={viewingUsername} onClose={closeProfile} />
+            </Suspense>
+          </motion.div>
         )}
       </AnimatePresence>
     </>

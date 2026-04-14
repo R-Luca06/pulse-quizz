@@ -23,6 +23,13 @@ export async function updateEmail(newEmail: string): Promise<void> {
   if (error) throw new AppError('auth_error', error.message)
 }
 
+export async function updateDescription(userId: string, description: string): Promise<void> {
+  const trimmed = description.trim()
+  if (trimmed.length > 120) throw new AppError('validation_error', 'La description ne peut pas dépasser 120 caractères')
+  const { error } = await supabase.from('profiles').update({ description: trimmed }).eq('id', userId)
+  if (error) throw new AppError('db_error', error.message)
+}
+
 export async function updateFeaturedBadges(userId: string, badges: string[]): Promise<void> {
   if (badges.length > 3) {
     throw new AppError('validation_error', 'Maximum 3 badges en vedette')
