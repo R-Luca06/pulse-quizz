@@ -1,6 +1,9 @@
 import { useState, useRef, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { AvatarContainer } from '../avatar'
+import { useAuth } from '../../hooks/useAuth'
+import FriendsPanel from '../social/FriendsPanel'
+import NotificationBell from '../notifications/NotificationBell'
 
 interface ConnectedHeaderProps {
   onShowStats: (tab?: 'stats' | 'leaderboard') => void
@@ -8,6 +11,8 @@ interface ConnectedHeaderProps {
   onShowAchievements: () => void
   onSignOut: () => void
   username: string
+  onViewProfile: (username: string) => void
+  onShowSocial?: () => void
 }
 
 const navLinkClass =
@@ -22,7 +27,10 @@ export default function ConnectedHeader({
   onShowAchievements,
   onSignOut,
   username,
+  onViewProfile,
+  onShowSocial,
 }: ConnectedHeaderProps) {
+  const { user } = useAuth()
   const [navOpen, setNavOpen] = useState(false)
   const [avatarOpen, setAvatarOpen] = useState(false)
   const navRef = useRef<HTMLDivElement>(null)
@@ -69,7 +77,15 @@ export default function ConnectedHeader({
       </div>
 
       {/* ── Droite : user chip (desktop) ── */}
-      <div className="hidden items-center gap-1 sm:flex">
+      <div className="hidden items-center gap-2 sm:flex">
+        {user && (
+          <FriendsPanel
+            userId={user.id}
+            onViewProfile={username => { onViewProfile(username) }}
+            onShowSocialPage={onShowSocial ?? (() => {})}
+          />
+        )}
+        {user && <NotificationBell userId={user.id} />}
         <button
           type="button"
           onClick={onShowProfile}
@@ -194,6 +210,18 @@ export default function ConnectedHeader({
             </div>
           )}
         </div>
+
+        {/* Social (FriendsPanel) */}
+        {user && (
+          <FriendsPanel
+            userId={user.id}
+            onViewProfile={username => { onViewProfile(username) }}
+            onShowSocialPage={onShowSocial ?? (() => {})}
+          />
+        )}
+
+        {/* Cloche notifications — rightmost = dropdown aligné bord droit écran */}
+        {user && <NotificationBell userId={user.id} />}
 
       </div>
     </motion.nav>

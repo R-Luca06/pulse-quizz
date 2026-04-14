@@ -4,6 +4,12 @@ import { useAuth } from '../../../hooks/useAuth'
 import { useToast } from '../../../contexts/ToastContext'
 import { updateUsername, updateEmail, updateDescription } from '../../../services/profile'
 import { AppError } from '../../../services/errors'
+import {
+  getNotificationPrefs,
+  updateNotificationPrefs,
+  DEFAULT_PREFS,
+  type NotificationPrefs,
+} from '../../../services/notifications'
 
 // ─── Icônes inline ───────────────────────────────────────────────────────────
 
@@ -40,24 +46,45 @@ function InlineActions({ onCancel, loading, disabled }: { onCancel: () => void; 
   )
 }
 
-// ─── Notification toggle (placeholder) ───────────────────────────────────────
+// ─── Notification toggle ──────────────────────────────────────────────────────
 
-function NotifRow({ label, description }: { label: string; description: string }) {
+function NotifToggle({
+  label,
+  description,
+  enabled,
+  loading,
+  onToggle,
+}: {
+  label: string
+  description: string
+  enabled: boolean
+  loading: boolean
+  onToggle: () => void
+}) {
   return (
     <div className="flex items-center gap-3 px-4 py-3">
       <div className="flex-1 min-w-0">
-        <p className="text-sm text-white/50">{label}</p>
-        <p className="text-xs text-white/25">{description}</p>
+        <p className="text-sm text-white/70">{label}</p>
+        <p className="text-xs text-white/30">{description}</p>
       </div>
-      <div className="flex items-center gap-2 shrink-0">
-        <span className="rounded-full bg-neon-violet/10 px-2 py-0.5 text-[10px] font-semibold text-neon-violet/60">
-          Bientôt
-        </span>
-        {/* Toggle placeholder */}
-        <div className="flex h-5 w-9 cursor-not-allowed items-center rounded-full bg-white/[0.06] px-0.5 opacity-40">
-          <div className="h-4 w-4 rounded-full bg-white/30" />
-        </div>
-      </div>
+      <button
+        type="button"
+        onClick={onToggle}
+        disabled={loading}
+        aria-checked={enabled}
+        role="switch"
+        className={[
+          'flex h-5 w-9 shrink-0 items-center rounded-full px-0.5 transition-all duration-200',
+          loading ? 'cursor-wait opacity-50' : 'cursor-pointer',
+          enabled ? 'bg-neon-violet/80' : 'bg-white/[0.08]',
+        ].join(' ')}
+      >
+        <motion.div
+          animate={{ x: enabled ? 16 : 0 }}
+          transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+          className={['h-4 w-4 rounded-full shadow-sm transition-colors', enabled ? 'bg-white' : 'bg-white/30'].join(' ')}
+        />
+      </button>
     </div>
   )
 }
@@ -70,6 +97,31 @@ export default function GeneralTab() {
   const { user, profile, refreshProfile, triggerAchievementCheck, setLocalDescription } = useAuth()
   const toast = useToast()
   const initial = (profile?.username?.[0] ?? '?').toUpperCase()
+
+  // ── Préférences notifications ──
+  const [prefs, setPrefs] = useState<NotificationPrefs>({ ...DEFAULT_PREFS })
+  const [prefsLoading, setPrefsLoading] = useState(false)
+  const [prefsReady, setPrefsReady] = useState(false)
+
+  useEffect(() => {
+    if (!user) return
+    getNotificationPrefs(user.id).then(p => { setPrefs(p); setPrefsReady(true) }).catch(() => {})
+  }, [user])
+
+  async function handleTogglePref(key: keyof NotificationPrefs) {
+    if (!user || prefsLoading) return
+    const next = { ...prefs, [key]: !prefs[key] }
+    setPrefs(next)
+    setPrefsLoading(true)
+    try {
+      await updateNotificationPrefs(user.id, next)
+    } catch {
+      setPrefs(prefs) // rollback
+      toast.error('Impossible de sauvegarder la préférence')
+    } finally {
+      setPrefsLoading(false)
+    }
+  }
 
   // ── Hero inline edit ──
   const [heroEdit, setHeroEdit] = useState(false)
@@ -420,10 +472,28 @@ export default function GeneralTab() {
         <p className="mb-3 text-[10px] font-bold uppercase tracking-widest text-white/30">Notifications</p>
 
         <div className="overflow-hidden rounded-xl border border-game-border bg-game-card/40 divide-y divide-game-border/60">
-          <NotifRow label="Nouvelles fonctionnalités" description="Sois le premier informé des mises à jour" />
-          <NotifRow label="Résultats de quiz" description="Partages et défis reçus" />
-          <NotifRow label="Rappels de pratique" description="Pour maintenir ta série" />
-          <NotifRow label="Promotions" description="Offres et événements spéciaux" />
+          {!prefsReady ? (
+            <div className="flex justify-center py-6">
+              <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/20 border-t-white/60" />
+            </div>
+          ) : (
+            <>
+              <NotifToggle
+                label="Badges débloqués"
+                description="Nouveaux trophées après une partie"
+                enabled={prefs.achievement_unlocked}
+                loading={prefsLoading}
+                onToggle={() => handleTogglePref('achievement_unlocked')}
+              />
+              <NotifToggle
+                label="Classement compétitif"
+                description="Évolution de ton rang après une partie"
+                enabled={prefs.rank_change}
+                loading={prefsLoading}
+                onToggle={() => handleTogglePref('rank_change')}
+              />
+            </>
+          )}
         </div>
       </div>
 

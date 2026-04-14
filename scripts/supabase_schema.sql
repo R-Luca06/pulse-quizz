@@ -34,19 +34,19 @@
 -- pour éviter les JOINs en lecture).
 
 CREATE TABLE IF NOT EXISTS profiles (
-  id               uuid        PRIMARY KEY REFERENCES auth.users (id) ON DELETE CASCADE,
-  username         text        NOT NULL,
-  featured_badges  text[]      NOT NULL DEFAULT '{}',  -- jusqu'à 3 achievement_id épinglés sur le leaderboard
-  created_at       timestamptz NOT NULL DEFAULT now(),
+  id                  uuid        PRIMARY KEY REFERENCES auth.users (id) ON DELETE CASCADE,
+  username            text        NOT NULL,
+  featured_badges     text[]      NOT NULL DEFAULT '{}',  -- jusqu'à 3 achievement_id épinglés sur le leaderboard
+  description         text,                               -- bio libre de l'utilisateur
+  username_changed    boolean     NOT NULL DEFAULT false,
+  avatar_changed      boolean     NOT NULL DEFAULT false,
+  description_changed boolean     NOT NULL DEFAULT false,
+  notification_prefs  jsonb       NOT NULL DEFAULT '{"achievement_unlocked":true,"rank_change":true}',
+  created_at          timestamptz NOT NULL DEFAULT now(),
 
   -- Unicité insensible à la casse (vérifié aussi côté app dans profile.ts)
   CONSTRAINT profiles_username_unique UNIQUE (username)
 );
-
--- ─────────────────────────────────────────────────────────────────────────────
--- Migration (si la table existe déjà) :
---   ALTER TABLE profiles ADD COLUMN IF NOT EXISTS featured_badges text[] NOT NULL DEFAULT '{}';
--- ─────────────────────────────────────────────────────────────────────────────
 
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 
@@ -372,14 +372,220 @@ GRANT EXECUTE ON FUNCTION delete_user() TO authenticated;
 ALTER TABLE user_global_stats
   ADD COLUMN IF NOT EXISTS comp_games_played integer NOT NULL DEFAULT 0;
 
--- ─────────────────────────────────────────────────────────────────────────────
--- profiles : flags de personnalisation pour les achievements
--- ─────────────────────────────────────────────────────────────────────────────
--- username_changed  → achievement "Réinvention"  (mis à true dans profile.ts)
--- avatar_changed    → achievement "Nouveau Visage" (à connecter quand la feature avatar existe)
--- description_changed → achievement "Mon Histoire" (à connecter quand la feature description existe)
 
-ALTER TABLE profiles
-  ADD COLUMN IF NOT EXISTS username_changed    boolean NOT NULL DEFAULT false,
-  ADD COLUMN IF NOT EXISTS avatar_changed      boolean NOT NULL DEFAULT false,
-  ADD COLUMN IF NOT EXISTS description_changed boolean NOT NULL DEFAULT false;
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- get_public_profile
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Appelée par publicProfile.ts pour afficher le profil public d'un joueur.
+-- Retourne null si le username n'existe pas.
+
+CREATE OR REPLACE FUNCTION get_public_profile(p_username text)
+RETURNS jsonb
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_user_id   uuid;
+  v_username  text;
+  v_desc      text;
+  v_featured  text[];
+  v_games     integer := 0;
+  v_correct   integer := 0;
+  v_streak    integer := 0;
+  v_best_comp integer := 0;
+  v_rank      bigint  := NULL;
+  v_total     bigint  := 0;
+  v_ach       jsonb   := '[]'::jsonb;
+  v_ach_dates jsonb   := '[]'::jsonb;
+BEGIN
+  -- Profil de base
+  SELECT id, username, description, featured_badges
+  INTO v_user_id, v_username, v_desc, v_featured
+  FROM profiles WHERE lower(username) = lower(p_username);
+
+  IF NOT FOUND THEN RETURN NULL; END IF;
+
+  -- Stats globales
+  SELECT COALESCE(games_played, 0), COALESCE(total_correct, 0), COALESCE(best_streak, 0)
+  INTO v_games, v_correct, v_streak
+  FROM user_global_stats WHERE user_id = v_user_id;
+
+  -- Meilleur score compétitif
+  SELECT COALESCE(score, 0) INTO v_best_comp
+  FROM leaderboard WHERE user_id = v_user_id AND mode = 'compétitif' LIMIT 1;
+
+  -- Rang et total joueurs compétitif
+  SELECT COUNT(*) INTO v_total
+  FROM leaderboard WHERE mode = 'compétitif' AND language = 'fr';
+
+  SELECT ranked.rank INTO v_rank FROM (
+    SELECT user_id, RANK() OVER (ORDER BY score DESC) AS rank
+    FROM leaderboard WHERE mode = 'compétitif' AND language = 'fr'
+  ) ranked WHERE ranked.user_id = v_user_id;
+
+  -- Achievements débloqués
+  SELECT
+    jsonb_agg(achievement_id ORDER BY unlocked_at),
+    jsonb_agg(jsonb_build_object('id', achievement_id, 'unlocked_at', unlocked_at) ORDER BY unlocked_at)
+  INTO v_ach, v_ach_dates
+  FROM user_achievements WHERE user_id = v_user_id;
+
+  RETURN jsonb_build_object(
+    'username',          v_username,
+    'avatar_emoji',      '',
+    'avatar_color',      '',
+    'description',       COALESCE(v_desc, ''),
+    'featured_badges',   COALESCE(to_jsonb(v_featured), '[]'::jsonb),
+    'games_played',      v_games,
+    'total_correct',     v_correct,
+    'best_streak',       v_streak,
+    'best_comp_score',   COALESCE(v_best_comp, 0),
+    'rank',              v_rank,
+    'total_players',     v_total,
+    'achievements',      COALESCE(v_ach,      '[]'::jsonb),
+    'achievement_dates', COALESCE(v_ach_dates, '[]'::jsonb)
+  );
+END;
+$$;
+
+-- Accessible aux utilisateurs connectés et anonymes (profil public)
+GRANT EXECUTE ON FUNCTION get_public_profile(text) TO authenticated, anon;
+
+
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- 7. friendships
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- Relation symétrique d'amitié entre deux utilisateurs.
+-- requester_id  : celui qui envoie la demande
+-- addressee_id  : celui qui reçoit la demande
+-- status        : 'pending' → 'accepted' | 'rejected'
+--
+-- Contrainte UNIQUE(requester_id, addressee_id) : une seule ligne par paire
+-- ordonnée. La paire inverse (addressee→requester) n'existe pas une fois acceptée ;
+-- on lit les deux sens avec un OR dans les requêtes.
+-- ─────────────────────────────────────────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS friendships (
+  id           uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+  requester_id uuid        NOT NULL REFERENCES auth.users (id) ON DELETE CASCADE,
+  addressee_id uuid        NOT NULL REFERENCES auth.users (id) ON DELETE CASCADE,
+  status       text        NOT NULL DEFAULT 'pending'
+                           CHECK (status IN ('pending', 'accepted', 'rejected')),
+  created_at   timestamptz NOT NULL DEFAULT now(),
+  updated_at   timestamptz NOT NULL DEFAULT now(),
+
+  CONSTRAINT friendships_no_self_loop  CHECK (requester_id <> addressee_id),
+  CONSTRAINT friendships_unique_pair   UNIQUE (requester_id, addressee_id)
+);
+
+-- Index pour accélérer les lectures dans les deux sens
+CREATE INDEX IF NOT EXISTS idx_friendships_requester ON friendships (requester_id);
+CREATE INDEX IF NOT EXISTS idx_friendships_addressee ON friendships (addressee_id);
+
+ALTER TABLE friendships ENABLE ROW LEVEL SECURITY;
+
+-- Un utilisateur peut voir toutes les lignes où il est impliqué
+CREATE POLICY "friendships_select_own"
+  ON friendships FOR SELECT
+  USING (auth.uid() = requester_id OR auth.uid() = addressee_id);
+
+-- Seul le requester peut créer une demande (en son nom)
+CREATE POLICY "friendships_insert_own"
+  ON friendships FOR INSERT
+  WITH CHECK (auth.uid() = requester_id);
+
+-- Mise à jour : requester peut annuler (DELETE), addressee peut accepter/refuser
+-- On autorise l'update si l'utilisateur est impliqué dans la relation
+CREATE POLICY "friendships_update_own"
+  ON friendships FOR UPDATE
+  USING (auth.uid() = requester_id OR auth.uid() = addressee_id);
+
+-- Suppression : les deux parties peuvent supprimer (retrait d'ami, annulation)
+CREATE POLICY "friendships_delete_own"
+  ON friendships FOR DELETE
+  USING (auth.uid() = requester_id OR auth.uid() = addressee_id);
+
+-- Trigger pour mettre à jour updated_at automatiquement
+CREATE OR REPLACE FUNCTION update_friendships_updated_at()
+RETURNS TRIGGER LANGUAGE plpgsql AS $$
+BEGIN
+  NEW.updated_at = now();
+  RETURN NEW;
+END;
+$$;
+
+CREATE OR REPLACE TRIGGER friendships_updated_at
+  BEFORE UPDATE ON friendships
+  FOR EACH ROW EXECUTE FUNCTION update_friendships_updated_at();
+
+
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- 8. notifications
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- Historique des 20 dernières notifications par utilisateur.
+-- Types :
+--   achievement_unlocked — data: { badge_id, badge_name, badge_icon }
+--   rank_up              — data: { new_rank, delta }
+--   rank_down            — data: { new_rank, delta }
+--
+-- Créées depuis le client (useGameOrchestration) après chaque partie.
+-- Élagage automatique à 20 par utilisateur via trigger.
+-- ═══════════════════════════════════════════════════════════════════════════════
+
+
+-- ── Table notifications ───────────────────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS notifications (
+  id          uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id     uuid        NOT NULL REFERENCES auth.users (id) ON DELETE CASCADE,
+  type        text        NOT NULL CHECK (type IN (
+                'achievement_unlocked', 'rank_up', 'rank_down'
+              )),
+  data        jsonb       NOT NULL DEFAULT '{}',
+  read        boolean     NOT NULL DEFAULT false,
+  created_at  timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_notifications_user_created
+  ON notifications (user_id, created_at DESC);
+
+ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
+
+-- Lecture : uniquement ses propres notifications
+CREATE POLICY "notifications_select_own"
+  ON notifications FOR SELECT
+  USING (auth.uid() = user_id);
+
+-- Insertion depuis le client (achievements, rank) — triggers SECURITY DEFINER bypass RLS
+CREATE POLICY "notifications_insert_own"
+  ON notifications FOR INSERT
+  WITH CHECK (auth.uid() = user_id);
+
+-- Mise à jour (marquer lu) : uniquement ses propres
+CREATE POLICY "notifications_update_own"
+  ON notifications FOR UPDATE
+  USING (auth.uid() = user_id);
+
+-- ── Trigger : élagage → 20 dernières par utilisateur ────────────────────────
+
+CREATE OR REPLACE FUNCTION trim_notifications()
+RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER AS $$
+BEGIN
+  DELETE FROM notifications
+  WHERE id IN (
+    SELECT id FROM notifications
+    WHERE user_id = NEW.user_id
+    ORDER BY created_at DESC
+    OFFSET 20
+  );
+  RETURN NEW;
+END;
+$$;
+
+CREATE OR REPLACE TRIGGER notifications_trim
+  AFTER INSERT ON notifications
+  FOR EACH ROW EXECUTE FUNCTION trim_notifications();
+

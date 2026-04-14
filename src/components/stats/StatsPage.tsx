@@ -17,6 +17,7 @@ interface Props {
   initialDiff?: Difficulty
   initialLang?: Language
   hideNav?: boolean
+  onViewProfile?: (username: string) => void
 }
 
 function StatTile({ label, value, accent }: { label: string; value: string | number; accent?: string }) {
@@ -94,7 +95,7 @@ const STATS_DIFFICULTIES: { value: Difficulty; label: string }[] = [
   ...DIFFICULTIES,
 ]
 
-export default function StatsPage({ onBack, defaultTab = 'stats', initialDiff, initialLang, hideNav = false }: Props) {
+export default function StatsPage({ onBack, defaultTab = 'stats', initialDiff, initialLang, hideNav = false, onViewProfile }: Props) {
   const { user } = useAuth()
   const [activeTab, setActiveTab] = useState<'stats' | 'leaderboard'>(defaultTab)
   const [filterDiff, setFilterDiff] = useState<Difficulty>(initialDiff ?? 'mixed')
@@ -504,7 +505,15 @@ export default function StatsPage({ onBack, defaultTab = 'stats', initialDiff, i
                                   #{rank}
                                 </span>
                                 <div className="flex flex-1 items-center gap-1.5 min-w-0">
-                                  <span className="truncate text-sm font-bold text-white">{entry.username}</span>
+                                  <span
+                                    className={[
+                                      'truncate text-sm font-bold text-white',
+                                      onViewProfile ? 'cursor-pointer underline decoration-transparent decoration-1 underline-offset-2 transition-colors hover:decoration-neon-violet' : '',
+                                    ].join(' ')}
+                                    onClick={onViewProfile ? (e) => { e.stopPropagation(); onViewProfile(entry.username) } : undefined}
+                                  >
+                                    {entry.username}
+                                  </span>
                                   {entry.featured_badges && entry.featured_badges.length > 0 && (
                                     <div className="flex shrink-0 items-center gap-0.5">
                                       {entry.featured_badges.map(id => (

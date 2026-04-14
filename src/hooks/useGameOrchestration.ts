@@ -9,6 +9,7 @@ import { incrementCategoryStats, incrementGlobalStats } from '../services/cloudS
 import { submitScore, getUserBestScore, getUserRank } from '../services/leaderboard'
 import { checkAndUnlockAchievements } from '../services/achievements'
 import { markPlayedAnonymous, computeBestStreak } from '../utils/statsStorage'
+import { createNotification, getNotificationPrefs } from '../services/notifications'
 import type React from 'react'
 
 interface Profile {
@@ -70,9 +71,26 @@ export function useGameOrchestration(params: UseGameOrchestrationParams) {
         incrementCategoryStats(user.id, mode, difficulty, category, score, results).catch(console.error)
         // Chaîner le check achievements APRÈS l'incrément des stats globales pour éviter
         // la race condition sur games_played (ex: Centenaire lu à 99 au lieu de 100)
-        incrementGlobalStats(user.id, results, score, mode)
-          .then(() => checkAndUnlockAchievements(user.id, { maxStreak, minAnswerTime, score, mode }))
-          .then(newlyUnlocked => { if (newlyUnlocked.length > 0) setNewAchievements(newlyUnlocked) })
+        const uid = user.id
+        incrementGlobalStats(uid, results, score, mode)
+          .then(() => Promise.all([
+            checkAndUnlockAchievements(uid, { maxStreak, minAnswerTime, score, mode }),
+            getNotificationPrefs(uid),
+          ]))
+          .then(([newlyUnlocked, prefs]) => {
+            if (newlyUnlocked.length > 0) {
+              setNewAchievements(newlyUnlocked)
+              if (prefs.achievement_unlocked) {
+                newlyUnlocked.forEach(a => {
+                  createNotification(uid, 'achievement_unlocked', {
+                    badge_id: a.id,
+                    badge_name: a.name,
+                    badge_icon: a.icon,
+                  }).catch(console.error)
+                })
+              }
+            }
+          })
           .catch(console.error)
       } else if (!user) {
         markPlayedAnonymous()
@@ -114,10 +132,34 @@ export function useGameOrchestration(params: UseGameOrchestrationParams) {
       })
       setScreen('ranking')
 
-      // Achievements en fire-and-forget — rank déjà connu
-      incrementGlobalStats(user.id, results, score, mode)
-        .then(() => checkAndUnlockAchievements(user.id, { maxStreak, minAnswerTime, score, mode, userRank: newRank }))
-        .then(newlyUnlocked => { if (newlyUnlocked.length > 0) setNewAchievements(newlyUnlocked) })
+      // Achievements + notifications en fire-and-forget
+      const uid = user.id
+      incrementGlobalStats(uid, results, score, mode)
+        .then(() => Promise.all([
+          checkAndUnlockAchievements(uid, { maxStreak, minAnswerTime, score, mode, userRank: newRank }),
+          getNotificationPrefs(uid),
+        ]))
+        .then(([newlyUnlocked, prefs]) => {
+          if (newlyUnlocked.length > 0) {
+            setNewAchievements(newlyUnlocked)
+            if (prefs.achievement_unlocked) {
+              newlyUnlocked.forEach(a => {
+                createNotification(uid, 'achievement_unlocked', {
+                  badge_id: a.id,
+                  badge_name: a.name,
+                  badge_icon: a.icon,
+                }).catch(console.error)
+              })
+            }
+          }
+          // Notif de classement
+          if (delta !== null && delta !== 0 && newRank !== null && prefs.rank_change) {
+            createNotification(uid, delta > 0 ? 'rank_up' : 'rank_down', {
+              new_rank: newRank,
+              delta: Math.abs(delta),
+            }).catch(console.error)
+          }
+        })
         .catch(console.error)
     } catch (err) {
       console.error(err)

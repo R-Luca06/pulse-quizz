@@ -15,6 +15,7 @@ interface Props {
   userScore: number
   language: Language
   onDone: () => void
+  onViewProfile?: (username: string) => void
 }
 
 const rowVariants = {
@@ -33,6 +34,7 @@ export default function RankingRevealScreen({
   userId,
   language,
   onDone,
+  onViewProfile,
 }: Props) {
   const initialPage = userRank !== null ? Math.floor((userRank - 1) / PAGE_SIZE) : 0
 
@@ -160,7 +162,13 @@ export default function RankingRevealScreen({
                         #{rank}
                       </span>
                       <div className="flex flex-1 items-center gap-1.5 min-w-0">
-                        <span className="truncate text-sm font-bold text-white">
+                        <span
+                          className={[
+                            'truncate text-sm font-bold text-white',
+                            onViewProfile && !isPlayer ? 'cursor-pointer underline decoration-transparent decoration-1 underline-offset-2 transition-colors hover:decoration-neon-violet' : '',
+                          ].join(' ')}
+                          onClick={onViewProfile && !isPlayer ? () => onViewProfile(entry.username) : undefined}
+                        >
                           {entry.username}
                         </span>
                         {entry.featured_badges && entry.featured_badges.length > 0 && (

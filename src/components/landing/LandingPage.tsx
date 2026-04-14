@@ -24,6 +24,8 @@ interface Props {
   onOpenSignUp: () => void
   onShowProfile: () => void
   onShowAchievements: () => void
+  onShowSocial?: () => void
+  onViewProfile: (username: string) => void
 }
 
 export default function LandingPage({
@@ -38,6 +40,8 @@ export default function LandingPage({
   onOpenSignUp,
   onShowProfile,
   onShowAchievements,
+  onShowSocial,
+  onViewProfile,
 }: Props) {
   const { user, profile, loading, signOut } = useAuth()
   const toast = useToast()
@@ -88,6 +92,8 @@ export default function LandingPage({
             onShowAchievements={onShowAchievements}
             username={profile?.username ?? ''}
             onSignOut={() => signOut().then(() => toast.success('Déconnecté'))}
+            onShowSocial={onShowSocial}
+            onViewProfile={onViewProfile}
           />
         </motion.div>
       ) : (
@@ -197,6 +203,8 @@ interface ConnectedBranchProps {
   onShowAchievements: () => void
   username: string
   onSignOut: () => void
+  onShowSocial?: () => void
+  onViewProfile: (username: string) => void
 }
 
 function ConnectedBranch({
@@ -214,6 +222,8 @@ function ConnectedBranch({
   onShowAchievements,
   username,
   onSignOut,
+  onShowSocial,
+  onViewProfile,
 }: ConnectedBranchProps) {
   const isLaunching = screen === 'launching'
   const [launchPhase, setLaunchPhase] = useState<LaunchPhase>('idle')
@@ -260,10 +270,12 @@ function ConnectedBranch({
         onShowAchievements={onShowAchievements}
         onSignOut={onSignOut}
         username={username}
+        onViewProfile={onViewProfile}
         shakeControls={shakeControls}
         settings={settings}
         onPlay={handleLaunch}
         onOpenSettings={() => setOpenSettings(true)}
+        onShowSocial={onShowSocial}
       />
 
       {/* GameDock : desktop uniquement (lg+) — le mobile a son dock dans PodiumScene */}

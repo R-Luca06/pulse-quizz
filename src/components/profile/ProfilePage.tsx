@@ -6,12 +6,14 @@ import ConfidentialityTab from './tabs/ConfidentialityTab'
 import AchievementsPage from '../achievements/AchievementsPage'
 
 const UserProfilePanel = lazy(() => import('../../pages/PublicProfilePage'))
+const SocialPage = lazy(() => import('../social/SocialPage'))
 
 type ProfileTab = 'general' | 'social' | 'public_profile' | 'achievements' | 'stats' | 'confidentiality'
 
 interface Props {
   onBack: () => void
   defaultTab?: ProfileTab
+  onViewProfile?: (username: string) => void
 }
 
 const TAB_LABELS: Record<ProfileTab, string> = {
@@ -48,7 +50,7 @@ const NAV_ENTRIES: NavEntry[] = [
     ),
   },
   {
-    type: 'item', key: 'social', label: 'Social', mobileLabel: 'Social', disabled: true,
+    type: 'item', key: 'social', label: 'Social', mobileLabel: 'Social',
     icon: (
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
@@ -106,59 +108,12 @@ const NAV_ENTRIES: NavEntry[] = [
 // items seuls (sans séparateurs), pour la barre mobile
 const NAV_ITEMS = NAV_ENTRIES.filter((e): e is NavItem => e.type === 'item')
 
-// ─── Placeholder Social ───────────────────────────────────────────────────────
-
-function SocialTab() {
-  const features = [
-    { icon: '👥', title: 'Amis', desc: 'Ajoute des joueurs et suis leurs stats' },
-    { icon: '⚔️', title: 'Défis', desc: 'Lance des défis directs à tes amis' },
-    { icon: '🏆', title: 'Classements amis', desc: 'Compare tes scores avec ton cercle' },
-    { icon: '🎯', title: 'Parties privées', desc: 'Joue en groupe avec tes contacts' },
-  ]
-  return (
-    <div className="flex flex-col items-center px-6 py-12 text-center">
-      {/* Icône centrale */}
-      <div className="relative mb-6">
-        <div className="flex h-20 w-20 items-center justify-center rounded-2xl border border-game-border bg-game-card/60">
-          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="rgba(139,92,246,0.4)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-            <circle cx="9" cy="7" r="4"/>
-            <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
-            <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-          </svg>
-        </div>
-        <span className="absolute -right-2 -top-2 rounded-full bg-neon-violet/15 px-2 py-0.5 text-[10px] font-bold text-neon-violet/70">
-          Bientôt
-        </span>
-      </div>
-
-      <h2 className="text-lg font-black text-white/70">Fonctionnalités sociales</h2>
-      <p className="mt-1.5 max-w-xs text-sm text-white/30">
-        Le mode multijoueur et les fonctionnalités sociales sont en cours de développement.
-      </p>
-
-      {/* Grille des features à venir */}
-      <div className="mt-8 grid w-full max-w-sm grid-cols-2 gap-3">
-        {features.map(f => (
-          <div
-            key={f.title}
-            className="flex flex-col gap-1.5 rounded-xl border border-game-border/50 bg-game-card/30 px-4 py-3 text-left"
-          >
-            <span className="text-xl opacity-40">{f.icon}</span>
-            <p className="text-xs font-bold text-white/40">{f.title}</p>
-            <p className="text-[11px] leading-relaxed text-white/20">{f.desc}</p>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
 
 // ─── Page principale ──────────────────────────────────────────────────────────
 
 const SESSION_KEY = 'profile_active_tab'
 
-export default function ProfilePage({ onBack, defaultTab = 'general' }: Props) {
+export default function ProfilePage({ onBack, defaultTab = 'general', onViewProfile }: Props) {
   const { user, profile } = useAuth()
   const [activeTab, setActiveTabRaw] = useState<ProfileTab>(() => {
     const saved = sessionStorage.getItem(SESSION_KEY) as ProfileTab | null
@@ -292,7 +247,11 @@ export default function ProfilePage({ onBack, defaultTab = 'general' }: Props) {
         {/* Content */}
         <div className="flex-1 overflow-y-auto">
           {activeTab === 'general'        && <GeneralTab />}
-          {activeTab === 'social'         && <SocialTab />}
+          {activeTab === 'social'         && (
+            <Suspense fallback={<div className="flex items-center justify-center py-16"><div className="h-6 w-6 animate-spin rounded-full border-2 border-neon-violet/30 border-t-neon-violet" /></div>}>
+              <SocialPage embedded onBack={() => setActiveTab('general')} onViewProfile={onViewProfile ?? (() => {})} />
+            </Suspense>
+          )}
           {activeTab === 'stats'          && <StatsTab onBack={() => setActiveTab('general')} />}
           {activeTab === 'achievements'   && <AchievementsPage hideBack />}
           {activeTab === 'confidentiality'&& <ConfidentialityTab onBack={onBack} />}

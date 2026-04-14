@@ -7,6 +7,7 @@ import { useAuth } from './hooks/useAuth'
 import { useGameOrchestration } from './hooks/useGameOrchestration'
 import type { Language, GameResult, RankingData, AchievementWithStatus, AchievementId } from './types/quiz'
 
+
 const QuizContainer = lazy(() => import('./components/quiz/QuizContainer'))
 const ResultScreen = lazy(() => import('./components/result/ResultScreen'))
 const RankingRevealScreen = lazy(() => import('./components/ranking/RankingRevealScreen'))
@@ -15,8 +16,9 @@ const AuthModal = lazy(() => import('./components/auth/AuthModal'))
 const ProfilePage = lazy(() => import('./components/profile/ProfilePage'))
 const AchievementsPage = lazy(() => import('./components/achievements/AchievementsPage'))
 const UserProfilePanel = lazy(() => import('./pages/PublicProfilePage'))
+const SocialPage = lazy(() => import('./components/social/SocialPage'))
 
-export type AppScreen = 'landing' | 'launching' | 'quiz' | 'ranking' | 'result' | 'stats' | 'profile' | 'achievements'
+export type AppScreen = 'landing' | 'launching' | 'quiz' | 'ranking' | 'result' | 'stats' | 'profile' | 'achievements' | 'social'
 
 // Écrans pendant lesquels l'overlay d'achievement doit être mis en attente
 const GAME_SCREENS: AppScreen[] = ['quiz', 'launching', 'ranking']
@@ -147,6 +149,8 @@ export default function App() {
                 onOpenSignUp={openSignUp}
                 onShowProfile={handleShowProfile}
                 onShowAchievements={() => handleShowAchievements('landing')}
+                onShowSocial={() => setScreen('social')}
+                onViewProfile={setViewingUsername}
               />
             </motion.div>
           )}
@@ -182,6 +186,7 @@ export default function App() {
                 {...rankingData}
                 language={settings.language}
                 onDone={() => setScreen('result')}
+                onViewProfile={setViewingUsername}
               />
             </motion.div>
           )}
@@ -225,6 +230,7 @@ export default function App() {
             >
               <ProfilePage
                 onBack={() => setScreen('landing')}
+                onViewProfile={setViewingUsername}
               />
             </motion.div>
           )}
@@ -259,7 +265,25 @@ export default function App() {
                 defaultTab={statsDefaultTab}
                 initialDiff={statsInitialDiff}
                 initialLang={statsInitialLang}
+                onViewProfile={setViewingUsername}
               />
+            </motion.div>
+          )}
+
+          {screen === 'social' && (
+            <motion.div
+              key="social"
+              initial={{ opacity: 0, y: 40 }}
+              animate={{ opacity: 1, y: 0, transition: { duration: 0.5, delay: 0.1, ease: 'easeOut' } }}
+              exit={{ opacity: 0, transition: { duration: 0.25 } }}
+              className="absolute inset-0 z-10"
+            >
+              <Suspense fallback={<div className="absolute inset-0 bg-game-bg" />}>
+                <SocialPage
+                  onBack={() => setScreen('landing')}
+                  onViewProfile={setViewingUsername}
+                />
+              </Suspense>
             </motion.div>
           )}
         </AnimatePresence>

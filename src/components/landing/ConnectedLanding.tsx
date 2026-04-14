@@ -15,10 +15,12 @@ interface Props {
   onShowAchievements: () => void
   onSignOut: () => void
   username: string
+  onViewProfile: (username: string) => void
   shakeControls?: ShakeControls
   settings?: GameSettings
   onPlay?: () => void
   onOpenSettings?: () => void
+  onShowSocial?: () => void
 }
 
 export default function ConnectedLanding({
@@ -28,10 +30,12 @@ export default function ConnectedLanding({
   onShowAchievements,
   onSignOut,
   username,
+  onViewProfile,
   shakeControls,
   settings,
   onPlay,
   onOpenSettings,
+  onShowSocial,
 }: Props) {
   return (
     <>
@@ -41,6 +45,8 @@ export default function ConnectedLanding({
         onShowAchievements={onShowAchievements}
         onSignOut={onSignOut}
         username={username}
+        onViewProfile={onViewProfile}
+        onShowSocial={onShowSocial}
       />
 
       <motion.div
