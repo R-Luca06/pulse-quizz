@@ -6,7 +6,7 @@ export const BADGE_FILL = '#111827'
 // ── Stroke color per tier (seul différenciateur visuel de l'hexagone) ─────────
 export const TIER_STROKE: Record<AchievementTier, string> = {
   common:    'rgba(255,255,255,0.22)',
-  rare:      'rgba(255,255,255,0.50)',
+  rare:      'rgba(96,165,250,0.65)',  // bleu ciel — "rare" universel dans les jeux
   epic:      '#a78bfa',   // violet doux
   legendary: '#f59e0b',   // or/amber
 }
@@ -15,7 +15,7 @@ export const TIER_STROKE: Record<AchievementTier, string> = {
 // TIER_STROKE utilise des rgba pour common/rare, TIER_GLOW_COLOR est toujours #hex.
 export const TIER_GLOW_COLOR: Record<AchievementTier, string> = {
   common:    '#ffffff',
-  rare:      '#ffffff',
+  rare:      '#60a5fa',  // bleu ciel
   epic:      '#a78bfa',
   legendary: '#f59e0b',
 }

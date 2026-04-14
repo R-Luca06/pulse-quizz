@@ -41,7 +41,7 @@ const TIER_LABEL: Record<AchievementTier, string> = {
 // Couleur du dot de rareté par tier
 const TIER_DOT_COLOR: Record<AchievementTier, string> = {
   common:    'rgba(255,255,255,0.30)',
-  rare:      'rgba(255,255,255,0.65)',
+  rare:      'rgba(96,165,250,0.80)',  // bleu ciel
   epic:      '#a78bfa',
   legendary: '#f59e0b',
 }
