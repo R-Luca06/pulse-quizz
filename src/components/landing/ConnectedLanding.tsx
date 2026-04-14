@@ -15,7 +15,7 @@ interface Props {
   onShowAchievements: () => void
   onSignOut: () => void
   username: string
-  onViewProfile: (username: string) => void
+  onViewProfile?: (username: string) => void
   shakeControls?: ShakeControls
   settings?: GameSettings
   onPlay?: () => void

@@ -12,7 +12,7 @@ import {
 } from '../../services/social'
 import type { FriendProfile, PendingRequest, SearchResult } from '../../services/social'
 import { getCompLeaderboardPage } from '../../services/leaderboard'
-import type { LeaderboardEntry } from '../../services/leaderboard'
+
 import { useAuth } from '../../hooks/useAuth'
 import { useToast } from '../../contexts/ToastContext'
 
@@ -51,8 +51,6 @@ function truncate(s: string, max = 9) { return s.length > max ? s.slice(0, max -
 
 interface RankedPlayer { userId: string; username: string; score: number; featuredBadges: string[]; isMe?: boolean }
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-type _LeaderboardEntryType = LeaderboardEntry
 
 function FriendsLeaderboard({
   friends,

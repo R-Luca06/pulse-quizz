@@ -49,6 +49,7 @@ function renderLanding() {
       onOpenSignUp={vi.fn()}
       onShowProfile={vi.fn()}
       onShowAchievements={vi.fn()}
+      onViewProfile={vi.fn()}
     />,
   )
 }
