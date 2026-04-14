@@ -79,8 +79,12 @@ export default function App() {
   function handleNavigateToAchievements(id: AchievementId) {
     setPendingBadgeRect(null) // reset avant navigation pour que le poll de l'overlay parte de zéro
     setPendingAchievementId(id)
-    setAchievementsOrigin('result')
-    setScreen('achievements')
+    // Ne change l'origine que si on N'est PAS déjà sur la page achievements,
+    // pour éviter de casser le bouton retour et la redirection post-animation.
+    if (screen !== 'achievements') {
+      setAchievementsOrigin('result')
+      setScreen('achievements')
+    }
   }
 
   function handleAchievementsDone() {

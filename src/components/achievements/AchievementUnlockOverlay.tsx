@@ -25,6 +25,12 @@ export default function AchievementUnlockOverlay({ achievements, onDone, onNavig
   onDoneRef.current = onDone
   pendingBadgeRectRef.current = pendingBadgeRect ?? null
 
+  // Bloquer le scroll pendant l'overlay
+  useEffect(() => {
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = '' }
+  }, [])
+
   const current = achievements[currentIndex]
   const tier   = current ? BADGE_TIER[current.id]    : 'common'
   const glow   = current ? TIER_GLOW_COLOR[tier]    : '#ffffff'
@@ -156,6 +162,17 @@ export default function AchievementUnlockOverlay({ achievements, onDone, onNavig
       transition={{ backgroundColor: { duration: 0.9 } }}
       className="fixed inset-0 z-50 overflow-hidden"
     >
+      {/* ── Bouton skip ── */}
+      <button
+        onClick={() => onDoneRef.current()}
+        className="absolute top-4 right-4 z-10 flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 text-sm font-medium text-white/60 transition-colors hover:bg-white/20 hover:text-white"
+      >
+        Passer
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+          <path d="M1 1l10 10M11 1L1 11" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+        </svg>
+      </button>
+
       {/* ── Trail : glow horizontal contractant pendant l'entrée ── */}
       <AnimatePresence>
         {phase === 'entering' && (

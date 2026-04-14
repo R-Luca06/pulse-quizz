@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { motion, AnimatePresence, type Transition } from 'framer-motion'
 import { useAuth } from '../../hooks/useAuth'
 import { getUserAchievements } from '../../services/achievements'
@@ -133,11 +133,13 @@ function AchievementCard({ achievement, pendingId, onBadgeReady, isPinned, canPi
     : { type: 'spring', stiffness: 280, damping: 22 }
 
   // ── Card class + style per status ─────────────────────────────────────────
+  // Durant l'animation d'insertion, la card se comporte comme si le badge était débloqué
+  const effectivelyUnlocked = status === 'unlocked' || isPending
   const cardClass = [
     'relative flex min-h-[160px] flex-col items-center gap-3 rounded-xl border p-4 text-center transition-colors',
-    isLocked
+    !effectivelyUnlocked && isLocked
       ? 'border-white/[0.06] bg-white/[0.02]'
-      : status === 'in_progress'
+      : !effectivelyUnlocked && status === 'in_progress'
         ? 'border-white/[0.18] bg-game-card/55'
         : 'border-emerald-500/40 bg-game-card',
   ].join(' ')
@@ -195,17 +197,15 @@ function AchievementCard({ achievement, pendingId, onBadgeReady, isPinned, canPi
       </AnimatePresence>
 
       {/* Indicateur de rareté — top-left, discret, visible pour tous les tiers */}
-      {!isLocked && (
-        <div className="absolute left-2 top-2 flex items-center gap-1 opacity-45">
-          <div
-            className="h-1.5 w-1.5 rounded-full"
-            style={{ backgroundColor: TIER_DOT_COLOR[tier] }}
-          />
-          <span className="text-[8px] font-medium uppercase tracking-wide text-white/55">
-            {tierLabel}
-          </span>
-        </div>
-      )}
+      <div className={['absolute left-2 top-2 flex items-center gap-1', isLocked ? 'opacity-25' : 'opacity-45'].join(' ')}>
+        <div
+          className="h-1.5 w-1.5 rounded-full"
+          style={{ backgroundColor: TIER_DOT_COLOR[tier] }}
+        />
+        <span className="text-[8px] font-medium uppercase tracking-wide text-white/55">
+          {tierLabel}
+        </span>
+      </div>
 
       {/* Bouton pin */}
       {status === 'unlocked' && (
@@ -240,13 +240,12 @@ function AchievementCard({ achievement, pendingId, onBadgeReady, isPinned, canPi
               'absolute inset-0',
               // Masqué en phase réceptive (l'overlay de pending le remplace)
               isReceptive ? 'opacity-0' : '',
-              // Icon grisée si pas débloqué
             ].join(' ')}
           >
             <MiniBadge
               achievementId={achievement.id}
               size={52}
-              unlocked={status === 'unlocked'}
+              unlocked={effectivelyUnlocked}
             />
           </div>
 
@@ -264,7 +263,7 @@ function AchievementCard({ achievement, pendingId, onBadgeReady, isPinned, canPi
         </div>
 
         {/* Pastille ✓ verte — identique pour tous les badges débloqués */}
-        {status === 'unlocked' && (
+        {effectivelyUnlocked && (
           <div className="absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full border border-game-bg bg-emerald-500/20 text-[8px] font-black text-emerald-400">
             ✓
           </div>
@@ -288,17 +287,17 @@ function AchievementCard({ achievement, pendingId, onBadgeReady, isPinned, canPi
 
       {/* Texte */}
       <div className="flex flex-1 flex-col gap-1 px-0.5">
-        <p className={['text-xs font-bold leading-tight', isLocked ? 'text-white/25' : 'text-white'].join(' ')}>
+        <p className={['text-xs font-bold leading-tight', (isLocked && !isPending) ? 'text-white/25' : 'text-white'].join(' ')}>
           {achievement.name}
         </p>
-        <p className={['text-[10px] leading-snug', isLocked ? 'text-white/15' : 'text-white/40'].join(' ')}>
+        <p className={['text-[10px] leading-snug', (isLocked && !isPending) ? 'text-white/15' : 'text-white/40'].join(' ')}>
           {achievement.description}
         </p>
       </div>
 
       {/* Bas de card */}
       <div className="w-full">
-        {status === 'unlocked' ? (
+        {effectivelyUnlocked ? (
           <span className="inline-block rounded-full bg-emerald-500/10 px-2 py-0.5 text-[9px] font-semibold text-emerald-400">
             Accompli
           </span>
@@ -330,7 +329,7 @@ function AchievementCard({ achievement, pendingId, onBadgeReady, isPinned, canPi
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function AchievementsPage({ onBack, hideBack = false, pendingAchievementId, onBadgeReady }: Props) {
-  const { user, profile, setLocalFeaturedBadges, triggerAchievementCheck } = useAuth()
+  const { user, profile, setLocalFeaturedBadges, triggerAchievementCheck, statsRefreshKey } = useAuth()
   const [achievements, setAchievements] = useState<AchievementWithStatus[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -367,39 +366,45 @@ export default function AchievementsPage({ onBack, hideBack = false, pendingAchi
     }
   }
 
+  const loadAchievements = useCallback(async (userId: string, silent = false) => {
+    const [achievementsData, globalStatsResult, compEntryResult, userStatsResult] = await Promise.all([
+      getUserAchievements(userId),
+      supabase.from('user_global_stats').select('games_played, comp_games_played').eq('user_id', userId).maybeSingle(),
+      supabase.from('leaderboard').select('score').eq('user_id', userId).eq('mode', 'compétitif').maybeSingle(),
+      supabase.from('user_stats').select('category').eq('user_id', userId).eq('mode', 'normal').neq('category', 'all').limit(20),
+    ])
+
+    type GlobalRow = { games_played: number; comp_games_played: number }
+    const gamesPlayed      = (globalStatsResult.data as GlobalRow | null)?.games_played ?? 0
+    const compGamesPlayed  = (globalStatsResult.data as GlobalRow | null)?.comp_games_played ?? 0
+    const compBestScore    = (compEntryResult.data as { score: number } | null)?.score ?? 0
+    const categoriesPlayed = new Set(((userStatsResult.data ?? []) as { category: string }[]).map(r => r.category)).size
+
+    const enriched = enrichProgress(achievementsData, { gamesPlayed, compGamesPlayed, compBestScore, categoriesPlayed })
+    if (!silent) setLoading(false)
+    setAchievements(enriched)
+    return enriched
+  }, [])
+
   useEffect(() => {
     if (!user) return
     let cancelled = false
     setLoading(true)
     setError(null)
 
-    async function load() {
-      try {
-        const [achievementsData, globalStatsResult, compEntryResult, userStatsResult] = await Promise.all([
-          getUserAchievements(user!.id),
-          supabase.from('user_global_stats').select('games_played, comp_games_played').eq('user_id', user!.id).maybeSingle(),
-          supabase.from('leaderboard').select('score').eq('user_id', user!.id).eq('mode', 'compétitif').maybeSingle(),
-          supabase.from('user_stats').select('category').eq('user_id', user!.id).eq('mode', 'normal').neq('category', 'all').limit(20),
-        ])
+    loadAchievements(user.id)
+      .catch(() => { if (!cancelled) setError('Impossible de charger les achievements.') })
+      .finally(() => { if (!cancelled) setLoading(false) })
 
-        type GlobalRow = { games_played: number; comp_games_played: number }
-        const gamesPlayed      = (globalStatsResult.data as GlobalRow | null)?.games_played ?? 0
-        const compGamesPlayed  = (globalStatsResult.data as GlobalRow | null)?.comp_games_played ?? 0
-        const compBestScore    = (compEntryResult.data as { score: number } | null)?.score ?? 0
-        const categoriesPlayed = new Set(((userStatsResult.data ?? []) as { category: string }[]).map(r => r.category)).size
-
-        const enriched = enrichProgress(achievementsData, { gamesPlayed, compGamesPlayed, compBestScore, categoriesPlayed })
-        if (!cancelled) setAchievements(enriched)
-      } catch {
-        if (!cancelled) setError('Impossible de charger les achievements.')
-      } finally {
-        if (!cancelled) setLoading(false)
-      }
-    }
-
-    load()
     return () => { cancelled = true }
-  }, [user])
+  }, [user, loadAchievements])
+
+  // Rechargement silencieux quand statsRefreshKey change (déclenché par handleAchievementsDone)
+  // → permet d'afficher le badge comme débloqué après l'animation d'unlock
+  useEffect(() => {
+    if (!user || statsRefreshKey === 0) return
+    loadAchievements(user.id, true).catch(console.error)
+  }, [user, statsRefreshKey, loadAchievements])
 
   // Filtre + tri : débloqués (par rareté desc) → en cours → non débutés
   const filtered = achievements

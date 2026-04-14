@@ -74,10 +74,10 @@ export default function LeaderboardCard({ onShowStats }: Props) {
           <>
             {/* ── Podium top 3 ────────────────────────────── */}
             <div className="mb-3 flex items-end justify-center gap-2">
-              {PODIUM_ORDER.map(idx => {
-                const entry = entries[idx]
-                const cfg = PODIUM_CONFIG[idx]
-                if (!entry) return <div key={idx} className="w-[76px]" />
+              {PODIUM_ORDER.map((dataIdx, displayPos) => {
+                const entry = entries[dataIdx]
+                const cfg = PODIUM_CONFIG[displayPos]
+                if (!entry) return <div key={dataIdx} className="w-[76px]" />
                 const isMe = user?.id === entry.user_id
                 return (
                   <div key={entry.id} className={`flex w-[76px] flex-col items-center ${cfg.paddingTop}`}>
