@@ -3,16 +3,8 @@ import { useAuth } from '../../contexts/AuthContext'
 import { fetchAllStats } from '../../services/cloudStats'
 import { getUserBestScore } from '../../services/leaderboard'
 import { getUserAchievements } from '../../services/achievements'
-import type { AchievementWithStatus, AchievementId } from '../../types/quiz'
-
-// Couleurs des badges hexagonaux (identiques à AchievementsPage)
-const BADGE_COLOR: Partial<Record<AchievementId, string>> = {
-  premiers_pas:        '#10b981',
-  premier_competiteur: '#0ea5e9',
-  serie_de_feu:        '#f97316',
-  perfectionniste:     '#8b5cf6',
-  centenaire:          '#f59e0b',
-}
+import MiniBadge from '../shared/MiniBadge'
+import type { AchievementWithStatus } from '../../types/quiz'
 
 interface StatsData {
   gamesPlayed: number
@@ -29,30 +21,6 @@ function fmt(value: number): string {
   return value > 0 ? value.toLocaleString('fr-FR') : '—'
 }
 
-function BadgeHex({ achievement }: { achievement: AchievementWithStatus }) {
-  const hex = BADGE_COLOR[achievement.id as AchievementId] ?? '#8b5cf6'
-  const gradId = `badge-grad-${achievement.id}`
-  return (
-    <div className="relative flex items-center justify-center" style={{ width: 52, height: 58 }}>
-      <svg viewBox="0 0 64 72" className="absolute inset-0 h-full w-full" fill="none">
-        <defs>
-          <linearGradient id={gradId} x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="rgba(255,255,255,0.22)" />
-            <stop offset="100%" stopColor="rgba(0,0,0,0.15)" />
-          </linearGradient>
-        </defs>
-        <path
-          d="M32 2 L62 20 L62 52 L32 70 L2 52 L2 20 Z"
-          fill={hex}
-          stroke="rgba(255,255,255,0.15)"
-          strokeWidth="1"
-        />
-        <path d="M32 2 L62 20 L62 52 L32 70 L2 52 L2 20 Z" fill={`url(#${gradId})`} />
-      </svg>
-      <span className="relative z-10 select-none text-xl leading-none">{achievement.icon}</span>
-    </div>
-  )
-}
 
 export default function PlayerStatsCard({ onShowStats }: Props) {
   const { user, statsRefreshKey } = useAuth()
@@ -163,7 +131,7 @@ export default function PlayerStatsCard({ onShowStats }: Props) {
                 Dernier badge
               </p>
               {data?.lastAchievement ? (
-                <BadgeHex achievement={data.lastAchievement} />
+                <MiniBadge achievementId={data.lastAchievement.id} size={52} unlocked={true} />
               ) : (
                 <p className="text-[11px] text-white/25">Aucun encore</p>
               )}

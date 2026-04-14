@@ -33,6 +33,11 @@ export default {
       animation: {
         'pulse-ring': 'pulse-ring 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite',
         'glow-pulse': 'glow-pulse 2s ease-in-out infinite',
+        // Badge tier animations (used in MiniBadge + AchievementsPage via Framer Motion animate strings)
+        'badge-fire':     'badge-fire 1.8s ease-in-out infinite',
+        'badge-electric': 'badge-electric 1.4s ease-in-out infinite',
+        'badge-gold':     'badge-gold 2.5s ease-in-out infinite',
+        'badge-prismatic':'badge-prismatic 3s linear infinite',
       },
       keyframes: {
         'pulse-ring': {
@@ -42,6 +47,28 @@ export default {
         'glow-pulse': {
           '0%, 100%': { boxShadow: '0 0 20px rgba(139, 92, 246, 0.3)' },
           '50%': { boxShadow: '0 0 40px rgba(139, 92, 246, 0.8), 0 0 60px rgba(59, 130, 246, 0.4)' },
+        },
+        'badge-fire': {
+          '0%, 100%': { filter: 'drop-shadow(0 0 4px #f9731680) drop-shadow(0 0 8px #ef444440)' },
+          '50%':       { filter: 'drop-shadow(0 0 8px #f97316cc) drop-shadow(0 0 16px #ef444460) drop-shadow(0 0 24px #f9731630)' },
+        },
+        'badge-electric': {
+          '0%, 100%': { filter: 'drop-shadow(0 0 3px #8b5cf670) drop-shadow(0 0 6px #3b82f640)' },
+          '40%':       { filter: 'drop-shadow(0 0 7px #a78bfacc) drop-shadow(0 0 14px #3b82f660) drop-shadow(0 0 20px #6366f130)' },
+          '65%':       { filter: 'drop-shadow(0 0 2px #8b5cf650) drop-shadow(0 0 4px #3b82f630)' },
+        },
+        'badge-gold': {
+          '0%, 100%': { filter: 'drop-shadow(0 0 4px #f59e0b80) drop-shadow(0 0 8px #eab30840)' },
+          '50%':       { filter: 'drop-shadow(0 0 8px #fbbf24cc) drop-shadow(0 0 18px #eab30860) drop-shadow(0 0 28px #f59e0b30)' },
+        },
+        'badge-prismatic': {
+          '0%':     { filter: 'drop-shadow(0 0 6px #f43f5eaa) drop-shadow(0 0 12px #f43f5e40)' },
+          '16.6%':  { filter: 'drop-shadow(0 0 6px #f97316aa) drop-shadow(0 0 12px #f9731640)' },
+          '33.3%':  { filter: 'drop-shadow(0 0 6px #eab308aa) drop-shadow(0 0 12px #eab30840)' },
+          '50%':    { filter: 'drop-shadow(0 0 6px #22c55eaa) drop-shadow(0 0 12px #22c55e40)' },
+          '66.6%':  { filter: 'drop-shadow(0 0 6px #3b82f6aa) drop-shadow(0 0 12px #3b82f640)' },
+          '83.3%':  { filter: 'drop-shadow(0 0 6px #8b5cf6aa) drop-shadow(0 0 12px #8b5cf640)' },
+          '100%':   { filter: 'drop-shadow(0 0 6px #f43f5eaa) drop-shadow(0 0 12px #f43f5e40)' },
         },
       },
     },

@@ -8,6 +8,7 @@ export const ACHIEVEMENTS: Achievement[] = [
     description: 'Créer son compte Pulse Quizz',
     icon: '🌱',
     progressTotal: null,
+    tier: 'common',
   },
 
   // ── Volume — parties jouées ──────────────────────────────────────────────────
@@ -17,6 +18,7 @@ export const ACHIEVEMENTS: Achievement[] = [
     description: 'Jouer sa première partie',
     icon: '🎮',
     progressTotal: 1,
+    tier: 'common',
   },
   {
     id: 'pris_au_jeu',
@@ -24,6 +26,7 @@ export const ACHIEVEMENTS: Achievement[] = [
     description: 'Jouer 10 parties',
     icon: '🎯',
     progressTotal: 10,
+    tier: 'common',
   },
   {
     id: 'accro',
@@ -31,6 +34,7 @@ export const ACHIEVEMENTS: Achievement[] = [
     description: 'Jouer 50 parties',
     icon: '🔁',
     progressTotal: 50,
+    tier: 'rare',
   },
   {
     id: 'centenaire',
@@ -38,6 +42,7 @@ export const ACHIEVEMENTS: Achievement[] = [
     description: 'Jouer 100 parties (tous modes)',
     icon: '🏆',
     progressTotal: 100,
+    tier: 'epic',
   },
   {
     id: 'marathonien',
@@ -45,6 +50,7 @@ export const ACHIEVEMENTS: Achievement[] = [
     description: 'Jouer 500 parties',
     icon: '🏃',
     progressTotal: 500,
+    tier: 'epic',
   },
 
   // ── Compétitif ──────────────────────────────────────────────────────────────
@@ -54,6 +60,7 @@ export const ACHIEVEMENTS: Achievement[] = [
     description: 'Terminer sa première partie compétitive',
     icon: '⚡',
     progressTotal: null,
+    tier: 'common',
   },
   {
     id: 'combattant',
@@ -61,6 +68,7 @@ export const ACHIEVEMENTS: Achievement[] = [
     description: 'Jouer 50 parties compétitives',
     icon: '🥊',
     progressTotal: 50,
+    tier: 'rare',
   },
   {
     id: 'gladiateur',
@@ -68,6 +76,7 @@ export const ACHIEVEMENTS: Achievement[] = [
     description: 'Jouer 100 parties compétitives',
     icon: '⚔️',
     progressTotal: 100,
+    tier: 'epic',
   },
   {
     id: 'legende_de_lareme',
@@ -75,6 +84,7 @@ export const ACHIEVEMENTS: Achievement[] = [
     description: 'Jouer 1 000 parties compétitives',
     icon: '🏟️',
     progressTotal: 1000,
+    tier: 'legendary',
   },
 
   // ── Séries ──────────────────────────────────────────────────────────────────
@@ -84,6 +94,7 @@ export const ACHIEVEMENTS: Achievement[] = [
     description: "Enchaîner 10 bonnes réponses d'affilée en une partie",
     icon: '🔥',
     progressTotal: null,
+    tier: 'rare',
   },
   {
     id: 'inferno',
@@ -91,6 +102,7 @@ export const ACHIEVEMENTS: Achievement[] = [
     description: "Enchaîner 20 bonnes réponses d'affilée",
     icon: '🌋',
     progressTotal: null,
+    tier: 'epic',
   },
   {
     id: 'inarretable',
@@ -98,6 +110,7 @@ export const ACHIEVEMENTS: Achievement[] = [
     description: "Enchaîner 30 bonnes réponses d'affilée",
     icon: '🌪️',
     progressTotal: null,
+    tier: 'epic',
   },
   {
     id: 'transcendant',
@@ -105,6 +118,7 @@ export const ACHIEVEMENTS: Achievement[] = [
     description: "Enchaîner 50 bonnes réponses d'affilée",
     icon: '✨',
     progressTotal: null,
+    tier: 'legendary',
   },
 
   // ── Rapidité ────────────────────────────────────────────────────────────────
@@ -114,6 +128,7 @@ export const ACHIEVEMENTS: Achievement[] = [
     description: 'Répondre correctement en moins de 5 secondes',
     icon: '🐇',
     progressTotal: null,
+    tier: 'common',
   },
   {
     id: 'foudroyant',
@@ -121,6 +136,7 @@ export const ACHIEVEMENTS: Achievement[] = [
     description: 'Répondre correctement en moins de 3 secondes',
     icon: '⚡',
     progressTotal: null,
+    tier: 'common',
   },
   {
     id: 'supersonique',
@@ -128,6 +144,7 @@ export const ACHIEVEMENTS: Achievement[] = [
     description: 'Répondre correctement en moins de 2 secondes',
     icon: '🚀',
     progressTotal: null,
+    tier: 'rare',
   },
   {
     id: 'instinct_pur',
@@ -135,6 +152,7 @@ export const ACHIEVEMENTS: Achievement[] = [
     description: "Répondre correctement en moins d'1 seconde",
     icon: '🧠',
     progressTotal: null,
+    tier: 'legendary',
   },
 
   // ── Perfection ──────────────────────────────────────────────────────────────
@@ -144,6 +162,7 @@ export const ACHIEVEMENTS: Achievement[] = [
     description: 'Score parfait en mode normal (10/10)',
     icon: '💎',
     progressTotal: null,
+    tier: 'rare',
   },
 
   // ── Points compétitif ───────────────────────────────────────────────────────
@@ -153,6 +172,7 @@ export const ACHIEVEMENTS: Achievement[] = [
     description: 'Atteindre 1 000 points en compétitif',
     icon: '🌱',
     progressTotal: 1000,
+    tier: 'common',
   },
   {
     id: 'challenger',
@@ -160,6 +180,7 @@ export const ACHIEVEMENTS: Achievement[] = [
     description: 'Atteindre 2 000 points en compétitif',
     icon: '🎖️',
     progressTotal: 2000,
+    tier: 'common',
   },
   {
     id: 'performeur',
@@ -167,6 +188,7 @@ export const ACHIEVEMENTS: Achievement[] = [
     description: 'Atteindre 3 000 points en compétitif',
     icon: '📈',
     progressTotal: 3000,
+    tier: 'common',
   },
   {
     id: 'chasseur_de_points',
@@ -174,6 +196,7 @@ export const ACHIEVEMENTS: Achievement[] = [
     description: 'Atteindre 5 000 points en compétitif',
     icon: '🎯',
     progressTotal: 5000,
+    tier: 'rare',
   },
   {
     id: 'expert',
@@ -181,6 +204,7 @@ export const ACHIEVEMENTS: Achievement[] = [
     description: 'Atteindre 10 000 points en compétitif',
     icon: '🔵',
     progressTotal: 10000,
+    tier: 'rare',
   },
   {
     id: 'maitre',
@@ -188,6 +212,7 @@ export const ACHIEVEMENTS: Achievement[] = [
     description: 'Atteindre 20 000 points en compétitif',
     icon: '🟣',
     progressTotal: 20000,
+    tier: 'epic',
   },
   {
     id: 'grand_maitre',
@@ -195,6 +220,7 @@ export const ACHIEVEMENTS: Achievement[] = [
     description: 'Atteindre 30 000 points en compétitif',
     icon: '💜',
     progressTotal: 30000,
+    tier: 'epic',
   },
   {
     id: 'legende',
@@ -202,6 +228,7 @@ export const ACHIEVEMENTS: Achievement[] = [
     description: 'Atteindre 50 000 points en compétitif',
     icon: '🌟',
     progressTotal: 50000,
+    tier: 'legendary',
   },
   {
     id: 'mythique',
@@ -209,6 +236,7 @@ export const ACHIEVEMENTS: Achievement[] = [
     description: 'Atteindre 100 000 points en compétitif',
     icon: '💫',
     progressTotal: 100000,
+    tier: 'legendary',
   },
 
   // ── Exploration ─────────────────────────────────────────────────────────────
@@ -218,6 +246,7 @@ export const ACHIEVEMENTS: Achievement[] = [
     description: 'Jouer dans les 7 catégories disponibles',
     icon: '🗺️',
     progressTotal: 7,
+    tier: 'common',
   },
   {
     id: 'polyvalent',
@@ -225,6 +254,7 @@ export const ACHIEVEMENTS: Achievement[] = [
     description: 'Jouer en mode Normal et en mode Compétitif',
     icon: '🔄',
     progressTotal: null,
+    tier: 'common',
   },
 
   // ── Classement ──────────────────────────────────────────────────────────────
@@ -234,6 +264,7 @@ export const ACHIEVEMENTS: Achievement[] = [
     description: 'Entrer dans le top 100 du classement compétitif',
     icon: '🏅',
     progressTotal: null,
+    tier: 'common',
   },
   {
     id: 'reconnu',
@@ -241,6 +272,7 @@ export const ACHIEVEMENTS: Achievement[] = [
     description: 'Entrer dans le top 50 du classement compétitif',
     icon: '🎗️',
     progressTotal: null,
+    tier: 'rare',
   },
   {
     id: 'les_25',
@@ -248,6 +280,7 @@ export const ACHIEVEMENTS: Achievement[] = [
     description: 'Entrer dans le top 25 du classement compétitif',
     icon: '💪',
     progressTotal: null,
+    tier: 'rare',
   },
   {
     id: 'les_meilleurs',
@@ -255,6 +288,7 @@ export const ACHIEVEMENTS: Achievement[] = [
     description: 'Entrer dans le top 10 du classement compétitif',
     icon: '🔟',
     progressTotal: null,
+    tier: 'epic',
   },
   {
     id: 'sur_le_podium',
@@ -262,6 +296,7 @@ export const ACHIEVEMENTS: Achievement[] = [
     description: 'Entrer dans le top 3 du classement compétitif',
     icon: '🥈',
     progressTotal: null,
+    tier: 'legendary',
   },
   {
     id: 'sans_rival',
@@ -269,6 +304,7 @@ export const ACHIEVEMENTS: Achievement[] = [
     description: 'Être numéro 1 du classement compétitif',
     icon: '👑',
     progressTotal: null,
+    tier: 'legendary',
   },
 
   // ── Personnalisation ────────────────────────────────────────────────────────
@@ -278,6 +314,7 @@ export const ACHIEVEMENTS: Achievement[] = [
     description: 'Épingler un badge dans le leaderboard',
     icon: '📌',
     progressTotal: null,
+    tier: 'common',
   },
   {
     id: 'collectionneur',
@@ -285,6 +322,7 @@ export const ACHIEVEMENTS: Achievement[] = [
     description: 'Épingler 3 badges dans le leaderboard',
     icon: '🗂️',
     progressTotal: null,
+    tier: 'rare',
   },
   {
     id: 'reinvention',
@@ -292,6 +330,7 @@ export const ACHIEVEMENTS: Achievement[] = [
     description: 'Changer son pseudo',
     icon: '✏️',
     progressTotal: null,
+    tier: 'common',
   },
   {
     id: 'nouveau_visage',
@@ -299,6 +338,7 @@ export const ACHIEVEMENTS: Achievement[] = [
     description: 'Changer son avatar',
     icon: '🎭',
     progressTotal: null,
+    tier: 'common',
   },
   {
     id: 'mon_histoire',
@@ -306,6 +346,7 @@ export const ACHIEVEMENTS: Achievement[] = [
     description: 'Renseigner sa description de profil',
     icon: '📖',
     progressTotal: null,
+    tier: 'common',
   },
 ]
 

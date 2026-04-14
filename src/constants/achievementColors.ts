@@ -1,56 +1,76 @@
-import type { AchievementId } from '../types/quiz'
+import type { AchievementId, AchievementTier } from '../types/quiz'
 
-/** Couleur hexadécimale principale de chaque achievement (badge hexagonal + glow) */
-export const BADGE_COLOR_HEX: Record<AchievementId, string> = {
+// ── Uniform fill for all badge hexagons ──────────────────────────────────────
+export const BADGE_FILL = '#111827'
+
+// ── Stroke color per tier (seul différenciateur visuel de l'hexagone) ─────────
+export const TIER_STROKE: Record<AchievementTier, string> = {
+  common:    'rgba(255,255,255,0.22)',
+  rare:      'rgba(255,255,255,0.50)',
+  epic:      '#a78bfa',   // violet doux
+  legendary: '#f59e0b',   // or/amber
+}
+
+// ── Hex pur par tier pour les animations (gradients, glow, flash) ─────────────
+// TIER_STROKE utilise des rgba pour common/rare, TIER_GLOW_COLOR est toujours #hex.
+export const TIER_GLOW_COLOR: Record<AchievementTier, string> = {
+  common:    '#ffffff',
+  rare:      '#ffffff',
+  epic:      '#a78bfa',
+  legendary: '#f59e0b',
+}
+
+// ── Prestige tier per achievement ────────────────────────────────────────────
+export const BADGE_TIER: Record<AchievementId, AchievementTier> = {
   // Compte
-  premiers_pas:          '#10b981',
+  premiers_pas:          'common',
   // Volume
-  coup_d_envoi:          '#10b981',
-  pris_au_jeu:           '#14b8a6',
-  accro:                 '#06b6d4',
-  centenaire:            '#f59e0b',
-  marathonien:           '#f97316',
+  coup_d_envoi:          'common',
+  pris_au_jeu:           'common',
+  accro:                 'rare',
+  centenaire:            'epic',
+  marathonien:           'epic',
   // Compétitif
-  premier_competiteur:   '#0ea5e9',
-  combattant:            '#f97316',
-  gladiateur:            '#ef4444',
-  legende_de_lareme:     '#f43f5e',
+  premier_competiteur:   'common',
+  combattant:            'rare',
+  gladiateur:            'epic',
+  legende_de_lareme:     'legendary',
   // Séries
-  serie_de_feu:          '#f97316',
-  inferno:               '#ef4444',
-  inarretable:           '#f43f5e',
-  transcendant:          '#8b5cf6',
+  serie_de_feu:          'rare',
+  inferno:               'epic',
+  inarretable:           'epic',
+  transcendant:          'legendary',
   // Rapidité
-  vif:                   '#0ea5e9',
-  foudroyant:            '#3b82f6',
-  supersonique:          '#6366f1',
-  instinct_pur:          '#8b5cf6',
+  vif:                   'common',
+  foudroyant:            'common',
+  supersonique:          'rare',
+  instinct_pur:          'legendary',
   // Perfection
-  perfectionniste:       '#8b5cf6',
+  perfectionniste:       'rare',
   // Points
-  rookie:                '#64748b',
-  challenger:            '#10b981',
-  performeur:            '#14b8a6',
-  chasseur_de_points:    '#06b6d4',
-  expert:                '#3b82f6',
-  maitre:                '#8b5cf6',
-  grand_maitre:          '#a855f7',
-  legende:               '#f59e0b',
-  mythique:              '#eab308',
+  rookie:                'common',
+  challenger:            'common',
+  performeur:            'common',
+  chasseur_de_points:    'rare',
+  expert:                'rare',
+  maitre:                'epic',
+  grand_maitre:          'epic',
+  legende:               'legendary',
+  mythique:              'legendary',
   // Exploration
-  touche_a_tout:         '#14b8a6',
-  polyvalent:            '#a855f7',
+  touche_a_tout:         'common',
+  polyvalent:            'common',
   // Classement
-  dans_l_elite:          '#64748b',
-  reconnu:               '#0ea5e9',
-  les_25:                '#3b82f6',
-  les_meilleurs:         '#8b5cf6',
-  sur_le_podium:         '#f59e0b',
-  sans_rival:            '#eab308',
+  dans_l_elite:          'common',
+  reconnu:               'rare',
+  les_25:                'rare',
+  les_meilleurs:         'epic',
+  sur_le_podium:         'legendary',
+  sans_rival:            'legendary',
   // Personnalisation
-  premier_pin:           '#8b5cf6',
-  collectionneur:        '#a855f7',
-  reinvention:           '#ec4899',
-  nouveau_visage:        '#f43f5e',
-  mon_histoire:          '#d946ef',
+  premier_pin:           'common',
+  collectionneur:        'rare',
+  reinvention:           'common',
+  nouveau_visage:        'common',
+  mon_histoire:          'common',
 }

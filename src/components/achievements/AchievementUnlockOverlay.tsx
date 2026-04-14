@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion, useAnimate } from 'framer-motion'
 import type { AchievementId, AchievementWithStatus } from '../../types/quiz'
-import { BADGE_COLOR_HEX as GLOW } from '../../constants/achievementColors'
+import { BADGE_FILL, TIER_STROKE, TIER_GLOW_COLOR, BADGE_TIER } from '../../constants/achievementColors'
 
 type OverlayPhase = 'idle' | 'entering' | 'holding' | 'exiting'
 
@@ -26,7 +26,9 @@ export default function AchievementUnlockOverlay({ achievements, onDone, onNavig
   pendingBadgeRectRef.current = pendingBadgeRect ?? null
 
   const current = achievements[currentIndex]
-  const glow = current ? GLOW[current.id] : '#8b5cf6'
+  const tier   = current ? BADGE_TIER[current.id]    : 'common'
+  const glow   = current ? TIER_GLOW_COLOR[tier]    : '#ffffff'
+  const stroke = current ? TIER_STROKE[tier]         : 'rgba(255,255,255,0.30)'
 
   useEffect(() => {
     if (!current) return
@@ -206,9 +208,9 @@ export default function AchievementUnlockOverlay({ achievements, onDone, onNavig
               </defs>
               <path
                 d="M32 2 L62 20 L62 52 L32 70 L2 52 L2 20 Z"
-                fill={glow}
-                stroke="rgba(255,255,255,0.2)"
-                strokeWidth="1"
+                fill={BADGE_FILL}
+                stroke={stroke}
+                strokeWidth="2"
               />
               <path
                 d="M32 2 L62 20 L62 52 L32 70 L2 52 L2 20 Z"

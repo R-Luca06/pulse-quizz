@@ -10,6 +10,8 @@ export interface TriviaQuestion {
 export type AnswerState = 'idle' | 'correct' | 'wrong' | 'timeout'
 export type QuizPhase = 'loading' | 'playing' | 'feedback' | 'finished' | 'error'
 export type GameMode   = 'normal' | 'compétitif'
+export type AchievementTier = 'common' | 'rare' | 'epic' | 'legendary'
+export type LegendaryEffect = 'fire' | 'electric' | 'gold' | 'prismatic'
 export type Difficulty = 'mixed' | 'easy' | 'medium' | 'hard'
 export type Language   = 'fr'
 export type Category   = 'all' | string
@@ -102,6 +104,7 @@ export interface Achievement {
   description: string
   icon: string  // emoji unicode
   progressTotal: number | null  // null = pas de progression trackable
+  tier: AchievementTier
 }
 
 export interface UserAchievement {
