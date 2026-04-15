@@ -30,10 +30,11 @@ interface UseGameOrchestrationParams {
   setGameResult: React.Dispatch<React.SetStateAction<GameResult>>
   setRankingData: React.Dispatch<React.SetStateAction<RankingData | null>>
   setNewAchievements: OnNewAchievements
+  setLoadingRanking: (v: boolean) => void
 }
 
 export function useGameOrchestration(params: UseGameOrchestrationParams) {
-  const { settings, user, profile, setScreen, setGameResult, setRankingData, setNewAchievements } = params
+  const { settings, user, profile, setScreen, setGameResult, setRankingData, setNewAchievements, setLoadingRanking } = params
 
   async function handleFinished(score: number, results: QuestionResult[]): Promise<void> {
     const { mode, difficulty, category, language } = settings
@@ -100,8 +101,9 @@ export function useGameOrchestration(params: UseGameOrchestrationParams) {
     }
 
     // ── Compétitif + connecté ─────────────────────────────────────────────────
-    // setScreen('result') en fallback immédiat ; si tout réussit on passe à 'ranking'.
-    setScreen('result')
+    // Spinner sur le quiz en attendant les données de classement ; transition
+    // directe vers 'ranking' quand prêt. setScreen('result') uniquement en cas d'erreur.
+    setLoadingRanking(true)
 
     try {
       const [prevBest, prevRank] = await Promise.all([
@@ -144,6 +146,7 @@ export function useGameOrchestration(params: UseGameOrchestrationParams) {
         username:  profile.username,
         userScore: score,
       })
+      setLoadingRanking(false)
       setScreen('ranking')
 
       // Achievements + notifications en fire-and-forget
@@ -176,7 +179,8 @@ export function useGameOrchestration(params: UseGameOrchestrationParams) {
         .catch(console.error)
     } catch (err) {
       console.error(err)
-      // screen already 'result' — rien à faire
+      setLoadingRanking(false)
+      setScreen('result')
     }
   }
 

@@ -58,7 +58,8 @@ export default function App() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingAchievements])
 
-  const { handleFinished } = useGameOrchestration({ settings, user, profile, setScreen, setGameResult, setRankingData, setNewAchievements: handleNewAchievements })
+  const [isLoadingRanking, setIsLoadingRanking] = useState(false)
+  const { handleFinished } = useGameOrchestration({ settings, user, profile, setScreen, setGameResult, setRankingData, setNewAchievements: handleNewAchievements, setLoadingRanking: setIsLoadingRanking })
   const [returnToSettings, setReturnToSettings] = useState(false)
   const [statsOrigin, setStatsOrigin] = useState<'landing' | 'result'>('landing')
   const [statsDefaultTab, setStatsDefaultTab] = useState<'stats' | 'leaderboard'>('stats')
@@ -170,6 +171,7 @@ export default function App() {
                 difficulty={settings.difficulty}
                 language={settings.language}
                 category={settings.category}
+                isLoadingRanking={isLoadingRanking}
               />
             </motion.div>
           )}

@@ -17,6 +17,7 @@ interface Props {
   difficulty: Difficulty
   language: Language
   category: Category
+  isLoadingRanking?: boolean
 }
 
 const FEEDBACK_COLORS: Record<string, string> = {
@@ -40,7 +41,7 @@ const BALLS: BallConfig[] = Array.from({ length: 40 }, (_, i) => ({
   delay:    parseFloat((-8 + Math.random() * 8).toFixed(1)),
 }))
 
-export default function QuizContainer({ onFinished, onQuit, gameMode, difficulty, language, category }: Props) {
+export default function QuizContainer({ onFinished, onQuit, gameMode, difficulty, language, category, isLoadingRanking = false }: Props) {
   const {
     phase,
     isRetrying,
@@ -242,6 +243,27 @@ export default function QuizContainer({ onFinished, onQuit, gameMode, difficulty
           </div>
         </div>
       </div>
+
+      {/* Overlay chargement classement (mode compétitif) */}
+      <AnimatePresence>
+        {isLoadingRanking && (
+          <motion.div
+            key="loading-ranking"
+            className="pointer-events-none fixed inset-0 z-50 flex flex-col items-center justify-center gap-4 bg-game-bg/80 backdrop-blur-sm"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.25 }}
+          >
+            <motion.div
+              className="h-12 w-12 rounded-full border-2 border-neon-violet/30 border-t-neon-violet"
+              animate={{ rotate: 360 }}
+              transition={{ duration: 0.8, repeat: Infinity, ease: 'linear' }}
+            />
+            <p className="text-sm uppercase tracking-widest text-white/40">Chargement du classement…</p>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Main content */}
       <div className="flex flex-1 items-center justify-center px-4 py-6">
