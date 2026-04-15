@@ -4,7 +4,7 @@ import { useAuth } from '../../hooks/useAuth'
 import { getUserBadges } from '../../services/badges'
 import { updateFeaturedBadges } from '../../services/profile'
 import { ACHIEVEMENT_MAP } from '../../constants/achievements'
-import { BADGE_TIER, TIER_GLOW_COLOR } from '../../constants/achievementColors'
+import { TIER_GLOW_COLOR } from '../../constants/achievementColors'
 import MiniBadge from '../shared/MiniBadge'
 import type { OwnedBadge, AchievementTier, BadgeSource } from '../../types/quiz'
 import type { AchievementId } from '../../types/quiz'
@@ -358,7 +358,7 @@ export default function CollectionPage({ hideBack = false, onBack }: Props) {
     open: boolean
     setOpen: (v: boolean) => void
     onChange: (v: T) => void
-    dropRef: React.RefObject<HTMLDivElement>
+    dropRef: React.RefObject<HTMLDivElement | null>
   }) {
     const activeLabel = options.find(f => f.key === value)?.label
     return (
@@ -391,7 +391,11 @@ export default function CollectionPage({ hideBack = false, onBack }: Props) {
               className="absolute left-0 top-9 z-50 min-w-[160px] overflow-hidden rounded-xl py-1.5"
               style={{ background: 'rgba(19,19,31,0.97)', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 8px 32px rgba(0,0,0,0.6)', backdropFilter: 'blur(20px)' }}
             >
-              {options.filter(f => f.key === 'all' || badges.some(b => (b as Record<string,string>)[label === 'Rareté' ? 'tier' : 'source'] === f.key)).map(f => {
+              {options.filter(f => {
+                if (f.key === 'all') return true
+                if (label === 'Rareté') return badges.some(b => b.tier === f.key as AchievementTier)
+                return badges.some(b => b.source === f.key as BadgeSource)
+              }).map(f => {
                 const count = label === 'Rareté'
                   ? (f.key === 'all' ? badges.length : badges.filter(b => b.tier === f.key as AchievementTier).length)
                   : (f.key === 'all' ? badges.length : badges.filter(b => b.source === f.key as BadgeSource).length)
