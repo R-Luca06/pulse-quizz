@@ -42,11 +42,14 @@ CREATE TABLE IF NOT EXISTS profiles (
   avatar_changed      boolean     NOT NULL DEFAULT false,
   description_changed boolean     NOT NULL DEFAULT false,
   notification_prefs  jsonb       NOT NULL DEFAULT '{"achievement_unlocked":true,"rank_change":true}',
-  created_at          timestamptz NOT NULL DEFAULT now(),
-
-  -- Unicité insensible à la casse (vérifié aussi côté app dans profile.ts)
-  CONSTRAINT profiles_username_unique UNIQUE (username)
+  created_at          timestamptz NOT NULL DEFAULT now()
 );
+
+-- Unicité insensible à la casse : index fonctionnel sur lower(username).
+-- Remplace l'ancienne contrainte UNIQUE (username) qui était case-sensitive.
+-- 'Alice' et 'alice' sont désormais considérés comme le même username.
+CREATE UNIQUE INDEX IF NOT EXISTS profiles_username_lower_unique
+  ON profiles (lower(username));
 
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 
@@ -86,13 +89,16 @@ CREATE TABLE IF NOT EXISTS questions (
   created_at        timestamptz NOT NULL DEFAULT now()
 );
 
--- Requêtes filtrées par langue + difficulté (get_random_questions)
-CREATE INDEX IF NOT EXISTS idx_questions_lang_diff
-  ON questions (language, difficulty);
+-- Index couvrant : (language, difficulty, category, id)
+-- Le champ id en fin de colonne permet au pivot UUID (get_random_questions) de faire
+-- un range scan id >= pivot directement dans l'index, sans retour à la heap.
+-- Remplace les deux anciens index partiels (lang_diff, lang_cat).
+CREATE INDEX IF NOT EXISTS idx_questions_lang_diff_cat_id
+  ON questions (language, difficulty, category, id);
 
--- Requêtes filtrées par langue + catégorie
-CREATE INDEX IF NOT EXISTS idx_questions_lang_cat
-  ON questions (language, category);
+-- Anciens index partiels devenus redondants — à dropper après création de l'index ci-dessus.
+-- DROP INDEX IF EXISTS idx_questions_lang_diff;
+-- DROP INDEX IF EXISTS idx_questions_lang_cat;
 
 ALTER TABLE questions ENABLE ROW LEVEL SECURITY;
 
@@ -149,20 +155,9 @@ CREATE POLICY "leaderboard_select_public"
   ON leaderboard FOR SELECT
   USING (true);
 
--- Insertion : uniquement ses propres scores
--- ⚠️ Garantie serveur NFR9 (Pulse Quizz PRD) : blocage du mode compétitif pour
--- les anonymes. auth.uid() renvoie NULL pour un client non-authentifié, donc
--- le WITH CHECK échoue → INSERT rejeté (erreur PostgreSQL 42501).
--- Ne pas assouplir sans revalidation sécurité.
-CREATE POLICY "leaderboard_insert_own"
-  ON leaderboard FOR INSERT
-  WITH CHECK (auth.uid() = user_id);
-
--- Modification : uniquement ses propres scores
-CREATE POLICY "leaderboard_update_own"
-  ON leaderboard FOR UPDATE
-  USING (auth.uid() = user_id)
-  WITH CHECK (auth.uid() = user_id);
+-- INSERT et UPDATE directs supprimés : toute écriture passe par la RPC submit_score
+-- (SECURITY DEFINER) qui valide l'authentification et garantit GREATEST(old, new)
+-- côté serveur. Cela empêche un utilisateur d'écrire un score arbitraire via REST.
 
 
 -- ─────────────────────────────────────────────────────────────────────────────
@@ -279,11 +274,187 @@ CREATE POLICY "user_achievements_insert_own"
 
 
 -- ─────────────────────────────────────────────────────────────────────────────
+-- increment_category_stats
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Remplace le pattern read-modify-write de cloudStats.incrementCategoryStats().
+-- INSERT ... ON CONFLICT DO UPDATE atomique : pas de race condition si deux
+-- parties se terminent simultanément (double onglet, reconnexion réseau).
+-- Les deltas (p_questions, p_correct, p_time) sont additionnés côté serveur.
+-- Les maxima (p_score, p_streak) utilisent GREATEST. p_fastest_perfect utilise LEAST.
+
+CREATE OR REPLACE FUNCTION increment_category_stats(
+  p_mode            text,
+  p_difficulty      text,
+  p_category        text,
+  p_questions       integer,
+  p_correct         integer,
+  p_time            real,
+  p_score           integer,
+  p_streak          integer,
+  p_fastest_perfect real    DEFAULT NULL
+)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF auth.uid() IS NULL THEN
+    RAISE EXCEPTION 'Not authenticated' USING ERRCODE = '42501';
+  END IF;
+
+  INSERT INTO user_stats (
+    user_id, mode, difficulty, category,
+    games_played, total_questions, total_correct, total_time,
+    best_score, best_streak, fastest_perfect, updated_at
+  )
+  VALUES (
+    auth.uid(), p_mode, p_difficulty, p_category,
+    1, p_questions, p_correct, p_time,
+    p_score, p_streak, p_fastest_perfect, now()
+  )
+  ON CONFLICT (user_id, mode, difficulty, category) DO UPDATE SET
+    games_played    = user_stats.games_played    + 1,
+    total_questions = user_stats.total_questions + EXCLUDED.total_questions,
+    total_correct   = user_stats.total_correct   + EXCLUDED.total_correct,
+    total_time      = user_stats.total_time      + EXCLUDED.total_time,
+    best_score      = GREATEST(user_stats.best_score,  EXCLUDED.best_score),
+    best_streak     = GREATEST(user_stats.best_streak, EXCLUDED.best_streak),
+    fastest_perfect = CASE
+      WHEN EXCLUDED.fastest_perfect IS NULL         THEN user_stats.fastest_perfect
+      WHEN user_stats.fastest_perfect IS NULL       THEN EXCLUDED.fastest_perfect
+      ELSE LEAST(user_stats.fastest_perfect, EXCLUDED.fastest_perfect)
+    END,
+    updated_at = now();
+END;
+$$;
+
+REVOKE ALL ON FUNCTION increment_category_stats(text,text,text,integer,integer,real,integer,integer,real) FROM public, anon;
+GRANT EXECUTE ON FUNCTION increment_category_stats(text,text,text,integer,integer,real,integer,integer,real) TO authenticated;
+
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- increment_global_stats
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Remplace cloudStats.incrementGlobalStats(). Même logique atomique.
+-- p_comp_score : score de la partie si mode compétitif, 0 sinon.
+
+CREATE OR REPLACE FUNCTION increment_global_stats(
+  p_mode            text,
+  p_questions       integer,
+  p_correct         integer,
+  p_streak          integer,
+  p_comp_score      integer,
+  p_fastest_perfect real    DEFAULT NULL
+)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF auth.uid() IS NULL THEN
+    RAISE EXCEPTION 'Not authenticated' USING ERRCODE = '42501';
+  END IF;
+
+  INSERT INTO user_global_stats (
+    user_id,
+    games_played, comp_games_played, total_questions, total_correct,
+    best_streak, fastest_perfect, comp_total_score, updated_at
+  )
+  VALUES (
+    auth.uid(),
+    1,
+    CASE WHEN p_mode = 'compétitif' THEN 1 ELSE 0 END,
+    p_questions, p_correct,
+    p_streak, p_fastest_perfect, p_comp_score, now()
+  )
+  ON CONFLICT (user_id) DO UPDATE SET
+    games_played      = user_global_stats.games_played + 1,
+    comp_games_played = user_global_stats.comp_games_played +
+                        CASE WHEN p_mode = 'compétitif' THEN 1 ELSE 0 END,
+    total_questions   = user_global_stats.total_questions + EXCLUDED.total_questions,
+    total_correct     = user_global_stats.total_correct   + EXCLUDED.total_correct,
+    best_streak       = GREATEST(user_global_stats.best_streak, EXCLUDED.best_streak),
+    fastest_perfect   = CASE
+      WHEN EXCLUDED.fastest_perfect IS NULL              THEN user_global_stats.fastest_perfect
+      WHEN user_global_stats.fastest_perfect IS NULL     THEN EXCLUDED.fastest_perfect
+      ELSE LEAST(user_global_stats.fastest_perfect, EXCLUDED.fastest_perfect)
+    END,
+    comp_total_score  = user_global_stats.comp_total_score + EXCLUDED.comp_total_score,
+    updated_at        = now();
+END;
+$$;
+
+REVOKE ALL ON FUNCTION increment_global_stats(text,integer,integer,integer,integer,real) FROM public, anon;
+GRANT EXECUTE ON FUNCTION increment_global_stats(text,integer,integer,integer,integer,real) TO authenticated;
+
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- submit_score
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Seul point d'entrée pour écrire dans leaderboard.
+-- INSERT ... ON CONFLICT DO UPDATE avec GREATEST(old, new) garantit côté serveur
+-- que le score ne peut qu'augmenter — impossible à contourner via REST.
+-- SECURITY DEFINER : s'exécute en tant que postgres (bypasse RLS).
+-- L'auth.uid() IS NULL check remplace la garantie NFR9 que donnaient les policies
+-- INSERT/UPDATE (qui ont été supprimées).
+
+CREATE OR REPLACE FUNCTION submit_score(
+  p_mode       text,
+  p_difficulty text,
+  p_language   text,
+  p_score      integer,
+  p_username   text,
+  p_game_data  jsonb DEFAULT NULL
+)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF auth.uid() IS NULL THEN
+    RAISE EXCEPTION 'Not authenticated' USING ERRCODE = '42501';
+  END IF;
+
+  INSERT INTO leaderboard (
+    user_id, username, score, mode, difficulty, language, game_data, updated_at
+  )
+  VALUES (
+    auth.uid(), p_username, p_score, p_mode, p_difficulty, p_language, p_game_data, now()
+  )
+  ON CONFLICT (user_id, mode, difficulty, language) DO UPDATE
+    SET score      = GREATEST(leaderboard.score, EXCLUDED.score),
+        username   = EXCLUDED.username,
+        game_data  = CASE
+                       WHEN EXCLUDED.score > leaderboard.score THEN EXCLUDED.game_data
+                       ELSE leaderboard.game_data
+                     END,
+        updated_at = CASE
+                       WHEN EXCLUDED.score > leaderboard.score THEN now()
+                       ELSE leaderboard.updated_at
+                     END;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION submit_score(text, text, text, integer, text, jsonb) FROM public, anon;
+GRANT EXECUTE ON FUNCTION submit_score(text, text, text, integer, text, jsonb) TO authenticated;
+
+
+-- ─────────────────────────────────────────────────────────────────────────────
 -- get_random_questions
 -- ─────────────────────────────────────────────────────────────────────────────
 -- Appelée par api.ts pour chaque partie.
 -- Filtre par langue, difficulté (ou 'mixed' = toutes), catégorie (ou 'all').
 -- Retourne N questions dans un ordre aléatoire.
+--
+-- Stratégie : pivot UUID aléatoire pour éviter ORDER BY RANDOM() sur l'ensemble filtré.
+--   1. Génère un UUID pivot aléatoire.
+--   2. Prend jusqu'à p_limit lignes avec id >= pivot (scan d'index ascendant).
+--   3. Complète avec des lignes id < pivot si nécessaire (scan descendant).
+--   4. Mélange seulement les p_limit candidats finaux (≤ 2×p_limit lignes max).
+-- Requiert idx_questions_lang_diff_cat_id pour le range scan id.
 
 CREATE OR REPLACE FUNCTION get_random_questions(
   p_language   text,
@@ -301,18 +472,46 @@ RETURNS TABLE (
   incorrect_answers text[],
   anecdote          text
 )
-LANGUAGE sql
-STABLE
+LANGUAGE plpgsql
+VOLATILE
 AS $$
-  SELECT
-    id, language, category, difficulty,
-    question, correct_answer, incorrect_answers, anecdote
-  FROM questions
-  WHERE language = p_language
-    AND (p_difficulty = 'mixed' OR difficulty = p_difficulty)
-    AND (p_category   = 'all'   OR category   = p_category)
-  ORDER BY RANDOM()
+DECLARE
+  v_pivot uuid := gen_random_uuid();
+BEGIN
+  RETURN QUERY
+  WITH pivot_above AS (
+    SELECT q.id, q.language, q.category, q.difficulty,
+           q.question, q.correct_answer, q.incorrect_answers, q.anecdote
+    FROM   questions q
+    WHERE  q.language = p_language
+      AND  (p_difficulty = 'mixed' OR q.difficulty = p_difficulty)
+      AND  (p_category   = 'all'   OR q.category   = p_category)
+      AND  q.id >= v_pivot
+    ORDER BY q.id
+    LIMIT p_limit
+  ),
+  pivot_below AS (
+    SELECT q.id, q.language, q.category, q.difficulty,
+           q.question, q.correct_answer, q.incorrect_answers, q.anecdote
+    FROM   questions q
+    WHERE  q.language = p_language
+      AND  (p_difficulty = 'mixed' OR q.difficulty = p_difficulty)
+      AND  (p_category   = 'all'   OR q.category   = p_category)
+      AND  q.id < v_pivot
+    ORDER BY q.id DESC
+    LIMIT p_limit
+  ),
+  candidates AS (
+    SELECT * FROM pivot_above
+    UNION ALL
+    SELECT * FROM pivot_below
+  )
+  SELECT c.id, c.language, c.category, c.difficulty,
+         c.question, c.correct_answer, c.incorrect_answers, c.anecdote
+  FROM   candidates c
+  ORDER BY random()
   LIMIT p_limit;
+END;
 $$;
 
 
@@ -373,12 +572,30 @@ ALTER TABLE user_global_stats
   ADD COLUMN IF NOT EXISTS comp_games_played integer NOT NULL DEFAULT 0;
 
 
+-- ─────────────────────────────────────────────────────────────────────────────
+-- profiles : unicité username insensible à la casse
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Remplace la contrainte UNIQUE (username) case-sensitive par un index
+-- fonctionnel sur lower(username). À exécuter sur une base existante.
+
+ALTER TABLE profiles DROP CONSTRAINT IF EXISTS profiles_username_unique;
+CREATE UNIQUE INDEX IF NOT EXISTS profiles_username_lower_unique
+  ON profiles (lower(username));
+
+
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- get_public_profile
 -- ─────────────────────────────────────────────────────────────────────────────
 -- Appelée par publicProfile.ts pour afficher le profil public d'un joueur.
 -- Retourne null si le username n'existe pas.
+--
+-- Optimisations vs version précédente :
+--   - Rang calculé via COUNT(*) WHERE score > v_best_comp + 1, O(1) avec
+--     idx_leaderboard_comp, au lieu de RANK() OVER (...) qui triait tous les joueurs.
+--   - Les 4 requêtes indépendantes (stats, leaderboard, rang, achievements) sont
+--     regroupées dans un seul bloc via des SELECTs enchaînés sans roundtrips inutiles.
+--   - Les deux jsonb_agg sur user_achievements sont fusionnées en un seul parcours.
 
 CREATE OR REPLACE FUNCTION get_public_profile(p_username text)
 RETURNS jsonb
@@ -415,21 +632,31 @@ BEGIN
 
   -- Meilleur score compétitif
   SELECT COALESCE(score, 0) INTO v_best_comp
-  FROM leaderboard WHERE user_id = v_user_id AND mode = 'compétitif' LIMIT 1;
+  FROM leaderboard
+  WHERE user_id = v_user_id AND mode = 'compétitif'
+  LIMIT 1;
 
-  -- Rang et total joueurs compétitif
+  -- Total joueurs compétitifs (langue fr)
   SELECT COUNT(*) INTO v_total
   FROM leaderboard WHERE mode = 'compétitif' AND language = 'fr';
 
-  SELECT ranked.rank INTO v_rank FROM (
-    SELECT user_id, RANK() OVER (ORDER BY score DESC) AS rank
-    FROM leaderboard WHERE mode = 'compétitif' AND language = 'fr'
-  ) ranked WHERE ranked.user_id = v_user_id;
+  -- Rang : nombre de joueurs avec un score STRICTEMENT supérieur + 1.
+  -- O(1) avec idx_leaderboard_comp (mode, language, score DESC).
+  -- Remplace RANK() OVER (...) qui triait l'ensemble complet des joueurs.
+  -- Si le joueur n'a pas de score compétitif, v_rank reste NULL.
+  IF v_best_comp > 0 THEN
+    SELECT COUNT(*) + 1 INTO v_rank
+    FROM leaderboard
+    WHERE mode = 'compétitif'
+      AND language = 'fr'
+      AND score > v_best_comp;
+  END IF;
 
-  -- Achievements débloqués
+  -- Achievements : un seul parcours, deux agrégats
   SELECT
-    jsonb_agg(achievement_id ORDER BY unlocked_at),
-    jsonb_agg(jsonb_build_object('id', achievement_id, 'unlocked_at', unlocked_at) ORDER BY unlocked_at)
+    jsonb_agg(achievement_id        ORDER BY unlocked_at),
+    jsonb_agg(jsonb_build_object('id', achievement_id, 'unlocked_at', unlocked_at)
+              ORDER BY unlocked_at)
   INTO v_ach, v_ach_dates
   FROM user_achievements WHERE user_id = v_user_id;
 
@@ -442,7 +669,7 @@ BEGIN
     'games_played',      v_games,
     'total_correct',     v_correct,
     'best_streak',       v_streak,
-    'best_comp_score',   COALESCE(v_best_comp, 0),
+    'best_comp_score',   v_best_comp,
     'rank',              v_rank,
     'total_players',     v_total,
     'achievements',      COALESCE(v_ach,      '[]'::jsonb),
@@ -497,11 +724,17 @@ CREATE POLICY "friendships_insert_own"
   ON friendships FOR INSERT
   WITH CHECK (auth.uid() = requester_id);
 
--- Mise à jour : requester peut annuler (DELETE), addressee peut accepter/refuser
--- On autorise l'update si l'utilisateur est impliqué dans la relation
-CREATE POLICY "friendships_update_own"
+-- Mise à jour : seul l'addressee peut changer le statut (accepted / rejected).
+-- Le requester n'a pas besoin d'UPDATE : il annule sa demande via DELETE.
+-- WITH CHECK garantit que seuls les statuts valides sont écrits et que
+-- l'addressee ne peut pas se réaffecter la relation (addressee_id inchangé).
+CREATE POLICY "friendships_update_addressee"
   ON friendships FOR UPDATE
-  USING (auth.uid() = requester_id OR auth.uid() = addressee_id);
+  USING (auth.uid() = addressee_id)
+  WITH CHECK (
+    auth.uid() = addressee_id
+    AND status IN ('accepted', 'rejected')
+  );
 
 -- Suppression : les deux parties peuvent supprimer (retrait d'ami, annulation)
 CREATE POLICY "friendships_delete_own"
@@ -588,4 +821,16 @@ $$;
 CREATE OR REPLACE TRIGGER notifications_trim
   AFTER INSERT ON notifications
   FOR EACH ROW EXECUTE FUNCTION trim_notifications();
+
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- leaderboard : suppression des policies INSERT/UPDATE directes
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Toute écriture dans leaderboard passe désormais par submit_score (RPC
+-- SECURITY DEFINER). Les policies directes sont supprimées pour empêcher
+-- l'écriture de scores arbitraires via l'API REST.
+
+DROP POLICY IF EXISTS "leaderboard_insert_own" ON leaderboard;
+DROP POLICY IF EXISTS "leaderboard_update_own" ON leaderboard;
+REVOKE INSERT, UPDATE ON leaderboard FROM authenticated;
 

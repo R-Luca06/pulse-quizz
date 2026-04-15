@@ -29,7 +29,7 @@ export interface CloudGlobalStatRow {
 }
 
 export async function incrementCategoryStats(
-  userId: string,
+  _userId: string,
   mode: GameMode,
   difficulty: Difficulty,
   category: Category,
@@ -40,40 +40,24 @@ export async function incrementCategoryStats(
   const totalTime = Math.round(results.reduce((s, r) => s + r.timeSpent, 0) * 10) / 10
   const isPerfect = mode === 'normal' && gameScore === results.length && results.length === NORMAL_MODE_QUESTIONS
 
-  const { data: existing } = await supabase
-    .from('user_stats')
-    .select('*')
-    .eq('user_id', userId)
-    .eq('mode', mode)
-    .eq('difficulty', difficulty)
-    .eq('category', String(category))
-    .maybeSingle()
-
-  const prev = existing ?? {
-    games_played: 0, total_questions: 0, total_correct: 0,
-    total_time: 0, best_score: 0, best_streak: 0, fastest_perfect: null,
-  }
-
-  await supabase.from('user_stats').upsert({
-    user_id: userId,
-    mode,
-    difficulty,
-    category: String(category),
-    games_played:    prev.games_played + 1,
-    total_questions: prev.total_questions + results.length,
-    total_correct:   prev.total_correct + gameScore,
-    total_time:      Math.round(((prev.total_time ?? 0) + totalTime) * 10) / 10,
-    best_score:      Math.max(prev.best_score, gameScore),
-    best_streak:     Math.max(prev.best_streak, streak),
-    fastest_perfect: isPerfect
-      ? prev.fastest_perfect === null ? totalTime : Math.min(prev.fastest_perfect, totalTime)
-      : prev.fastest_perfect,
-    updated_at: new Date().toISOString(),
-  }, { onConflict: 'user_id,mode,difficulty,category' })
+  // RPC atomique : INSERT ... ON CONFLICT DO UPDATE SET col = col + delta.
+  // Élimine la race condition du pattern précédent (SELECT → calcul → UPSERT).
+  const { error } = await supabase.rpc('increment_category_stats', {
+    p_mode:            mode,
+    p_difficulty:      difficulty,
+    p_category:        String(category),
+    p_questions:       results.length,
+    p_correct:         gameScore,
+    p_time:            totalTime,
+    p_score:           gameScore,
+    p_streak:          streak,
+    p_fastest_perfect: isPerfect ? totalTime : null,
+  })
+  if (error) throw new Error(error.message)
 }
 
 export async function incrementGlobalStats(
-  userId: string,
+  _userId: string,
   results: QuestionResult[],
   gameScore: number,
   mode: GameMode,
@@ -81,37 +65,18 @@ export async function incrementGlobalStats(
   const streak = computeBestStreak(results)
   const totalTime = Math.round(results.reduce((s, r) => s + r.timeSpent, 0) * 10) / 10
   const isPerfect = mode === 'normal' && gameScore === results.length && results.length === NORMAL_MODE_QUESTIONS
-
-  const { data: existing } = await supabase
-    .from('user_global_stats')
-    .select('*')
-    .eq('user_id', userId)
-    .maybeSingle()
-
-  const prev = existing ?? {
-    games_played: 0, comp_games_played: 0, total_questions: 0, total_correct: 0,
-    best_streak: 0, fastest_perfect: null, comp_total_score: 0,
-  }
-
   const correctCount = results.filter(r => r.isCorrect).length
 
-  await supabase.from('user_global_stats').upsert({
-    user_id: userId,
-    games_played:      prev.games_played + 1,
-    comp_games_played: mode === 'compétitif'
-      ? (prev.comp_games_played ?? 0) + 1
-      : (prev.comp_games_played ?? 0),
-    total_questions:   prev.total_questions + results.length,
-    total_correct:     prev.total_correct + correctCount,
-    best_streak:       Math.max(prev.best_streak, streak),
-    fastest_perfect:   isPerfect
-      ? prev.fastest_perfect === null ? totalTime : Math.min(prev.fastest_perfect, totalTime)
-      : prev.fastest_perfect,
-    comp_total_score:  mode === 'compétitif'
-      ? (prev.comp_total_score ?? 0) + gameScore
-      : (prev.comp_total_score ?? 0),
-    updated_at: new Date().toISOString(),
-  }, { onConflict: 'user_id' })
+  // RPC atomique : même logique que increment_category_stats.
+  const { error } = await supabase.rpc('increment_global_stats', {
+    p_mode:            mode,
+    p_questions:       results.length,
+    p_correct:         correctCount,
+    p_streak:          streak,
+    p_comp_score:      mode === 'compétitif' ? gameScore : 0,
+    p_fastest_perfect: isPerfect ? totalTime : null,
+  })
+  if (error) throw new Error(error.message)
 }
 
 export async function getCloudBestScore(

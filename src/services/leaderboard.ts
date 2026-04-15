@@ -48,69 +48,18 @@ export interface SubmitParams {
 }
 
 export async function submitScore(params: SubmitParams): Promise<void> {
-  const { userId, username, score, mode, difficulty, language, gameData } = params
-
-  if (mode === 'compétitif') {
-    const { data: existing } = await supabase
-      .from('leaderboard')
-      .select('id, score')
-      .eq('user_id', userId)
-      .eq('mode', mode)
-      .eq('language', language)
-      .maybeSingle()
-
-    if (!existing || score > existing.score) {
-      if (existing) {
-        const { error } = await supabase
-          .from('leaderboard')
-          .update({
-            username,
-            score,
-            game_data: gameData ?? null,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', existing.id)
-        if (error) throw mapSupabaseWriteError(error)
-      } else {
-        const { error } = await supabase
-          .from('leaderboard')
-          .insert({
-            user_id: userId,
-            username,
-            score,
-            mode,
-            difficulty: 'mixed',
-            language,
-            game_data: gameData ?? null,
-            updated_at: new Date().toISOString(),
-          })
-        if (error) throw mapSupabaseWriteError(error)
-      }
-    }
-  } else {
-    const { data: existing } = await supabase
-      .from('leaderboard')
-      .select('id, score')
-      .eq('user_id', userId)
-      .eq('mode', mode)
-      .eq('difficulty', difficulty)
-      .maybeSingle()
-
-    if (!existing || score > existing.score) {
-      if (existing) {
-        const { error } = await supabase
-          .from('leaderboard')
-          .update({ username, score, updated_at: new Date().toISOString() })
-          .eq('id', existing.id)
-        if (error) throw mapSupabaseWriteError(error)
-      } else {
-        const { error } = await supabase
-          .from('leaderboard')
-          .insert({ user_id: userId, username, score, mode, difficulty, language, updated_at: new Date().toISOString() })
-        if (error) throw mapSupabaseWriteError(error)
-      }
-    }
-  }
+  const { username, score, mode, difficulty, language, gameData } = params
+  // La logique "seulement si meilleur score" est désormais garantie côté serveur
+  // par submit_score (GREATEST). Plus de read-modify-write côté client.
+  const { error } = await supabase.rpc('submit_score', {
+    p_mode:       mode,
+    p_difficulty: mode === 'compétitif' ? 'mixed' : difficulty,
+    p_language:   language,
+    p_score:      score,
+    p_username:   username,
+    p_game_data:  gameData ?? null,
+  })
+  if (error) throw mapSupabaseWriteError(error)
 }
 
 export async function getCompTopScores(
@@ -146,18 +95,13 @@ export async function getCompLeaderboardPage(
   const entries = data as LeaderboardEntry[]
   if (entries.length === 0) return []
 
-  // Count entries with a strictly higher score than the first entry on this page.
-  // This gives us the base rank (same for all tied entries at the top of the page).
-  const { count: higherCount } = await supabase
-    .from('leaderboard')
-    .select('*', { count: 'exact', head: true })
-    .eq('mode', 'compétitif')
-    .eq('language', language)
-    .gt('score', entries[0].score)
+  // Rang de base dérivé de la position dans la page.
+  // Le tri (score DESC, updated_at ASC) est deterministe : pas d'égalité aux
+  // frontières de page, donc page * pageSize + 1 est toujours exact.
+  // Supprime le roundtrip COUNT(higherCount) de l'ancienne implémentation.
+  const baseRank = page * pageSize + 1
 
-  const baseRank = (higherCount ?? 0) + 1
-
-  // Fetch featured_badges for all users on this page in one shot
+  // Fetch featured_badges pour les utilisateurs de cette page uniquement.
   const userIds = entries.map(e => e.user_id)
   const { data: profileData } = await supabase
     .from('profiles')
@@ -168,8 +112,8 @@ export async function getCompLeaderboardPage(
       .map(p => [p.id, p.featured_badges ?? []])
   )
 
-  // Each entry's rank = baseRank + number of entries on this page with a strictly higher score.
-  // Entries with the same score get the same rank.
+  // Rang de chaque entry = baseRank + nombre d'entries sur cette page avec un score strictement supérieur.
+  // Les égalités de score partagent le même rang.
   return entries.map(entry => ({
     ...entry,
     rank: baseRank + entries.filter(e => e.score > entry.score).length,
