@@ -30,11 +30,11 @@ interface UseGameOrchestrationParams {
   setGameResult: React.Dispatch<React.SetStateAction<GameResult>>
   setRankingData: React.Dispatch<React.SetStateAction<RankingData | null>>
   setNewAchievements: OnNewAchievements
-  setLoadingRanking: (v: boolean) => void
+  setLoadingRanking?: (v: boolean) => void
 }
 
 export function useGameOrchestration(params: UseGameOrchestrationParams) {
-  const { settings, user, profile, setScreen, setGameResult, setRankingData, setNewAchievements, setLoadingRanking } = params
+  const { settings, user, profile, setScreen, setGameResult, setRankingData, setNewAchievements, setLoadingRanking = () => {} } = params
 
   async function handleFinished(score: number, results: QuestionResult[]): Promise<void> {
     const { mode, difficulty, category, language } = settings
