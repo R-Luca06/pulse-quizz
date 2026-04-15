@@ -43,6 +43,16 @@ export interface RankingData {
   userScore: number
 }
 
+// ─── Badges ───────────────────────────────────────────────────────────────────
+
+export type BadgeSource = 'achievement' | 'shop' | 'season' | 'rank'
+
+export interface OwnedBadge {
+  badge_id:    string       // = achievement_id pour source 'achievement'
+  source:      BadgeSource
+  obtained_at: string       // ISO timestamp
+}
+
 // ─── Achievements ─────────────────────────────────────────────────────────────
 
 export type AchievementId =

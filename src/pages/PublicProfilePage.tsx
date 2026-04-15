@@ -233,7 +233,7 @@ function BadgeShelf({ achievements, achievementDates }: { achievements: Achievem
             <span style={{ color: '#a78bfa' }}>{achievements.length}</span>
             <span style={{ color: 'rgba(255,255,255,0.2)', fontSize: 10 }}>/{ALL_BADGE_IDS.length}</span>
           </span>
-          <span style={{ fontSize: 7, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', color: 'rgba(255,255,255,0.18)' }}>badges</span>
+          <span style={{ fontSize: 7, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', color: 'rgba(255,255,255,0.18)' }}>succès</span>
         </div>
       </div>
       {/* Ombre */}

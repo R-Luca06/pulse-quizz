@@ -2,7 +2,6 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { motion, AnimatePresence, type Transition } from 'framer-motion'
 import { useAuth } from '../../hooks/useAuth'
 import { getUserAchievements } from '../../services/achievements'
-import { updateFeaturedBadges } from '../../services/profile'
 import { supabase } from '../../services/supabase'
 import { BADGE_TIER, TIER_GLOW_COLOR } from '../../constants/achievementColors'
 import MiniBadge from '../shared/MiniBadge'
@@ -12,7 +11,7 @@ interface Props {
   onBack?: () => void
   hideBack?: boolean
   pendingAchievementId?: AchievementId | null
-  onBadgeReady?: (rect: DOMRect) => void
+  onBadgeReady?:         (rect: DOMRect) => void
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -72,26 +71,14 @@ function getStatus(a: AchievementWithStatus): AchievementStatus {
   return 'locked'
 }
 
-// ─── Pin icon ─────────────────────────────────────────────────────────────────
-
-const PinIcon = ({ filled }: { filled: boolean }) => (
-  <svg width="11" height="11" viewBox="0 0 24 24" fill={filled ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <line x1="12" y1="17" x2="12" y2="22"/>
-    <path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"/>
-  </svg>
-)
-
 // ─── Card ─────────────────────────────────────────────────────────────────────
 
 type CardPendingPhase = 'idle' | 'receptive' | 'inserted'
 
-function AchievementCard({ achievement, pendingId, onBadgeReady, isPinned, canPin, onTogglePin }: {
+function AchievementCard({ achievement, pendingId, onBadgeReady }: {
   achievement: AchievementWithStatus
   pendingId?: AchievementId | null
   onBadgeReady?: (rect: DOMRect) => void
-  isPinned: boolean
-  canPin: boolean
-  onTogglePin: (id: AchievementId) => void
 }) {
   const status   = getStatus(achievement)
   const isLocked = status === 'locked'
@@ -207,25 +194,6 @@ function AchievementCard({ achievement, pendingId, onBadgeReady, isPinned, canPi
         </span>
       </div>
 
-      {/* Bouton pin */}
-      {status === 'unlocked' && (
-        <motion.button
-          whileTap={{ scale: 0.85 }}
-          onClick={e => { e.stopPropagation(); onTogglePin(achievement.id) }}
-          disabled={!isPinned && !canPin}
-          title={isPinned ? 'Retirer du leaderboard' : canPin ? 'Afficher dans le leaderboard' : 'Maximum 3 badges'}
-          className={[
-            'absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full transition-colors',
-            isPinned
-              ? 'bg-neon-violet/20 text-neon-violet hover:bg-neon-violet/30'
-              : canPin
-                ? 'bg-white/5 text-white/25 hover:bg-white/10 hover:text-white/60'
-                : 'cursor-not-allowed text-white/10',
-          ].join(' ')}
-        >
-          <PinIcon filled={isPinned} />
-        </motion.button>
-      )}
 
       {/* Badge — utilise MiniBadge (source unique) avec animations de pending par-dessus */}
       <div className="relative mt-1 shrink-0">
@@ -329,19 +297,13 @@ function AchievementCard({ achievement, pendingId, onBadgeReady, isPinned, canPi
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function AchievementsPage({ onBack, hideBack = false, pendingAchievementId, onBadgeReady }: Props) {
-  const { user, profile, setLocalFeaturedBadges, triggerAchievementCheck, statsRefreshKey } = useAuth()
+  const { user, statsRefreshKey } = useAuth()
   const [achievements, setAchievements] = useState<AchievementWithStatus[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [filter, setFilter] = useState<FilterKey>('all')
   const [filterOpen, setFilterOpen] = useState(false)
   const filterRef = useRef<HTMLDivElement>(null)
-  const [featuredBadges, setFeaturedBadges] = useState<string[]>([])
-  const [pinSaving, setPinSaving] = useState(false)
-
-  useEffect(() => {
-    setFeaturedBadges(profile?.featured_badges ?? [])
-  }, [profile?.featured_badges])
 
   useEffect(() => {
     function onPointerDown(e: PointerEvent) {
@@ -352,31 +314,6 @@ export default function AchievementsPage({ onBack, hideBack = false, pendingAchi
     document.addEventListener('pointerdown', onPointerDown)
     return () => document.removeEventListener('pointerdown', onPointerDown)
   }, [])
-
-  async function handleTogglePin(id: AchievementId) {
-    if (!user) return
-    const already = featuredBadges.includes(id)
-    const next = already
-      ? featuredBadges.filter(b => b !== id)
-      : featuredBadges.length < 3
-        ? [...featuredBadges, id]
-        : featuredBadges
-
-    if (next === featuredBadges) return
-    setFeaturedBadges(next)
-    setLocalFeaturedBadges(next)
-    if (pinSaving) return
-    setPinSaving(true)
-    try {
-      await updateFeaturedBadges(user.id, next)
-      triggerAchievementCheck().catch(console.error)
-    } catch {
-      setFeaturedBadges(featuredBadges)
-      setLocalFeaturedBadges(featuredBadges)
-    } finally {
-      setPinSaving(false)
-    }
-  }
 
   const loadAchievements = useCallback(async (userId: string, silent = false) => {
     const [achievementsData, globalStatsResult, compEntryResult, userStatsResult] = await Promise.all([
@@ -522,21 +459,6 @@ export default function AchievementsPage({ onBack, hideBack = false, pendingAchi
 
             {/* Barre d'outils */}
             <div className="mb-4 flex items-center gap-2">
-              <div className="flex items-center gap-1.5 rounded-lg border border-neon-violet/20 bg-neon-violet/5 px-2.5 py-1.5">
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-neon-violet/60">
-                  <line x1="12" y1="17" x2="12" y2="22"/>
-                  <path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"/>
-                </svg>
-                <span className="text-[10px] font-semibold text-neon-violet/70">Badges leaderboard</span>
-                <span className={`text-[10px] font-black tabular-nums ${featuredBadges.length >= 3 ? 'text-neon-violet' : 'text-white/40'}`}>
-                  {featuredBadges.length}/3
-                </span>
-              </div>
-
-              {pinSaving && (
-                <div className="h-3 w-3 animate-spin rounded-full border border-neon-violet/30 border-t-neon-violet/70" />
-              )}
-
               {/* Dropdown filtre — mobile uniquement (< sm) */}
               <div ref={filterRef} className="relative ml-auto sm:hidden">
                 <button
@@ -626,9 +548,6 @@ export default function AchievementsPage({ onBack, hideBack = false, pendingAchi
                     achievement={a}
                     pendingId={pendingAchievementId}
                     onBadgeReady={onBadgeReady}
-                    isPinned={featuredBadges.includes(a.id)}
-                    canPin={featuredBadges.length < 3}
-                    onTogglePin={handleTogglePin}
                   />
                 ))}
               </div>
