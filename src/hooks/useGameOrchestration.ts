@@ -40,38 +40,39 @@ export function useGameOrchestration(params: UseGameOrchestrationParams) {
     const maxStreak    = computeBestStreak(results)
     const minAnswerTime = computeMinAnswerTime(results)
 
-    // Fetch previous best from cloud (0 if not logged in or no entry)
-    let prevBest = 0
-    let prevRank: number | null = null
-    if (user) {
-      if (mode === 'normal') {
-        prevBest = await getCloudBestScore(user.id, mode, difficulty, category)
-      } else if (mode === 'compétitif') {
-        ;[prevBest, prevRank] = await Promise.all([
-          getUserBestScore(user.id, language),
-          getUserRank(user.id, language),
-        ])
-      }
-    }
-
-    const isNewBest = score > prevBest
-    const baseResult: GameResult = {
+    // Transition immédiate — aucun await avant setScreen pour éviter que le
+    // quiz container reste affiché si les requêtes Supabase sont lentes/bloquées.
+    // Les données cloud (bestScore, rank) sont chargées en arrière-plan.
+    const immediateResult: GameResult = {
       score,
       results,
-      bestScore: isNewBest ? score : prevBest,
-      isNewBest,
-      userRank: null,
+      bestScore: score,
+      isNewBest: false,
+      userRank:  null,
       rankDelta: null,
     }
-    setGameResult(baseResult)
+    setGameResult(immediateResult)
 
-    // Non-competitive or unauthenticated — fast path
+    // ── Chemin non-compétitif ou non-connecté ─────────────────────────────────
     if (!user || mode !== 'compétitif' || !profile) {
+      setScreen('result')
+
       if (user && mode === 'normal') {
-        incrementCategoryStats(user.id, mode, difficulty, category, score, results).catch(console.error)
+        const uid = user.id
+        // Charge le meilleur score précédent en arrière-plan et met à jour l'UI
+        getCloudBestScore(uid, mode, difficulty, category)
+          .then(prevBest => {
+            setGameResult(prev => ({
+              ...prev,
+              bestScore: Math.max(prevBest, score),
+              isNewBest: score > prevBest,
+            }))
+          })
+          .catch(() => {})
+
+        incrementCategoryStats(uid, mode, difficulty, category, score, results).catch(console.error)
         // Chaîner le check achievements APRÈS l'incrément des stats globales pour éviter
         // la race condition sur games_played (ex: Centenaire lu à 99 au lieu de 100)
-        const uid = user.id
         incrementGlobalStats(uid, results, score, mode)
           .then(() => Promise.all([
             checkAndUnlockAchievements(uid, { maxStreak, minAnswerTime, score, mode }),
@@ -95,39 +96,52 @@ export function useGameOrchestration(params: UseGameOrchestrationParams) {
       } else if (!user) {
         markPlayedAnonymous()
       }
-      setScreen('result')
       return
     }
 
-    // Competitive + authenticated — submit first to get the rank, then check achievements
+    // ── Compétitif + connecté ─────────────────────────────────────────────────
+    // setScreen('result') en fallback immédiat ; si tout réussit on passe à 'ranking'.
+    setScreen('result')
+
     try {
+      const [prevBest, prevRank] = await Promise.all([
+        getUserBestScore(user.id, language),
+        getUserRank(user.id, language),
+      ])
+
+      setGameResult(prev => ({
+        ...prev,
+        bestScore: Math.max(prevBest, score),
+        isNewBest: score > prevBest,
+      }))
+
       await submitScore({
-        userId: user.id,
+        userId:   user.id,
         username: profile.username,
         score,
         mode,
         difficulty: 'mixed',
         language,
         gameData: results.map(r => ({
-          question: r.question,
+          question:     r.question,
           correctAnswer: r.correctAnswer,
-          userAnswer: r.userAnswer,
-          isCorrect: r.isCorrect,
-          timeSpent: r.timeSpent,
+          userAnswer:   r.userAnswer,
+          isCorrect:    r.isCorrect,
+          timeSpent:    r.timeSpent,
           pointsEarned: r.pointsEarned ?? 0,
-          multiplier: r.multiplier ?? 1,
+          multiplier:   r.multiplier ?? 1,
         })),
       })
 
       const newRank = await getUserRank(user.id, language)
-      const delta = newRank !== null && prevRank !== null ? prevRank - newRank : null
+      const delta   = newRank !== null && prevRank !== null ? prevRank - newRank : null
 
       setGameResult(prev => ({ ...prev, userRank: newRank, rankDelta: delta }))
       setRankingData({
-        userRank: newRank,
+        userRank:  newRank,
         rankDelta: delta,
-        userId: user.id,
-        username: profile.username,
+        userId:    user.id,
+        username:  profile.username,
         userScore: score,
       })
       setScreen('ranking')
@@ -152,18 +166,17 @@ export function useGameOrchestration(params: UseGameOrchestrationParams) {
               })
             }
           }
-          // Notif de classement
           if (delta !== null && delta !== 0 && newRank !== null && prefs.rank_change) {
             createNotification(uid, delta > 0 ? 'rank_up' : 'rank_down', {
               new_rank: newRank,
-              delta: Math.abs(delta),
+              delta:    Math.abs(delta),
             }).catch(console.error)
           }
         })
         .catch(console.error)
     } catch (err) {
       console.error(err)
-      setScreen('result')
+      // screen already 'result' — rien à faire
     }
   }
 
