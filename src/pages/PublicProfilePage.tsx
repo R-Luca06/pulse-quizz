@@ -424,7 +424,7 @@ function StatCard({ label, value, accent, delay }: { label: string; value: strin
 
 function LoadingState({ onClose, hideNav }: { onClose: () => void; hideNav?: boolean }) {
   return (
-    <div className={hideNav ? 'flex flex-col' : 'flex min-h-screen flex-col bg-game-bg'}>
+    <div className={hideNav ? 'flex flex-col' : 'flex h-full flex-col bg-game-bg'}>
       {!hideNav && (
         <div className="flex items-center border-b border-game-border px-3 py-2">
           <button onClick={onClose} className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs text-white/35 transition-colors hover:bg-white/5 hover:text-white/70">
@@ -449,7 +449,7 @@ function LoadingState({ onClose, hideNav }: { onClose: () => void; hideNav?: boo
 
 function NotFoundState({ username, onClose, hideNav }: { username: string; onClose: () => void; hideNav?: boolean }) {
   return (
-    <div className={hideNav ? 'flex flex-col' : 'flex min-h-screen flex-col bg-game-bg'}>
+    <div className={hideNav ? 'flex flex-col' : 'flex h-full flex-col bg-game-bg'}>
       {!hideNav && (
         <div className="flex items-center border-b border-game-border px-3 py-2">
           <button onClick={onClose} className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs text-white/35 transition-colors hover:bg-white/5 hover:text-white/70">
@@ -620,7 +620,7 @@ function WallPage({ profile, onClose, hideNav }: { profile: PublicProfile; onClo
   )
 
   return (
-    <div className={hideNav ? 'flex flex-col' : 'flex min-h-screen flex-col bg-game-bg'}>
+    <div className={hideNav ? 'flex flex-col' : 'flex h-full flex-col bg-game-bg'}>
 
       {/* ── Barre retour — masquée quand embarqué dans ProfilePage ────────── */}
       {!hideNav && (
@@ -861,7 +861,7 @@ function WallPage({ profile, onClose, hideNav }: { profile: PublicProfile; onClo
         )}
       </motion.div>
 
-      <div className="flex flex-1 flex-col gap-4 overflow-y-auto pb-8 pt-4">
+      <div className="flex flex-1 flex-col gap-4 overflow-y-auto pb-8 pt-4" style={{ WebkitOverflowScrolling: 'touch' } as React.CSSProperties}>
 
         {/* ── La Salle ───────────────────────────────────────────────────── */}
         <div className="px-4">

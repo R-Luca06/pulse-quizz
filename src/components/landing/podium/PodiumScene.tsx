@@ -138,59 +138,60 @@ export default function PodiumScene({ isLaunching, onShowStats, settings, onPlay
 
       {/* ════════════════════════════════════════════════════
           MOBILE layout (< lg) : flex-col, avatar haut,
-          dock inline, cards empilées + scroll
+          dock inline, cards empilées + scroll global
       ════════════════════════════════════════════════════ */}
-      <div className="absolute inset-0 flex flex-col lg:hidden">
+      <div className="absolute inset-0 overflow-y-auto lg:hidden" style={{ scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' } as React.CSSProperties}>
+        <div className="flex flex-col">
 
-        {/* Zone avatar — portion haute, sous le header (pt-14) */}
-        <motion.div
-          className="flex shrink-0 items-center justify-center pt-14"
-          style={{ height: 'calc(28vh + 56px)' }}
-          animate={
-            isLaunching
-              ? { opacity: 0, scale: 0.85, transition: { duration: 0.25 } }
-              : { opacity: 1, scale: 1 }
-          }
-        >
+          {/* Zone avatar — portion haute, sous le header (pt-14) */}
           <motion.div
-            className="relative flex flex-col items-center gap-3"
-            style={{ willChange: 'transform' }}
-            animate={floatAnimation}
-            transition={floatTransition}
+            className="flex shrink-0 items-center justify-center pt-14"
+            style={{ height: 'calc(28vh + 56px)' }}
+            animate={
+              isLaunching
+                ? { opacity: 0, scale: 0.85, transition: { duration: 0.25 } }
+                : { opacity: 1, scale: 1 }
+            }
           >
-            <div
-              aria-hidden="true"
-              className="pointer-events-none absolute inset-0 rounded-full"
-              style={{
-                background:
-                  'radial-gradient(circle, rgba(139, 92, 246, 0.1) 0%, rgba(139, 92, 246, 0.03) 50%, transparent 70%)',
-                transform: 'scale(1.3)',
-                zIndex: 0,
-              }}
-            />
-            <div className="relative z-[1]">
-              <AvatarContainer className="h-28 w-28" fontSize="3.5rem" />
-            </div>
-            <div className="relative z-[1] flex flex-col items-center gap-1 text-center">
-              <span className="text-sm font-bold text-white/90">@{profile?.username ?? '…'}</span>
-              {rank !== null && (
-                <span className="text-xs font-semibold text-neon-gold/80">#{rank} mondial</span>
-              )}
-            </div>
+            <motion.div
+              className="relative flex flex-col items-center gap-3"
+              style={{ willChange: 'transform' }}
+              animate={floatAnimation}
+              transition={floatTransition}
+            >
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-0 rounded-full"
+                style={{
+                  background:
+                    'radial-gradient(circle, rgba(139, 92, 246, 0.1) 0%, rgba(139, 92, 246, 0.03) 50%, transparent 70%)',
+                  transform: 'scale(1.3)',
+                  zIndex: 0,
+                }}
+              />
+              <div className="relative z-[1]">
+                <AvatarContainer className="h-28 w-28" fontSize="3.5rem" />
+              </div>
+              <div className="relative z-[1] flex flex-col items-center gap-1 text-center">
+                <span className="text-sm font-bold text-white/90">@{profile?.username ?? '…'}</span>
+                {rank !== null && (
+                  <span className="text-xs font-semibold text-neon-gold/80">#{rank} mondial</span>
+                )}
+              </div>
+            </motion.div>
           </motion.div>
-        </motion.div>
 
-        {/* Dock mobile */}
-        <div className="shrink-0 py-3">
-          <MobileDock settings={settings} onPlay={onPlay} onOpenSettings={onOpenSettings} />
-        </div>
+          {/* Dock mobile */}
+          <div className="shrink-0 py-3">
+            <MobileDock settings={settings} onPlay={onPlay} onOpenSettings={onOpenSettings} />
+          </div>
 
-        {/* Cards empilées — zone scrollable */}
-        <div className="flex-1 overflow-y-auto" style={{ scrollbarWidth: 'none' }}>
+          {/* Cards empilées */}
           <div className="flex flex-col gap-3 px-4 pb-8 pt-1">
             <LeaderboardCard onShowStats={tab => onShowStats(tab)} />
             <PlayerStatsCard onShowStats={tab => onShowStats(tab)} />
           </div>
+
         </div>
       </div>
 

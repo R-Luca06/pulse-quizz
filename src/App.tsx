@@ -321,7 +321,7 @@ export default function App() {
             animate={{ x: 0 }}
             exit={{ x: '100%' }}
             transition={{ type: 'spring', stiffness: 380, damping: 38 }}
-            className="fixed inset-0 z-40 bg-game-bg"
+            className="fixed inset-0 z-40 overflow-hidden bg-game-bg"
           >
             <Suspense fallback={<div className="absolute inset-0 bg-game-bg" />}>
               <UserProfilePanel username={viewingUsername} onClose={closeProfile} />
