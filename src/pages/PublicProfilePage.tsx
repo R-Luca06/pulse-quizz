@@ -8,6 +8,8 @@ import type { AchievementId, AchievementTier } from '../types/quiz'
 import { getPublicProfile, type PublicProfile } from '../services/publicProfile'
 import { useAuth } from '../hooks/useAuth'
 import { updateFeaturedBadges, updateUsername, updateDescription } from '../services/profile'
+import { sendFriendRequest, removeFriendship, getFriendshipStatus, type FriendshipStatus } from '../services/social'
+import { useToast } from '../contexts/ToastContext'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -473,12 +475,58 @@ function NotFoundState({ username, onClose, hideNav }: { username: string; onClo
 
 function WallPage({ profile, onClose, hideNav }: { profile: PublicProfile; onClose: () => void; hideNav?: boolean }) {
   const { user, profile: authProfile, setLocalFeaturedBadges, setLocalDescription: setAuthDescription, refreshProfile, triggerAchievementCheck } = useAuth()
+  const toast = useToast()
   const [isOwnProfile] = useState(() =>
     !!user && !!authProfile && authProfile.username.toLowerCase() === profile.username.toLowerCase()
   )
 
   const title     = computeTitle(profile.rank)
   const rankLabel = computeRankLabel(profile.rank, profile.total_players)
+
+  // ── Friendship state ──
+  const [friendStatus,   setFriendStatus]   = useState<FriendshipStatus | null>(null)
+  const [friendshipId,   setFriendshipId]   = useState<string | null>(null)
+  const [isRequester,    setIsRequester]    = useState<boolean | null>(null)
+  const [friendLoading,  setFriendLoading]  = useState(false)
+
+  useEffect(() => {
+    if (!user || isOwnProfile || !profile.userId) return
+    getFriendshipStatus(user.id, profile.userId).then(res => {
+      setFriendStatus(res.status)
+      setFriendshipId(res.friendshipId)
+      setIsRequester(res.isRequester)
+    })
+  }, [user, isOwnProfile, profile.userId])
+
+  async function handleFriendAction() {
+    if (!user || !profile.userId) return
+    setFriendLoading(true)
+    try {
+      if (friendStatus === null) {
+        const row = await sendFriendRequest(user.id, profile.userId)
+        setFriendStatus('pending')
+        setFriendshipId(row.id)
+        setIsRequester(true)
+        toast.success('Demande envoyée !')
+      } else if (friendStatus === 'pending' && isRequester) {
+        await removeFriendship(friendshipId!)
+        setFriendStatus(null)
+        setFriendshipId(null)
+        setIsRequester(null)
+        toast.success('Demande annulée')
+      } else if (friendStatus === 'accepted') {
+        await removeFriendship(friendshipId!)
+        setFriendStatus(null)
+        setFriendshipId(null)
+        setIsRequester(null)
+        toast.success('Ami supprimé')
+      }
+    } catch {
+      toast.error("Une erreur est survenue")
+    } finally {
+      setFriendLoading(false)
+    }
+  }
 
   // Champs éditables localement
   const [localUsername,    setLocalUsername]    = useState(profile.username)
@@ -597,16 +645,40 @@ function WallPage({ profile, onClose, hideNav }: { profile: PublicProfile; onClo
         className="flex items-start gap-3 border-b border-game-border px-5 py-4"
       >
         {/* Avatar */}
-        <div
-          className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-2xl"
-          style={{
-            background: `radial-gradient(circle at 35% 35%, ${profile.avatar_color}55, ${profile.avatar_color}22)`,
-            border: `2px solid ${profile.avatar_color}80`,
-            boxShadow: `0 0 20px ${profile.avatar_color}40`,
-          }}
-        >
-          {profile.avatar_emoji}
-        </div>
+        {profile.avatar_emoji ? (
+          <div
+            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-2xl"
+            style={{
+              background: `radial-gradient(circle at 35% 35%, ${profile.avatar_color}55, ${profile.avatar_color}22)`,
+              border: `2px solid ${profile.avatar_color}80`,
+              boxShadow: `0 0 20px ${profile.avatar_color}40`,
+            }}
+          >
+            {profile.avatar_emoji}
+          </div>
+        ) : (
+          <div className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-full">
+            <div
+              className="absolute inset-0 rounded-full"
+              style={{
+                background: 'radial-gradient(circle, rgba(139,92,246,0.22) 0%, rgba(139,92,246,0.06) 55%, transparent 75%)',
+                transform: 'scale(1.4)',
+              }}
+            />
+            <div
+              className="relative z-10 flex h-full w-full items-center justify-center rounded-full"
+              style={{
+                background: 'linear-gradient(135deg, rgba(139,92,246,0.3) 0%, rgba(59,130,246,0.18) 100%)',
+                border: '2px solid rgba(139,92,246,0.5)',
+                boxShadow: '0 0 20px rgba(139,92,246,0.3), inset 0 1px 0 rgba(255,255,255,0.1)',
+              }}
+            >
+              <span className="relative z-10 select-none text-lg font-black text-white/90">
+                {profile.username[0]?.toUpperCase() ?? '?'}
+              </span>
+            </div>
+          </div>
+        )}
 
         {/* Info */}
         <div className="min-w-0 flex-1">
@@ -711,23 +783,82 @@ function WallPage({ profile, onClose, hideNav }: { profile: PublicProfile; onClo
         </div>
 
         {/* Actions */}
-        <div className="flex shrink-0 items-center pt-0.5">
-          <div className="group relative">
-            <div
-              className="flex cursor-not-allowed items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-bold select-none"
-              style={{ border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.22)' }}
-            >
-              <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-                <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-              </svg>
-              Défier
-            </div>
-            <div className="pointer-events-none absolute bottom-full left-1/2 mb-2 -translate-x-1/2 whitespace-nowrap rounded-md border border-game-border bg-game-card px-2.5 py-1 text-[10px] font-semibold text-white/40 opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
-              Bientôt disponible
-            </div>
+        {!isOwnProfile && (
+          <div className="flex shrink-0 items-center pt-0.5">
+            {!user ? (
+              <div className="group relative">
+                <div
+                  className="flex cursor-not-allowed items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-bold select-none"
+                  style={{ border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.22)' }}
+                >
+                  <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+                    <line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/>
+                  </svg>
+                  Ajouter
+                </div>
+                <div className="pointer-events-none absolute bottom-full left-1/2 mb-2 -translate-x-1/2 whitespace-nowrap rounded-md border border-game-border bg-game-card px-2.5 py-1 text-[10px] font-semibold text-white/40 opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
+                  Connecte-toi pour ajouter des amis
+                </div>
+              </div>
+            ) : friendStatus === 'accepted' ? (
+              <button
+                onClick={handleFriendAction}
+                disabled={friendLoading}
+                className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-bold transition-all disabled:opacity-50"
+                style={{ border: '1px solid rgba(74,222,128,0.35)', background: 'rgba(74,222,128,0.08)', color: 'rgba(74,222,128,0.85)' }}
+              >
+                {friendLoading
+                  ? <div className="h-2.5 w-2.5 animate-spin rounded-full border border-current/40 border-t-current" />
+                  : <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                }
+                Amis
+              </button>
+            ) : friendStatus === 'pending' && isRequester ? (
+              <button
+                onClick={handleFriendAction}
+                disabled={friendLoading}
+                className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-bold transition-all disabled:opacity-50"
+                style={{ border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.45)' }}
+              >
+                {friendLoading
+                  ? <div className="h-2.5 w-2.5 animate-spin rounded-full border border-current/40 border-t-current" />
+                  : <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+                }
+                En attente…
+              </button>
+            ) : friendStatus === 'pending' && !isRequester ? (
+              <button
+                onClick={handleFriendAction}
+                disabled={friendLoading}
+                className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-bold transition-all disabled:opacity-50"
+                style={{ border: '1px solid rgba(251,191,36,0.35)', background: 'rgba(251,191,36,0.08)', color: 'rgba(251,191,36,0.85)' }}
+              >
+                {friendLoading
+                  ? <div className="h-2.5 w-2.5 animate-spin rounded-full border border-current/40 border-t-current" />
+                  : <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                }
+                Accepter
+              </button>
+            ) : (
+              <button
+                onClick={handleFriendAction}
+                disabled={friendLoading}
+                className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-bold transition-all hover:opacity-80 disabled:opacity-50"
+                style={{ border: '1px solid rgba(139,92,246,0.4)', background: 'rgba(139,92,246,0.1)', color: 'rgba(196,181,253,0.9)' }}
+              >
+                {friendLoading
+                  ? <div className="h-2.5 w-2.5 animate-spin rounded-full border border-current/40 border-t-current" />
+                  : <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+                      <line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/>
+                    </svg>
+                }
+                Ajouter
+              </button>
+            )}
           </div>
-        </div>
+        )}
       </motion.div>
 
       <div className="flex flex-1 flex-col gap-4 overflow-y-auto pb-8 pt-4">

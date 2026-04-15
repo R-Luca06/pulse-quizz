@@ -241,6 +241,29 @@ export async function getPendingRequests(userId: string): Promise<PendingRequest
   })
 }
 
+/** Retourne le statut de la relation entre deux utilisateurs. */
+export async function getFriendshipStatus(
+  currentUserId: string,
+  targetUserId: string,
+): Promise<{ status: FriendshipStatus | null; friendshipId: string | null; isRequester: boolean | null }> {
+  const { data } = await supabase
+    .from('friendships')
+    .select('id, requester_id, status')
+    .or(
+      `and(requester_id.eq.${currentUserId},addressee_id.eq.${targetUserId}),` +
+      `and(requester_id.eq.${targetUserId},addressee_id.eq.${currentUserId})`
+    )
+    .limit(1)
+    .maybeSingle()
+
+  if (!data) return { status: null, friendshipId: null, isRequester: null }
+  return {
+    status: data.status as FriendshipStatus,
+    friendshipId: data.id,
+    isRequester: data.requester_id === currentUserId,
+  }
+}
+
 /** Compte les demandes reçues en attente (pour le badge notif). */
 export async function getPendingReceivedCount(userId: string): Promise<number> {
   const { count, error } = await supabase

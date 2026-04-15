@@ -2,6 +2,7 @@ import { supabase } from './supabase'
 import type { AchievementId } from '../types/quiz'
 
 export interface PublicProfile {
+  userId:            string
   username:          string
   avatar_emoji:      string
   avatar_color:      string
@@ -19,11 +20,15 @@ export interface PublicProfile {
 }
 
 export async function getPublicProfile(username: string): Promise<PublicProfile | null> {
-  const { data, error } = await supabase.rpc('get_public_profile', { p_username: username })
-  if (error || !data) return null
+  const [rpcResult, profileRow] = await Promise.all([
+    supabase.rpc('get_public_profile', { p_username: username }),
+    supabase.from('profiles').select('id').ilike('username', username).single(),
+  ])
+  if (rpcResult.error || !rpcResult.data) return null
   // La RPC retourne un jsonb → cast direct
-  const raw = data as Record<string, unknown>
+  const raw = rpcResult.data as Record<string, unknown>
   return {
+    userId:          profileRow.data?.id ?? '',
     username:        raw.username        as string,
     avatar_emoji:    raw.avatar_emoji    as string,
     avatar_color:    raw.avatar_color    as string,
