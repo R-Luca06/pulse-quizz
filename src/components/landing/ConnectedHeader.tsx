@@ -11,13 +11,14 @@ import type { DailyTheme, DailyEntry, DailyStreak } from '../../types/quiz'
 
 interface ConnectedHeaderProps {
   onShowStats: (tab?: 'stats' | 'leaderboard' | 'daily') => void
-  onShowProfile: () => void
+  onShowProfile: (tab?: string) => void
   onShowAchievements: () => void
   onSignOut: () => void
   username: string
   onViewProfile: (username: string) => void
   onShowSocial?: () => void
   onShowDaily?: () => void
+  onShowCollection?: () => void
 }
 
 const dropdownItemClass =
@@ -61,6 +62,7 @@ export default function ConnectedHeader({
   onViewProfile,
   onShowSocial,
   onShowDaily,
+  onShowCollection,
 }: ConnectedHeaderProps) {
   const { user, totalXp } = useAuth()
   const xpData = getLevelProgress(totalXp)
@@ -162,13 +164,17 @@ export default function ConnectedHeader({
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
                 Classement
               </button>
-              <button type="button" onClick={() => { onShowDaily?.(); closeAll() }} className={dropdownItemClass}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-                Journalier
+              <button type="button" onClick={() => { onShowProfile('stats'); closeAll() }} className={dropdownItemClass}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+                Statistiques
               </button>
-              <button type="button" onClick={() => { onShowAchievements(); closeAll() }} className={dropdownItemClass}>
+              <button type="button" onClick={() => { onShowProfile('achievements'); closeAll() }} className={dropdownItemClass}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="8" r="6"/><path d="M15.477 12.89L17 22l-5-3-5 3 1.523-9.11"/></svg>
                 Achievements
+              </button>
+              <button type="button" onClick={() => { onShowProfile('collection'); closeAll() }} className={dropdownItemClass}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/><line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/></svg>
+                Collections
               </button>
             </div>
           )}
@@ -194,7 +200,7 @@ export default function ConnectedHeader({
             <AvatarContainer className="h-7 w-7" />
             {level > 0 && (
               <div
-                className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full text-[8px] font-black text-white leading-none"
+                className="absolute -bottom-1 -right-1 z-10 flex h-4 w-4 items-center justify-center rounded-full text-[8px] font-black text-white leading-none"
                 style={{ background: 'linear-gradient(135deg, #7c3aed, #2563eb)', border: '1.5px solid rgba(10,7,20,1)' }}
               >
                 {level}
@@ -240,9 +246,17 @@ export default function ConnectedHeader({
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
                 Classement
               </button>
-              <button type="button" onClick={() => { onShowAchievements(); closeAll() }} className={dropdownItemClass}>
+              <button type="button" onClick={() => { onShowProfile('stats'); closeAll() }} className={dropdownItemClass}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+                Statistiques
+              </button>
+              <button type="button" onClick={() => { onShowProfile('achievements'); closeAll() }} className={dropdownItemClass}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="8" r="6"/><path d="M15.477 12.89L17 22l-5-3-5 3 1.523-9.11"/></svg>
                 Achievements
+              </button>
+              <button type="button" onClick={() => { onShowProfile('collection'); closeAll() }} className={dropdownItemClass}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/><line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/></svg>
+                Collections
               </button>
             </div>
           )}

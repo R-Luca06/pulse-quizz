@@ -9,7 +9,7 @@ import CollectionPage from '../collection/CollectionPage'
 const UserProfilePanel = lazy(() => import('../../pages/PublicProfilePage'))
 const SocialPage = lazy(() => import('../social/SocialPage'))
 
-type ProfileTab = 'general' | 'social' | 'public_profile' | 'achievements' | 'collection' | 'stats' | 'confidentiality'
+export type ProfileTab = 'general' | 'social' | 'public_profile' | 'achievements' | 'collection' | 'stats' | 'confidentiality'
 
 interface Props {
   onBack: () => void

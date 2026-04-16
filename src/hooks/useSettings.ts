@@ -62,5 +62,16 @@ export function useSettings() {
     })
   }
 
-  return { settings, update }
+  // Met à jour l'état en mémoire SANS persister dans localStorage.
+  // Utilisé pour le mode daily afin de ne pas écraser les préférences normales.
+  function updateTemp(patch: Partial<GameSettings>) {
+    setSettings((prev) => ({ ...prev, ...patch }))
+  }
+
+  // Recharge les settings depuis localStorage (pour restaurer après un daily).
+  function reset() {
+    setSettings(load())
+  }
+
+  return { settings, update, updateTemp, reset }
 }

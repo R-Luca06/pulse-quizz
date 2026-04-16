@@ -22,11 +22,12 @@ interface Props {
   onShowStats: (tab?: 'stats' | 'leaderboard' | 'daily') => void
   onOpenSignIn: () => void
   onOpenSignUp: () => void
-  onShowProfile: () => void
+  onShowProfile: (tab?: string) => void
   onShowAchievements: () => void
   onShowSocial?: () => void
   onViewProfile: (username: string) => void
   onShowDaily?: () => void
+  onShowCollection?: () => void
 }
 
 export default function LandingPage({
@@ -44,6 +45,7 @@ export default function LandingPage({
   onShowSocial,
   onViewProfile,
   onShowDaily,
+  onShowCollection,
 }: Props) {
   const { user, profile, loading, signOut } = useAuth()
   const toast = useToast()
@@ -97,6 +99,7 @@ export default function LandingPage({
             onShowSocial={onShowSocial}
             onViewProfile={onViewProfile}
             onShowDaily={onShowDaily}
+            onShowCollection={onShowCollection}
           />
         </motion.div>
       ) : (
@@ -202,13 +205,14 @@ interface ConnectedBranchProps {
   showRules: boolean
   setShowRules: (v: boolean) => void
   onShowStats: (tab?: 'stats' | 'leaderboard' | 'daily') => void
-  onShowProfile: () => void
+  onShowProfile: (tab?: string) => void
   onShowAchievements: () => void
   username: string
   onSignOut: () => void
   onShowSocial?: () => void
   onViewProfile: (username: string) => void
   onShowDaily?: () => void
+  onShowCollection?: () => void
 }
 
 function ConnectedBranch({
@@ -229,6 +233,7 @@ function ConnectedBranch({
   onShowSocial,
   onViewProfile,
   onShowDaily,
+  onShowCollection,
 }: ConnectedBranchProps) {
   const isLaunching = screen === 'launching'
   const [launchPhase, setLaunchPhase] = useState<LaunchPhase>('idle')
@@ -282,6 +287,7 @@ function ConnectedBranch({
         onOpenSettings={() => setOpenSettings(true)}
         onShowSocial={onShowSocial}
         onShowDaily={onShowDaily}
+        onShowCollection={onShowCollection}
       />
 
       {/* GameDock : desktop uniquement (lg+) — le mobile a son dock dans PodiumScene */}

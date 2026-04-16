@@ -7,6 +7,7 @@ import { useSettings } from './hooks/useSettings'
 import { useAuth } from './hooks/useAuth'
 import { useGameOrchestration } from './hooks/useGameOrchestration'
 import type { Language, GameResult, RankingData, AchievementWithStatus, AchievementId } from './types/quiz'
+import type { ProfileTab } from './components/profile/ProfilePage'
 import { trackScreenViewed, trackGameAbandoned } from './services/analytics'
 import { addXp } from './services/cloudStats'
 import { XP_PER_ACHIEVEMENT } from './constants/xp'
@@ -23,14 +24,15 @@ const UserProfilePanel = lazy(() => import('./pages/PublicProfilePage'))
 const SocialPage = lazy(() => import('./components/social/SocialPage'))
 const DailyChallengePage = lazy(() => import('./components/daily/DailyChallengePage'))
 const DailyChallengeModal = lazy(() => import('./components/daily/DailyChallengeModal'))
+const CollectionPage = lazy(() => import('./components/collection/CollectionPage'))
 
-export type AppScreen = 'landing' | 'launching' | 'quiz' | 'ranking' | 'result' | 'stats' | 'profile' | 'achievements' | 'social' | 'daily'
+export type AppScreen = 'landing' | 'launching' | 'quiz' | 'ranking' | 'result' | 'stats' | 'profile' | 'achievements' | 'social' | 'daily' | 'collection'
 
 // Écrans pendant lesquels l'overlay d'achievement doit être mis en attente
 const GAME_SCREENS: AppScreen[] = ['quiz', 'launching', 'ranking']
 
 export default function App() {
-  const { settings, update } = useSettings()
+  const { settings, update, updateTemp, reset } = useSettings()
   const { user, profile, pendingAchievements, clearPendingAchievements, refreshStats, showXpGain } = useAuth()
 
   const [screen, setScreen] = useState<AppScreen>('landing')
@@ -102,6 +104,7 @@ export default function App() {
   const openSignUp = () => setAuthModal({ open: true, tab: 'signup' })
   const closeAuth = () => setAuthModal(a => ({ ...a, open: false }))
   const [achievementsOrigin, setAchievementsOrigin] = useState<'landing' | 'profile' | 'result'>('landing')
+  const [profileDefaultTab, setProfileDefaultTab] = useState<ProfileTab>('general')
   const [viewingUsername, setViewingUsername] = useState<string | null>(null)
   const closeProfile = () => setViewingUsername(null)
 
@@ -155,12 +158,13 @@ export default function App() {
     handleShowStats('landing', 'daily')
   }
 
-  // Called when a daily game completes: go back to landing + reopen the card modal
-  function handleDailyComplete() { setScreen('landing'); setShowDailyModal(true) }
+  // Called when a daily game completes: restore persisted settings, go back to landing
+  function handleDailyComplete() { reset(); setScreen('landing'); setShowDailyModal(true) }
 
   function handleStartDailyGame() {
     setShowDailyModal(false)
-    update({ mode: 'daily', difficulty: 'mixed', category: 'all' })
+    // updateTemp : n'écrase PAS localStorage, pour préserver les préférences normales
+    updateTemp({ mode: 'daily', difficulty: 'mixed', category: 'all' })
     setScreen('launching')
   }
 
@@ -174,6 +178,7 @@ export default function App() {
     }
     setReturnToSettings(false); setNewAchievements([]); setPendingAchievementId(null)
     if (settings.mode === 'daily') {
+      reset()
       setScreen('landing')
       setShowDailyModal(true)
     } else {
@@ -198,7 +203,15 @@ export default function App() {
 
   function handleBackFromStats() { setScreen(statsOrigin) }
 
-  function handleShowProfile() { setScreen('profile') }
+  function handleShowProfile(tab?: ProfileTab) {
+    if (tab) {
+      sessionStorage.removeItem('profile_active_tab')
+      setProfileDefaultTab(tab)
+    }
+    setScreen('profile')
+  }
+
+  function handleShowCollection() { setScreen('collection') }
 
   return (
     <>
@@ -226,6 +239,7 @@ export default function App() {
                 onShowSocial={() => setScreen('social')}
                 onViewProfile={setViewingUsername}
                 onShowDaily={handleShowDaily}
+                onShowCollection={handleShowCollection}
               />
             </motion.div>
           )}
@@ -306,6 +320,7 @@ export default function App() {
             >
               <ProfilePage
                 onBack={() => setScreen('landing')}
+                defaultTab={profileDefaultTab}
                 onViewProfile={setViewingUsername}
               />
             </motion.div>
@@ -376,6 +391,20 @@ export default function App() {
                   onBack={() => setScreen('landing')}
                   onStartGame={handleStartDailyGame}
                 />
+              </Suspense>
+            </motion.div>
+          )}
+
+          {screen === 'collection' && (
+            <motion.div
+              key="collection"
+              initial={{ opacity: 0, y: 40 }}
+              animate={{ opacity: 1, y: 0, transition: { duration: 0.5, delay: 0.1, ease: 'easeOut' } }}
+              exit={{ opacity: 0, transition: { duration: 0.25 } }}
+              className="absolute inset-0 z-10"
+            >
+              <Suspense fallback={<div className="absolute inset-0 bg-game-bg" />}>
+                <CollectionPage onBack={() => setScreen('landing')} />
               </Suspense>
             </motion.div>
           )}
