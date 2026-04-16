@@ -203,10 +203,10 @@ export default function App() {
 
   function handleBackFromStats() { setScreen(statsOrigin) }
 
-  function handleShowProfile(tab?: ProfileTab) {
+  function handleShowProfile(tab?: string) {
     if (tab) {
       sessionStorage.removeItem('profile_active_tab')
-      setProfileDefaultTab(tab)
+      setProfileDefaultTab(tab as ProfileTab)
     }
     setScreen('profile')
   }

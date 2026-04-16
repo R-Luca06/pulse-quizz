@@ -56,13 +56,11 @@ function useCountdown() {
 export default function ConnectedHeader({
   onShowStats,
   onShowProfile,
-  onShowAchievements,
   onSignOut,
   username,
   onViewProfile,
   onShowSocial,
   onShowDaily,
-  onShowCollection,
 }: ConnectedHeaderProps) {
   const { user, totalXp } = useAuth()
   const xpData = getLevelProgress(totalXp)
