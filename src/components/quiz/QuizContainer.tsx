@@ -75,9 +75,6 @@ export default function QuizContainer({ onFinished, onQuit, gameMode, difficulty
   }, [urgentSecond])
 
 
-  // Daily info overlay
-  const [showDailyInfo, setShowDailyInfo] = useState(false)
-
   // Combo overlay at milestone streaks
   const [comboVisible, setComboVisible] = useState(false)
   const [comboValue, setComboValue] = useState(0)
@@ -200,15 +197,7 @@ export default function QuizContainer({ onFinished, onQuit, gameMode, difficulty
               <path d="M1 1l8 8M9 1L1 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
             </svg>
           </button>
-          {gameMode === 'daily' && (
-            <button
-              onClick={() => setShowDailyInfo(true)}
-              aria-label="Règles du défi journalier"
-              className="flex h-6 w-6 items-center justify-center rounded-full border border-neon-violet/30 bg-[#0d0d18] text-xs font-bold text-neon-violet/70 transition-colors hover:border-neon-violet/60 hover:text-neon-violet"
-            >
-              i
-            </button>
-          )}
+
           <div className="text-sm font-semibold text-white/40">
             <span className="text-white">
               {gameMode === 'compétitif' ? totalAnswered + 1 : currentIndex + 1}
@@ -257,92 +246,6 @@ export default function QuizContainer({ onFinished, onQuit, gameMode, difficulty
         </div>
       </div>
 
-      {/* Overlay info daily */}
-      <AnimatePresence>
-        {showDailyInfo && (
-          <>
-            <motion.div
-              key="daily-info-backdrop"
-              className="fixed inset-0 z-[60] bg-black/70 backdrop-blur-sm"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.18 }}
-              onClick={() => setShowDailyInfo(false)}
-            />
-            <motion.div
-              key="daily-info-modal"
-              className="fixed inset-0 z-[70] flex items-center justify-center px-4"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.18 }}
-            >
-              <motion.div
-                className="relative w-full max-w-sm rounded-2xl border border-neon-violet/20 bg-[#0d0d18] p-6 shadow-[0_0_40px_rgba(139,92,246,0.15)]"
-                initial={{ scale: 0.92, y: 16 }}
-                animate={{ scale: 1, y: 0 }}
-                exit={{ scale: 0.95, y: 8 }}
-                transition={{ type: 'spring', stiffness: 380, damping: 30 }}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <div className="mb-4 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xl">📅</span>
-                    <h2 className="text-base font-black text-neon-violet">Défi Journalier</h2>
-                  </div>
-                  <button
-                    onClick={() => setShowDailyInfo(false)}
-                    className="flex h-7 w-7 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/40 transition-colors hover:border-white/20 hover:text-white/70"
-                  >
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                      <path d="M1 1l10 10M11 1L1 11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                    </svg>
-                  </button>
-                </div>
-                <div className="flex flex-col gap-3 text-sm text-white/60">
-                  <div className="flex flex-col gap-2">
-                    {[
-                      { icon: '📅', text: '10 questions thématiques — une seule tentative par jour' },
-                      { icon: '⚡', text: 'Réponds vite pour multiplier tes points — même système que le mode compétitif' },
-                      { icon: '✓', text: 'Pas d\'élimination — la partie continue même sur une mauvaise réponse' },
-                      { icon: '🔥', text: 'Ton multiplicateur XP augmente avec ta série de jours consécutifs' },
-                    ].map((rule, i) => (
-                      <div key={i} className="flex items-start gap-3 rounded-xl border border-white/5 bg-white/[0.03] px-3 py-2.5">
-                        <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center text-base leading-none">{rule.icon}</span>
-                        <span className="leading-snug">{rule.text}</span>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="rounded-xl border border-neon-violet/15 bg-neon-violet/5 p-3">
-                    <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-neon-violet/60">Multiplicateurs de vitesse</p>
-                    <div className="flex flex-col gap-1">
-                      {COMP_SPEED_TIERS.map(t => {
-                        const label = t.maxTime === Infinity ? '> 8s' : `≤ ${t.maxTime}s`
-                        const color = t.multiplier >= 3 ? 'text-yellow-400' : t.multiplier >= 2 ? 'text-purple-400' : t.multiplier >= 1.5 ? 'text-blue-400' : t.multiplier >= 1.2 ? 'text-white/50' : 'text-white/30'
-                        return (
-                          <div key={t.maxTime} className="flex items-center justify-between">
-                            <span className="text-xs text-white/40">{label}</span>
-                            <span className={`text-xs font-bold ${color}`}>×{t.multiplier}</span>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  </div>
-                </div>
-                <motion.button
-                  onClick={() => setShowDailyInfo(false)}
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.97 }}
-                  className="mt-5 w-full rounded-xl bg-gradient-to-r from-neon-violet to-neon-blue py-2.5 text-sm font-bold text-white shadow-[0_0_20px_rgba(139,92,246,0.3)]"
-                >
-                  Compris !
-                </motion.button>
-              </motion.div>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
 
       {/* Overlay chargement classement (mode compétitif) */}
       <AnimatePresence>

@@ -41,7 +41,7 @@ CREATE TABLE IF NOT EXISTS daily_challenge_entries (
   id           uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id      uuid        NOT NULL REFERENCES auth.users (id) ON DELETE CASCADE,
   date         date        NOT NULL,
-  score        int         NOT NULL CHECK (score >= 0 AND score <= 5),
+  score        int         NOT NULL CHECK (score >= 0 AND score <= 10),
   xp_earned    int         NOT NULL CHECK (xp_earned >= 0),
   multiplier   numeric(4,2) NOT NULL DEFAULT 1.0,
   streak_day   int         NOT NULL DEFAULT 1,
