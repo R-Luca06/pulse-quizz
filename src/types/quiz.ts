@@ -26,6 +26,13 @@ export interface QuestionResult {
   multiplier?: number        // mode compétitif uniquement (ex: 3, 2, 1.5, 1.2, 1)
 }
 
+export interface XpBreakdown {
+  base:    number   // XP fixe pour avoir joué
+  correct: number   // XP des bonnes réponses
+  bonus:   number   // XP bonus (score parfait)
+  total:   number
+}
+
 export interface GameResult {
   score: number
   results: QuestionResult[]
@@ -33,6 +40,7 @@ export interface GameResult {
   isNewBest: boolean
   userRank: number | null
   rankDelta: number | null
+  xpBreakdown: XpBreakdown | null
 }
 
 export interface RankingData {

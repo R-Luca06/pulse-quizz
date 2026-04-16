@@ -1,15 +1,16 @@
 import type { User } from '@supabase/supabase-js'
 import type { AppScreen } from '../App'
 import type { GameSettings } from './useSettings'
-import type { QuestionResult, GameResult, RankingData, AchievementWithStatus } from '../types/quiz'
+import type { QuestionResult, GameResult, RankingData, AchievementWithStatus, XpBreakdown } from '../types/quiz'
 
 type OnNewAchievements = (achievements: AchievementWithStatus[]) => void
-import { getCloudBestScore } from '../services/cloudStats'
-import { incrementCategoryStats, incrementGlobalStats } from '../services/cloudStats'
+import { getCloudBestScore, incrementCategoryStats, incrementGlobalStats, addXp } from '../services/cloudStats'
 import { submitScore, getUserBestScore, getUserRank } from '../services/leaderboard'
 import { checkAndUnlockAchievements } from '../services/achievements'
 import { markPlayedAnonymous, computeBestStreak } from '../utils/statsStorage'
 import { createNotification, getNotificationPrefs } from '../services/notifications'
+import { trackGameFinished } from '../services/analytics'
+import { computeXpGained, XP_PER_ACHIEVEMENT } from '../constants/xp'
 import type React from 'react'
 
 interface Profile {
@@ -31,15 +32,24 @@ interface UseGameOrchestrationParams {
   setRankingData: React.Dispatch<React.SetStateAction<RankingData | null>>
   setNewAchievements: OnNewAchievements
   setLoadingRanking?: (v: boolean) => void
+  showXpGain?: (params: { gameXp: XpBreakdown | null; achievementXp: number }) => void
+  storePendingXp?: (params: { gameXp: XpBreakdown | null; achievementXp: number }) => void
 }
 
 export function useGameOrchestration(params: UseGameOrchestrationParams) {
-  const { settings, user, profile, setScreen, setGameResult, setRankingData, setNewAchievements, setLoadingRanking = () => {} } = params
+  const { settings, user, profile, setScreen, setGameResult, setRankingData, setNewAchievements, setLoadingRanking = () => {}, showXpGain = () => {}, storePendingXp = () => {} } = params
 
   async function handleFinished(score: number, results: QuestionResult[]): Promise<void> {
     const { mode, difficulty, category, language } = settings
     const maxStreak    = computeBestStreak(results)
     const minAnswerTime = computeMinAnswerTime(results)
+    const xpBreakdown  = user ? computeXpGained(results, mode, score) : null
+
+    const lastResult = results[results.length - 1]
+    const end_reason = mode === 'compétitif' && lastResult
+      ? (lastResult.userAnswer === null ? 'timeout' : 'wrong_answer')
+      : 'completed'
+    trackGameFinished({ mode, difficulty, category, language, score, questions_answered: results.length, end_reason })
 
     // Transition immédiate — aucun await avant setScreen pour éviter que le
     // quiz container reste affiché si les requêtes Supabase sont lentes/bloquées.
@@ -51,6 +61,7 @@ export function useGameOrchestration(params: UseGameOrchestrationParams) {
       isNewBest: false,
       userRank:  null,
       rankDelta: null,
+      xpBreakdown,
     }
     setGameResult(immediateResult)
 
@@ -74,14 +85,18 @@ export function useGameOrchestration(params: UseGameOrchestrationParams) {
         incrementCategoryStats(uid, mode, difficulty, category, score, results).catch(console.error)
         // Chaîner le check achievements APRÈS l'incrément des stats globales pour éviter
         // la race condition sur games_played (ex: Centenaire lu à 99 au lieu de 100)
-        incrementGlobalStats(uid, results, score, mode)
+        const gameXp = xpBreakdown?.total ?? 0
+        incrementGlobalStats(uid, results, score, mode, gameXp)
           .then(() => Promise.all([
             checkAndUnlockAchievements(uid, { maxStreak, minAnswerTime, score, mode }),
             getNotificationPrefs(uid),
           ]))
           .then(([newlyUnlocked, prefs]) => {
+            let achievementXp = 0
             if (newlyUnlocked.length > 0) {
               setNewAchievements(newlyUnlocked)
+              achievementXp = newlyUnlocked.reduce((sum, a) => sum + XP_PER_ACHIEVEMENT[a.tier], 0)
+              if (achievementXp > 0) addXp(achievementXp).catch(console.error)
               if (prefs.achievement_unlocked) {
                 newlyUnlocked.forEach(a => {
                   createNotification(uid, 'achievement_unlocked', {
@@ -91,6 +106,11 @@ export function useGameOrchestration(params: UseGameOrchestrationParams) {
                   }).catch(console.error)
                 })
               }
+              // Différer le toast XP après la fermeture de l'overlay achievement
+              storePendingXp({ gameXp: xpBreakdown, achievementXp })
+            } else {
+              // Pas d'achievement — toast immédiat sur l'écran résultat
+              showXpGain({ gameXp: xpBreakdown, achievementXp: 0 })
             }
           })
           .catch(console.error)
@@ -151,14 +171,18 @@ export function useGameOrchestration(params: UseGameOrchestrationParams) {
 
       // Achievements + notifications en fire-and-forget
       const uid = user.id
-      incrementGlobalStats(uid, results, score, mode)
+      const gameXpComp = xpBreakdown?.total ?? 0
+      incrementGlobalStats(uid, results, score, mode, gameXpComp)
         .then(() => Promise.all([
           checkAndUnlockAchievements(uid, { maxStreak, minAnswerTime, score, mode, userRank: newRank }),
           getNotificationPrefs(uid),
         ]))
         .then(([newlyUnlocked, prefs]) => {
+          let achievementXp = 0
           if (newlyUnlocked.length > 0) {
             setNewAchievements(newlyUnlocked)
+            achievementXp = newlyUnlocked.reduce((sum, a) => sum + XP_PER_ACHIEVEMENT[a.tier], 0)
+            if (achievementXp > 0) addXp(achievementXp).catch(console.error)
             if (prefs.achievement_unlocked) {
               newlyUnlocked.forEach(a => {
                 createNotification(uid, 'achievement_unlocked', {
@@ -168,6 +192,11 @@ export function useGameOrchestration(params: UseGameOrchestrationParams) {
                 }).catch(console.error)
               })
             }
+            // Différer le toast XP après la fermeture de l'overlay achievement
+            storePendingXp({ gameXp: xpBreakdown, achievementXp })
+          } else {
+            // Pas d'achievement — toast immédiat
+            showXpGain({ gameXp: xpBreakdown, achievementXp: 0 })
           }
           if (delta !== null && delta !== 0 && newRank !== null && prefs.rank_change) {
             createNotification(uid, delta > 0 ? 'rank_up' : 'rank_down', {

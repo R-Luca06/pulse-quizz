@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '../../../hooks/useAuth'
+import { getLevelProgress } from '../../../constants/levels'
 import { useToast } from '../../../contexts/ToastContext'
 import { updateUsername, updateEmail, updateDescription } from '../../../services/profile'
 import { AppError } from '../../../services/errors'
@@ -94,7 +95,8 @@ function NotifToggle({
 type ActiveField = 'username' | 'email' | 'description' | null
 
 export default function GeneralTab() {
-  const { user, profile, refreshProfile, triggerAchievementCheck, setLocalDescription } = useAuth()
+  const { user, profile, refreshProfile, triggerAchievementCheck, setLocalDescription, totalXp } = useAuth()
+  const xpData = getLevelProgress(totalXp)
   const toast = useToast()
   const initial = (profile?.username?.[0] ?? '?').toUpperCase()
 
@@ -303,6 +305,26 @@ export default function GeneralTab() {
             )}
           </div>
         </div>
+      </div>
+
+      {/* ─── Bande XP (Option B) ───────────────────────────────────────────── */}
+      <div className="flex items-center gap-3 border-b border-game-border/40 bg-game-card/20 px-6 py-2.5">
+        <div className="flex shrink-0 items-baseline gap-1">
+          <span className="text-[9px] font-bold uppercase tracking-wider text-neon-violet/60">Niv.</span>
+          <span className="text-sm font-black text-neon-violet">{xpData.level}</span>
+        </div>
+        <div className="flex-1 h-1.5 overflow-hidden rounded-full bg-white/[0.08]">
+          <motion.div
+            className="h-full rounded-full"
+            style={{ background: 'linear-gradient(90deg, #7c3aed, #2563eb)' }}
+            initial={{ width: 0 }}
+            animate={{ width: `${xpData.percentage}%` }}
+            transition={{ duration: 0.9, ease: 'easeOut', delay: 0.2 }}
+          />
+        </div>
+        <span className="shrink-0 tabular-nums text-[10px] text-white/30">
+          {xpData.progressXp.toLocaleString('fr-FR')}&thinsp;/&thinsp;{xpData.neededXp.toLocaleString('fr-FR')} XP
+        </span>
       </div>
 
       {/* ─── Section Profil ────────────────────────────────────────────────── */}

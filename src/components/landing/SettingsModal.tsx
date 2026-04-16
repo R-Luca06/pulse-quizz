@@ -4,6 +4,7 @@ import { getMuted, setMuted } from '../../utils/sounds'
 import { FR_CATEGORIES, MODES, DIFFICULTIES, LANGUAGES, btnBase, btnSelected, btnIdle } from '../../constants/quiz'
 import { useAuth } from '../../hooks/useAuth'
 import type { GameSettings } from '../../hooks/useSettings'
+import { trackGameStarted } from '../../services/analytics'
 
 interface Props {
   settings: GameSettings
@@ -32,6 +33,7 @@ export default function SettingsModal({ settings, onSettingsChange, onLaunch, on
       onRequireAuth?.()
       return
     }
+    trackGameStarted({ mode, difficulty, category, language })
     onLaunch()
   }
 

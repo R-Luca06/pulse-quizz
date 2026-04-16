@@ -14,6 +14,7 @@ export interface PublicProfile {
   best_comp_score:   number
   rank:              number | null
   total_players:     number
+  total_xp:          number
   achievements:      AchievementId[]
   /** id → date ISO de déblocage */
   achievement_dates: Record<string, string>
@@ -40,6 +41,7 @@ export async function getPublicProfile(username: string): Promise<PublicProfile 
     best_comp_score: (raw.best_comp_score as number)  ?? 0,
     rank:            (raw.rank            as number | null) ?? null,
     total_players:   (raw.total_players   as number)  ?? 0,
+    total_xp:        (raw.total_xp        as number)  ?? 0,
     achievements:      ((raw.achievements as string[]) ?? []).filter(Boolean) as AchievementId[],
     achievement_dates: Object.fromEntries(
       ((raw.achievement_dates as { id: string; unlocked_at: string }[]) ?? [])

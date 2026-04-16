@@ -4,6 +4,7 @@ import { AvatarContainer } from '../avatar'
 import { useAuth } from '../../hooks/useAuth'
 import FriendsPanel from '../social/FriendsPanel'
 import NotificationBell from '../notifications/NotificationBell'
+import { getLevelProgress, getLevelFromXp } from '../../constants/levels'
 
 interface ConnectedHeaderProps {
   onShowStats: (tab?: 'stats' | 'leaderboard') => void
@@ -30,7 +31,9 @@ export default function ConnectedHeader({
   onViewProfile,
   onShowSocial,
 }: ConnectedHeaderProps) {
-  const { user } = useAuth()
+  const { user, totalXp } = useAuth()
+  const xpData = getLevelProgress(totalXp)
+  const level  = getLevelFromXp(totalXp)
   const [navOpen, setNavOpen] = useState(false)
   const [avatarOpen, setAvatarOpen] = useState(false)
   const navRef = useRef<HTMLDivElement>(null)
@@ -51,6 +54,7 @@ export default function ConnectedHeader({
   }
 
   return (
+    <>
     <motion.nav
       className="absolute inset-x-0 top-0 z-20 flex h-14 items-center justify-between border-b border-white/10 bg-game-bg/70 px-4 backdrop-blur-md sm:px-8"
       initial={{ opacity: 0, y: -8 }}
@@ -92,7 +96,17 @@ export default function ConnectedHeader({
           aria-label={`Ouvrir le profil de ${username}`}
           className="group flex items-center gap-2 rounded-full py-1 pl-1 pr-3 text-sm font-semibold text-white/80 transition-colors hover:text-white focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neon-violet/60"
         >
-          <AvatarContainer className="h-7 w-7 flex-shrink-0" />
+          <div className="relative flex-shrink-0">
+            <AvatarContainer className="h-7 w-7" />
+            {level > 0 && (
+              <div
+                className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full text-[8px] font-black text-white leading-none"
+                style={{ background: 'linear-gradient(135deg, #7c3aed, #2563eb)', border: '1.5px solid rgba(10,7,20,1)' }}
+              >
+                {level}
+              </div>
+            )}
+          </div>
           <span className="underline decoration-white/20 decoration-1 underline-offset-4 transition-colors group-hover:decoration-neon-violet">
             @{username}
           </span>
@@ -225,5 +239,48 @@ export default function ConnectedHeader({
 
       </div>
     </motion.nav>
+
+    {/* ── Étiquette XP desktop — dépasse sous la navbar à droite ────── */}
+    {user && (
+      <motion.div
+        className="absolute right-8 top-14 z-10 hidden sm:flex items-center gap-2 rounded-b-lg border border-t-0 border-white/10 bg-game-bg/90 px-3 py-1.5 backdrop-blur-sm"
+        initial={{ opacity: 0, y: -4 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, delay: 0.6 }}
+      >
+        <span className="shrink-0 text-[9px] font-black text-neon-violet/70">Niv.{xpData.level}</span>
+        <div className="h-1 w-20 overflow-hidden rounded-full bg-white/10">
+          <div
+            className="h-full rounded-full transition-all duration-700"
+            style={{ width: `${xpData.percentage}%`, background: 'linear-gradient(90deg, #7c3aed, #2563eb)' }}
+          />
+        </div>
+        <span className="shrink-0 tabular-nums text-[9px] text-white/25">
+          {xpData.progressXp.toLocaleString('fr-FR')}&thinsp;/&thinsp;{xpData.neededXp.toLocaleString('fr-FR')}
+        </span>
+      </motion.div>
+    )}
+
+    {/* ── Bande XP mobile — masquée à partir de sm ───────────────────── */}
+    {user && (
+      <motion.div
+        className="absolute inset-x-0 top-14 z-10 flex items-center gap-2.5 border-b border-white/[0.05] bg-game-bg/80 px-4 py-1.5 backdrop-blur-sm sm:hidden"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.4, delay: 0.5 }}
+      >
+        <span className="shrink-0 text-[10px] font-black text-neon-violet/80">Niv.{xpData.level}</span>
+        <div className="flex-1 h-1 overflow-hidden rounded-full bg-white/10">
+          <div
+            className="h-full rounded-full transition-all duration-700"
+            style={{ width: `${xpData.percentage}%`, background: 'linear-gradient(90deg, #7c3aed, #2563eb)' }}
+          />
+        </div>
+        <span className="shrink-0 tabular-nums text-[10px] text-white/25">
+          {xpData.progressXp.toLocaleString('fr-FR')}&thinsp;/&thinsp;{xpData.neededXp.toLocaleString('fr-FR')} XP
+        </span>
+      </motion.div>
+    )}
+    </>
   )
 }

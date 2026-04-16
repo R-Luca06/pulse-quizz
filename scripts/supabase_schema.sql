@@ -834,3 +834,182 @@ DROP POLICY IF EXISTS "leaderboard_insert_own" ON leaderboard;
 DROP POLICY IF EXISTS "leaderboard_update_own" ON leaderboard;
 REVOKE INSERT, UPDATE ON leaderboard FROM authenticated;
 
+
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- Système XP
+-- ═══════════════════════════════════════════════════════════════════════════════
+
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- user_global_stats : colonne total_xp
+-- ─────────────────────────────────────────────────────────────────────────────
+
+ALTER TABLE user_global_stats
+  ADD COLUMN IF NOT EXISTS total_xp integer NOT NULL DEFAULT 0;
+
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- increment_global_stats : ajout du paramètre p_xp
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Remplace la version précédente (sans XP). total_xp est incrémenté atomiquement
+-- en même temps que les autres stats de la partie.
+
+CREATE OR REPLACE FUNCTION increment_global_stats(
+  p_mode            text,
+  p_questions       integer,
+  p_correct         integer,
+  p_streak          integer,
+  p_comp_score      integer,
+  p_xp              integer,
+  p_fastest_perfect real    DEFAULT NULL
+)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF auth.uid() IS NULL THEN
+    RAISE EXCEPTION 'Not authenticated' USING ERRCODE = '42501';
+  END IF;
+
+  INSERT INTO user_global_stats (
+    user_id,
+    games_played, comp_games_played, total_questions, total_correct,
+    best_streak, fastest_perfect, comp_total_score, total_xp, updated_at
+  )
+  VALUES (
+    auth.uid(),
+    1,
+    CASE WHEN p_mode = 'compétitif' THEN 1 ELSE 0 END,
+    p_questions, p_correct,
+    p_streak, p_fastest_perfect, p_comp_score, p_xp, now()
+  )
+  ON CONFLICT (user_id) DO UPDATE SET
+    games_played      = user_global_stats.games_played + 1,
+    comp_games_played = user_global_stats.comp_games_played +
+                        CASE WHEN p_mode = 'compétitif' THEN 1 ELSE 0 END,
+    total_questions   = user_global_stats.total_questions + EXCLUDED.total_questions,
+    total_correct     = user_global_stats.total_correct   + EXCLUDED.total_correct,
+    best_streak       = GREATEST(user_global_stats.best_streak, EXCLUDED.best_streak),
+    fastest_perfect   = CASE
+      WHEN EXCLUDED.fastest_perfect IS NULL              THEN user_global_stats.fastest_perfect
+      WHEN user_global_stats.fastest_perfect IS NULL     THEN EXCLUDED.fastest_perfect
+      ELSE LEAST(user_global_stats.fastest_perfect, EXCLUDED.fastest_perfect)
+    END,
+    comp_total_score  = user_global_stats.comp_total_score + EXCLUDED.comp_total_score,
+    total_xp          = user_global_stats.total_xp         + EXCLUDED.total_xp,
+    updated_at        = now();
+END;
+$$;
+
+REVOKE ALL ON FUNCTION increment_global_stats(text,integer,integer,integer,integer,integer,real) FROM public, anon;
+GRANT EXECUTE ON FUNCTION increment_global_stats(text,integer,integer,integer,integer,integer,real) TO authenticated;
+
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- add_xp : ajout d'XP ponctuel (achievements débloqués)
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Appelée séparément après checkAndUnlockAchievements pour créditer l'XP
+-- des achievements débloqués lors de la partie.
+
+CREATE OR REPLACE FUNCTION add_xp(p_amount integer)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF auth.uid() IS NULL THEN
+    RAISE EXCEPTION 'Not authenticated' USING ERRCODE = '42501';
+  END IF;
+
+  INSERT INTO user_global_stats (user_id, total_xp)
+  VALUES (auth.uid(), p_amount)
+  ON CONFLICT (user_id) DO UPDATE SET
+    total_xp   = user_global_stats.total_xp + EXCLUDED.total_xp,
+    updated_at = now();
+END;
+$$;
+
+REVOKE ALL ON FUNCTION add_xp(integer) FROM public, anon;
+GRANT EXECUTE ON FUNCTION add_xp(integer) TO authenticated;
+
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- get_public_profile : exposer total_xp
+-- ─────────────────────────────────────────────────────────────────────────────
+
+CREATE OR REPLACE FUNCTION get_public_profile(p_username text)
+RETURNS jsonb
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_user_id   uuid;
+  v_username  text;
+  v_desc      text;
+  v_featured  text[];
+  v_games     integer := 0;
+  v_correct   integer := 0;
+  v_streak    integer := 0;
+  v_total_xp  integer := 0;
+  v_best_comp integer := 0;
+  v_rank      bigint  := NULL;
+  v_total     bigint  := 0;
+  v_ach       jsonb   := '[]'::jsonb;
+  v_ach_dates jsonb   := '[]'::jsonb;
+BEGIN
+  SELECT id, username, description, featured_badges
+  INTO v_user_id, v_username, v_desc, v_featured
+  FROM profiles WHERE lower(username) = lower(p_username);
+
+  IF NOT FOUND THEN RETURN NULL; END IF;
+
+  SELECT COALESCE(games_played, 0), COALESCE(total_correct, 0),
+         COALESCE(best_streak, 0),  COALESCE(total_xp, 0)
+  INTO v_games, v_correct, v_streak, v_total_xp
+  FROM user_global_stats WHERE user_id = v_user_id;
+
+  SELECT COALESCE(score, 0) INTO v_best_comp
+  FROM leaderboard WHERE user_id = v_user_id AND mode = 'compétitif' LIMIT 1;
+
+  SELECT COUNT(*) INTO v_total
+  FROM leaderboard WHERE mode = 'compétitif' AND language = 'fr';
+
+  IF v_best_comp > 0 THEN
+    SELECT COUNT(*) + 1 INTO v_rank
+    FROM leaderboard
+    WHERE mode = 'compétitif' AND language = 'fr' AND score > v_best_comp;
+  END IF;
+
+  SELECT
+    jsonb_agg(achievement_id        ORDER BY unlocked_at),
+    jsonb_agg(jsonb_build_object('id', achievement_id, 'unlocked_at', unlocked_at)
+              ORDER BY unlocked_at)
+  INTO v_ach, v_ach_dates
+  FROM user_achievements WHERE user_id = v_user_id;
+
+  RETURN jsonb_build_object(
+    'username',          v_username,
+    'avatar_emoji',      '',
+    'avatar_color',      '',
+    'description',       COALESCE(v_desc, ''),
+    'featured_badges',   COALESCE(to_jsonb(v_featured), '[]'::jsonb),
+    'games_played',      v_games,
+    'total_correct',     v_correct,
+    'best_streak',       v_streak,
+    'total_xp',          v_total_xp,
+    'best_comp_score',   v_best_comp,
+    'rank',              v_rank,
+    'total_players',     v_total,
+    'achievements',      COALESCE(v_ach,      '[]'::jsonb),
+    'achievement_dates', COALESCE(v_ach_dates, '[]'::jsonb)
+  );
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION get_public_profile(text) TO authenticated, anon;
+

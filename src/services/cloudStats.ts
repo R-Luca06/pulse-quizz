@@ -61,21 +61,27 @@ export async function incrementGlobalStats(
   results: QuestionResult[],
   gameScore: number,
   mode: GameMode,
+  xp: number,
 ): Promise<void> {
   const streak = computeBestStreak(results)
   const totalTime = Math.round(results.reduce((s, r) => s + r.timeSpent, 0) * 10) / 10
   const isPerfect = mode === 'normal' && gameScore === results.length && results.length === NORMAL_MODE_QUESTIONS
   const correctCount = results.filter(r => r.isCorrect).length
 
-  // RPC atomique : même logique que increment_category_stats.
   const { error } = await supabase.rpc('increment_global_stats', {
     p_mode:            mode,
     p_questions:       results.length,
     p_correct:         correctCount,
     p_streak:          streak,
     p_comp_score:      mode === 'compétitif' ? gameScore : 0,
+    p_xp:              xp,
     p_fastest_perfect: isPerfect ? totalTime : null,
   })
+  if (error) throw new Error(error.message)
+}
+
+export async function addXp(amount: number): Promise<void> {
+  const { error } = await supabase.rpc('add_xp', { p_amount: amount })
   if (error) throw new Error(error.message)
 }
 

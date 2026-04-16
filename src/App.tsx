@@ -2,10 +2,14 @@ import { useState, useRef, useEffect, lazy, Suspense } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import LandingPage from './components/landing/LandingPage'
 import AchievementUnlockOverlay from './components/achievements/AchievementUnlockOverlay'
+import XpToast from './components/xp/XpToast'
 import { useSettings } from './hooks/useSettings'
 import { useAuth } from './hooks/useAuth'
 import { useGameOrchestration } from './hooks/useGameOrchestration'
 import type { Language, GameResult, RankingData, AchievementWithStatus, AchievementId } from './types/quiz'
+import { trackScreenViewed, trackGameAbandoned } from './services/analytics'
+import { addXp } from './services/cloudStats'
+import { XP_PER_ACHIEVEMENT } from './constants/xp'
 
 
 const QuizContainer = lazy(() => import('./components/quiz/QuizContainer'))
@@ -25,10 +29,10 @@ const GAME_SCREENS: AppScreen[] = ['quiz', 'launching', 'ranking']
 
 export default function App() {
   const { settings, update } = useSettings()
-  const { user, profile, pendingAchievements, clearPendingAchievements, refreshStats } = useAuth()
+  const { user, profile, pendingAchievements, clearPendingAchievements, refreshStats, showXpGain } = useAuth()
 
   const [screen, setScreen] = useState<AppScreen>('landing')
-  const [gameResult, setGameResult] = useState<GameResult>({ score: 0, results: [], bestScore: 0, isNewBest: false, userRank: null, rankDelta: null })
+  const [gameResult, setGameResult] = useState<GameResult>({ score: 0, results: [], bestScore: 0, isNewBest: false, userRank: null, rankDelta: null, xpBreakdown: null })
   const [rankingData, setRankingData] = useState<RankingData | null>(null)
   const [newAchievements, setNewAchievements] = useState<AchievementWithStatus[]>([])
   const [pendingAchievementId, setPendingAchievementId] = useState<AchievementId | null>(null)
@@ -38,28 +42,50 @@ export default function App() {
   // (pour y revenir après l'animation, quel que soit le screen parcouru)
   const screenRef = useRef<AppScreen>('landing')
   useEffect(() => { screenRef.current = screen }, [screen])
+
+  // XP en attente à déclencher après la fermeture de l'overlay achievement
+  const pendingXpRef = useRef<{ gameXp: import('./types/quiz').XpBreakdown | null; achievementXp: number } | null>(null)
+  function storePendingXp(p: { gameXp: import('./types/quiz').XpBreakdown | null; achievementXp: number }) {
+    pendingXpRef.current = p
+  }
+
+  // Analytics — screen views (on exclut 'launching' qui est un état transitoire)
+  useEffect(() => {
+    const trackable: AppScreen[] = ['landing', 'result', 'ranking', 'stats', 'profile', 'achievements', 'social']
+    if (trackable.includes(screen)) trackScreenViewed(screen)
+  }, [screen])
   const overlayOriginRef = useRef<AppScreen>('result')
 
-  function handleNewAchievements(unlocked: AchievementWithStatus[]) {
+  function handleNewAchievements(unlocked: AchievementWithStatus[], fromGame = false) {
     if (unlocked.length > 0) {
       // Si les achievements arrivent pendant une partie, l'overlay apparaîtra sur 'result'
       const origin = screenRef.current
       overlayOriginRef.current = GAME_SCREENS.includes(origin) ? 'result' : origin
+      // Pour les achievements hors partie, mémoriser l'XP à déclencher après l'animation
+      if (!fromGame && user) {
+        const xp = unlocked.reduce((sum, a) => sum + XP_PER_ACHIEVEMENT[a.tier], 0)
+        pendingXpRef.current = { gameXp: null, achievementXp: xp }
+      }
     }
     setNewAchievements(unlocked)
+  }
+
+  // Wrapper passé à useGameOrchestration — marque les achievements comme venant d'une partie
+  function handleNewGameAchievements(unlocked: AchievementWithStatus[]) {
+    handleNewAchievements(unlocked, true)
   }
 
   // Achievements débloqués depuis AuthContext (ex: inscription → premiers_pas)
   useEffect(() => {
     if (pendingAchievements.length > 0) {
-      handleNewAchievements(pendingAchievements)
+      handleNewAchievements(pendingAchievements, false)
       clearPendingAchievements()
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingAchievements])
 
   const [isLoadingRanking, setIsLoadingRanking] = useState(false)
-  const { handleFinished } = useGameOrchestration({ settings, user, profile, setScreen, setGameResult, setRankingData, setNewAchievements: handleNewAchievements, setLoadingRanking: setIsLoadingRanking })
+  const { handleFinished } = useGameOrchestration({ settings, user, profile, setScreen, setGameResult, setRankingData, setNewAchievements: handleNewGameAchievements, setLoadingRanking: setIsLoadingRanking, showXpGain, storePendingXp })
   const [returnToSettings, setReturnToSettings] = useState(false)
   const [statsOrigin, setStatsOrigin] = useState<'landing' | 'result'>('landing')
   const [statsDefaultTab, setStatsDefaultTab] = useState<'stats' | 'leaderboard'>('stats')
@@ -94,6 +120,18 @@ export default function App() {
   }
 
   function handleAchievementsDone() {
+    // Déclencher l'XP toast après la fermeture de l'overlay (game ou hors-partie)
+    const pending = pendingXpRef.current
+    pendingXpRef.current = null
+    if (pending) {
+      const total = (pending.gameXp?.total ?? 0) + pending.achievementXp
+      if (total > 0) {
+        // addXp déjà appelé pour les achievements de partie (dans useGameOrchestration)
+        // Pour les achievements hors-partie, il faut l'appeler ici
+        if (!pending.gameXp && pending.achievementXp > 0) addXp(pending.achievementXp).catch(console.error)
+        showXpGain(pending)
+      }
+    }
     setNewAchievements([])
     setPendingAchievementId(null)
     setPendingBadgeRect(null)
@@ -106,7 +144,12 @@ export default function App() {
 
   function handleExplosion() { setScreen('quiz') }
 
-  function handleQuit() { setReturnToSettings(false); setNewAchievements([]); setPendingAchievementId(null); setScreen('landing') }
+  function handleQuit() {
+    if (screenRef.current === 'quiz') {
+      trackGameAbandoned({ mode: settings.mode, difficulty: settings.difficulty, category: settings.category, language: settings.language })
+    }
+    setReturnToSettings(false); setNewAchievements([]); setPendingAchievementId(null); setScreen('landing')
+  }
 
   function handleReplay() { setNewAchievements([]); setPendingAchievementId(null); setScreen('quiz') }
 
@@ -311,6 +354,9 @@ export default function App() {
           />
         )}
       </AnimatePresence>
+
+      {/* ── Toast XP — notification globale après chaque gain d'XP ───────── */}
+      <XpToast />
 
       {/* ── Profil utilisateur — overlay glissant depuis la droite ────────── */}
       <AnimatePresence>

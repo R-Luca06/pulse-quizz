@@ -6,6 +6,7 @@ import { BADGE_TIER, TIER_GLOW_COLOR } from '../constants/achievementColors'
 import { ACHIEVEMENT_MAP } from '../constants/achievements'
 import type { AchievementId, AchievementTier } from '../types/quiz'
 import { getPublicProfile, type PublicProfile } from '../services/publicProfile'
+import { getLevelFromXp } from '../constants/levels'
 import { useAuth } from '../hooks/useAuth'
 import { updateFeaturedBadges, updateUsername, updateDescription } from '../services/profile'
 import { sendFriendRequest, removeFriendship, getFriendshipStatus, type FriendshipStatus } from '../services/social'
@@ -647,7 +648,7 @@ function WallPage({ profile, onClose, hideNav }: { profile: PublicProfile; onClo
         {/* Avatar */}
         {profile.avatar_emoji ? (
           <div
-            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-2xl"
+            className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-2xl"
             style={{
               background: `radial-gradient(circle at 35% 35%, ${profile.avatar_color}55, ${profile.avatar_color}22)`,
               border: `2px solid ${profile.avatar_color}80`,
@@ -655,6 +656,11 @@ function WallPage({ profile, onClose, hideNav }: { profile: PublicProfile; onClo
             }}
           >
             {profile.avatar_emoji}
+            {getLevelFromXp(profile.total_xp) > 0 && (
+              <div style={{ position: 'absolute', bottom: -3, right: -3, width: 16, height: 16, borderRadius: '50%', background: 'linear-gradient(135deg, #7c3aed, #2563eb)', border: '1.5px solid rgba(10,7,20,1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 7, fontWeight: 900, color: 'white', lineHeight: 1 }}>
+                {getLevelFromXp(profile.total_xp)}
+              </div>
+            )}
           </div>
         ) : (
           <div className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-full">
@@ -677,6 +683,11 @@ function WallPage({ profile, onClose, hideNav }: { profile: PublicProfile; onClo
                 {profile.username[0]?.toUpperCase() ?? '?'}
               </span>
             </div>
+            {getLevelFromXp(profile.total_xp) > 0 && (
+              <div style={{ position: 'absolute', bottom: -3, right: -3, width: 16, height: 16, borderRadius: '50%', background: 'linear-gradient(135deg, #7c3aed, #2563eb)', border: '1.5px solid rgba(10,7,20,1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 7, fontWeight: 900, color: 'white', lineHeight: 1 }}>
+                {getLevelFromXp(profile.total_xp)}
+              </div>
+            )}
           </div>
         )}
 

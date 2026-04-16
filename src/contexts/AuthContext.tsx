@@ -1,8 +1,10 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '../services/supabase'
 import { checkAndUnlockAchievements, type AchievementContext } from '../services/achievements'
-import type { AchievementWithStatus } from '../types/quiz'
+import type { AchievementWithStatus, XpBreakdown } from '../types/quiz'
+import { identifyUser, resetIdentity, trackUserSignedUp, trackUserSignedIn } from '../services/analytics'
+import { getLevelFromXp } from '../constants/levels'
 
 interface Profile {
   username: string
@@ -10,10 +12,23 @@ interface Profile {
   description: string
 }
 
+export interface XpGainNotification {
+  gameXp: XpBreakdown | null
+  achievementXp: number
+  total: number
+  levelBefore: number
+  levelAfter: number
+  id: number  // unique ID to re-trigger animations on repeated toasts
+}
+
 interface AuthContextValue {
   user: User | null
   profile: Profile | null
   loading: boolean
+  totalXp: number
+  xpNotification: XpGainNotification | null
+  showXpGain: (params: { gameXp: XpBreakdown | null; achievementXp: number }) => void
+  clearXpNotification: () => void
   pendingAchievements: AchievementWithStatus[]
   clearPendingAchievements: () => void
   statsRefreshKey: number
@@ -33,6 +48,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
+  const [totalXp, setTotalXp] = useState(0)
+  const [xpNotification, setXpNotification] = useState<XpGainNotification | null>(null)
+  const totalXpRef = useRef(0)
+  const toastIdRef = useRef(0)
   const [pendingAchievements, setPendingAchievements] = useState<AchievementWithStatus[]>([])
   const [statsRefreshKey, setStatsRefreshKey] = useState(0)
 
@@ -52,22 +71,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!user) {
       let cancelled = false
-      queueMicrotask(() => { if (!cancelled) setProfile(null) })
+      queueMicrotask(() => { if (!cancelled) { setProfile(null); setTotalXp(0); resetIdentity() } })
       return () => { cancelled = true }
     }
     let cancelled = false
-    supabase
-      .from('profiles')
-      .select('username, featured_badges, description')
-      .eq('id', user.id)
-      .maybeSingle()
-      .then(({ data }) => {
-        if (!cancelled && data) setProfile({ username: data.username, featured_badges: data.featured_badges ?? [], description: data.description ?? '' })
-      })
+    Promise.all([
+      supabase.from('profiles').select('username, featured_badges, description').eq('id', user.id).maybeSingle(),
+      supabase.from('user_global_stats').select('total_xp').eq('user_id', user.id).maybeSingle(),
+    ]).then(([profileRes, xpRes]) => {
+      if (!cancelled) {
+        if (profileRes.data) {
+          setProfile({ username: profileRes.data.username, featured_badges: profileRes.data.featured_badges ?? [], description: profileRes.data.description ?? '' })
+          identifyUser(user.id, { username: profileRes.data.username, email: user.email ?? undefined })
+        }
+        const xp = (xpRes.data as { total_xp: number } | null)?.total_xp ?? 0
+        setTotalXp(xp)
+        totalXpRef.current = xp
+      }
+    })
     // Vérification rétroactive silencieuse — fire and forget
     checkAndUnlockAchievements(user.id).catch(err => console.error('Achievement check failed:', err))
     return () => { cancelled = true }
   }, [user])
+
+  function showXpGain({ gameXp, achievementXp }: { gameXp: XpBreakdown | null; achievementXp: number }) {
+    const total = (gameXp?.total ?? 0) + achievementXp
+    if (total <= 0) return
+    const levelBefore = getLevelFromXp(totalXpRef.current)
+    const levelAfter  = getLevelFromXp(totalXpRef.current + total)
+    totalXpRef.current += total
+    setTotalXp(prev => prev + total)
+    setXpNotification({ gameXp, achievementXp, total, levelBefore, levelAfter, id: ++toastIdRef.current })
+  }
+
+  function clearXpNotification() {
+    setXpNotification(null)
+  }
 
   function clearPendingAchievements() {
     setPendingAchievements([])
@@ -122,6 +161,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw profileError
     }
     setProfile({ username, featured_badges: [], description: '' })
+    trackUserSignedUp({ username })
 
     // Vérification des achievements post-inscription (profile existe maintenant)
     checkAndUnlockAchievements(data.user.id)
@@ -132,11 +172,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   async function signIn(email: string, password: string) {
     const { error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) throw error
+    trackUserSignedIn()
   }
 
   async function signOut() {
     await supabase.auth.signOut()
     setProfile(null)
+    setTotalXp(0)
+    totalXpRef.current = 0
   }
 
   async function refreshProfile(): Promise<void> {
@@ -150,7 +193,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, pendingAchievements, clearPendingAchievements, statsRefreshKey, refreshStats, setLocalFeaturedBadges, setLocalDescription, triggerAchievementCheck, signUp, signIn, signOut, refreshProfile }}>
+    <AuthContext.Provider value={{ user, profile, loading, totalXp, xpNotification, showXpGain, clearXpNotification, pendingAchievements, clearPendingAchievements, statsRefreshKey, refreshStats, setLocalFeaturedBadges, setLocalDescription, triggerAchievementCheck, signUp, signIn, signOut, refreshProfile }}>
       {children}
     </AuthContext.Provider>
   )
