@@ -1,9 +1,9 @@
-import type { default as PostHog } from 'posthog-js'
+import type posthogJs from 'posthog-js'
 import type { GameMode, Difficulty, Category, Language } from '../types/quiz'
 
 const KEY = import.meta.env.VITE_POSTHOG_KEY as string | undefined
 
-let ph: PostHog | null = null
+let ph: typeof posthogJs | null = null
 
 export function initAnalytics(): void {
   if (!KEY) return
