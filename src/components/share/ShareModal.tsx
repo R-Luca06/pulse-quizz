@@ -40,7 +40,7 @@ type CopyState = 'idle' | 'ok' | 'err'
 type DlState   = 'idle' | 'ok'
 
 export default function ShareModal({
-  open, onClose, score, results, gameMode, username, userRank, cardRef,
+  open, onClose, score, results, gameMode, userRank, cardRef,
 }: Props) {
   const isCompetitif = gameMode === 'compétitif'
   const tiers = isCompetitif ? COMP_TIERS : NORMAL_TIERS
