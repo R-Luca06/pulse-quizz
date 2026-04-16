@@ -208,7 +208,7 @@ export async function checkAndUnlockAchievements(
 // ─── Daily Challenge Achievements ────────────────────────────────────────────
 
 export interface DailyAchievementContext {
-  score: number            // nombre de bonnes réponses (0–10), pas les points
+  score: number            // nombre de bonnes réponses (0–10), pas les points de vitesse
   currentStreak: number    // série après cette partie
   userRank: number | null  // rang dans le leaderboard du jour
 }
@@ -228,12 +228,12 @@ export async function checkAndUnlockDailyAchievements(
     (existing ?? []).map((r: { achievement_id: string }) => r.achievement_id)
   )
 
-  // 2. Compte les scores parfaits en daily
+  // 2. Compte les scores parfaits en daily (correct_answers = 10 sur 10)
   const { count: perfectCount } = await supabase
     .from('daily_challenge_entries')
     .select('*', { count: 'exact', head: true })
     .eq('user_id', userId)
-    .eq('score', 10)
+    .eq('correct_answers', 10)
 
   const { count: totalDaily } = await supabase
     .from('daily_challenge_entries')

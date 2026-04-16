@@ -403,7 +403,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   {
     id: 'daily_score_parfait',
     name: 'Score Parfait',
-    description: 'Réussir un 5/5 au défi journalier',
+    description: 'Réussir un 10/10 au défi journalier',
     icon: '✨',
     progressTotal: null,
     tier: 'common',
@@ -419,7 +419,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   {
     id: 'daily_infaillible',
     name: 'Infaillible',
-    description: 'Score parfait 5/5 avec le multiplicateur ×3 actif',
+    description: 'Score parfait 10/10 avec le multiplicateur ×3 actif',
     icon: '🔥',
     progressTotal: null,
     tier: 'epic',
