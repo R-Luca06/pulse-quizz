@@ -7,7 +7,7 @@ export default function GuestHeader({ onOpenSignIn, onOpenSignUp }: Props) {
   return (
     <nav className="sticky top-0 z-30 w-full border-b border-white/5 bg-[#0B0820]/85 backdrop-blur-md">
       <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between px-6">
-        <a href="#top" className="select-none text-lg font-black tracking-tight text-white" aria-label="Pulse Quizz — retour en haut">
+        <a href="#top" className="select-none text-lg font-black tracking-tight text-white" aria-label="PulseQuizz — retour en haut">
           Pulse<span className="text-neon-violet">Quizz</span>
         </a>
 

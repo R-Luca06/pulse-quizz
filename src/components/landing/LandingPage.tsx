@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, lazy, Suspense } from 'react'
 import { motion, useAnimationControls, AnimatePresence } from 'framer-motion'
-import SettingsModal from './SettingsModal'
-import RulesModal from './RulesModal'
-import ConnectedLanding from './ConnectedLanding'
-import GuestLanding from './GuestLanding'
 import GameDock from './GameDock'
+
+const SettingsModal = lazy(() => import('./SettingsModal'))
+const RulesModal = lazy(() => import('./RulesModal'))
+const ConnectedLanding = lazy(() => import('./ConnectedLanding'))
+const GuestLanding = lazy(() => import('./GuestLanding'))
 import { useAuth } from '../../hooks/useAuth'
 import { useToast } from '../../contexts/ToastContext'
 import type { AppScreen } from '../../App'
@@ -165,28 +166,35 @@ function GuestBranch({
 
   return (
     <div className="absolute inset-0 overflow-y-auto bg-[#0B0820] text-white">
-      <GuestLanding
-        onOpenSettings={() => setOpenSettings(true)}
-        onOpenSignIn={onOpenSignIn}
-        onOpenSignUp={onOpenSignUp}
-      />
+      <Suspense fallback={null}>
+        <GuestLanding
+          onOpenSettings={() => setOpenSettings(true)}
+          onOpenSignIn={onOpenSignIn}
+          onOpenSignUp={onOpenSignUp}
+        />
+      </Suspense>
 
       <AnimatePresence>
         {openSettings && (
-          <SettingsModal
-            key="settings"
-            settings={settings}
-            onSettingsChange={onSettingsChange}
-            onLaunch={handleLaunch}
-            onClose={() => setOpenSettings(false)}
-            onShowRules={() => setShowRules(true)}
-            onRequireAuth={handleRequireAuth}
-          />
+          <Suspense key="settings" fallback={null}>
+            <SettingsModal
+              settings={settings}
+              onSettingsChange={onSettingsChange}
+              onLaunch={handleLaunch}
+              onClose={() => setOpenSettings(false)}
+              onShowRules={() => setShowRules(true)}
+              onRequireAuth={handleRequireAuth}
+            />
+          </Suspense>
         )}
       </AnimatePresence>
 
       <AnimatePresence>
-        {showRules && <RulesModal key="rules" onClose={() => setShowRules(false)} />}
+        {showRules && (
+          <Suspense key="rules" fallback={null}>
+            <RulesModal onClose={() => setShowRules(false)} />
+          </Suspense>
+        )}
       </AnimatePresence>
     </div>
   )
@@ -273,22 +281,24 @@ function ConnectedBranch({
         />
       )}
 
-      <ConnectedLanding
-        isLaunching={isLaunching}
-        onShowStats={onShowStats}
-        onShowProfile={onShowProfile}
-        onShowAchievements={onShowAchievements}
-        onSignOut={onSignOut}
-        username={username}
-        onViewProfile={onViewProfile}
-        shakeControls={shakeControls}
-        settings={settings}
-        onPlay={handleLaunch}
-        onOpenSettings={() => setOpenSettings(true)}
-        onShowSocial={onShowSocial}
-        onShowDaily={onShowDaily}
-        onShowCollection={onShowCollection}
-      />
+      <Suspense fallback={null}>
+        <ConnectedLanding
+          isLaunching={isLaunching}
+          onShowStats={onShowStats}
+          onShowProfile={onShowProfile}
+          onShowAchievements={onShowAchievements}
+          onSignOut={onSignOut}
+          username={username}
+          onViewProfile={onViewProfile}
+          shakeControls={shakeControls}
+          settings={settings}
+          onPlay={handleLaunch}
+          onOpenSettings={() => setOpenSettings(true)}
+          onShowSocial={onShowSocial}
+          onShowDaily={onShowDaily}
+          onShowCollection={onShowCollection}
+        />
+      </Suspense>
 
       {/* GameDock : desktop uniquement (lg+) — le mobile a son dock dans PodiumScene */}
       {!isLaunching && (
@@ -299,19 +309,24 @@ function ConnectedBranch({
 
       <AnimatePresence>
         {openSettings && (
-          <SettingsModal
-            key="settings"
-            settings={settings}
-            onSettingsChange={onSettingsChange}
-            onLaunch={handleLaunch}
-            onClose={() => setOpenSettings(false)}
-            onShowRules={() => setShowRules(true)}
-          />
+          <Suspense key="settings" fallback={null}>
+            <SettingsModal
+              settings={settings}
+              onSettingsChange={onSettingsChange}
+              onLaunch={handleLaunch}
+              onClose={() => setOpenSettings(false)}
+              onShowRules={() => setShowRules(true)}
+            />
+          </Suspense>
         )}
       </AnimatePresence>
 
       <AnimatePresence>
-        {showRules && <RulesModal key="rules" onClose={() => setShowRules(false)} />}
+        {showRules && (
+          <Suspense key="rules" fallback={null}>
+            <RulesModal onClose={() => setShowRules(false)} />
+          </Suspense>
+        )}
       </AnimatePresence>
     </div>
   )

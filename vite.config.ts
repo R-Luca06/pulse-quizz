@@ -7,4 +7,15 @@ export default defineConfig({
   server: {
     host: true, // expose sur le réseau local (0.0.0.0)
   },
+  build: {
+    target: 'es2020',
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules/@supabase')) return 'vendor-supabase'
+          if (id.includes('node_modules/framer-motion')) return 'vendor-framer'
+        },
+      },
+    },
+  },
 })

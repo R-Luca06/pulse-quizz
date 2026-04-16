@@ -419,7 +419,7 @@ function Footer() {
       <p className="text-sm font-black tracking-tight text-white">
         Pulse<span className="text-neon-violet">Quizz</span>
       </p>
-      <p className="mt-2 text-xs text-white/40">
+      <p className="mt-2 text-xs text-white/60">
         Quiz compétitif en français · Rejoins la communauté
       </p>
     </footer>
