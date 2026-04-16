@@ -53,7 +53,7 @@ export default function DailyChallengeModal({ onClose, onStartGame, onShowLeader
   const [streak,      setStreak]      = useState<DailyStreak | null>(null)
   const [playerCount, setPlayerCount] = useState(0)
   const [userRank,    setUserRank]    = useState<number | null>(null)
-  const [lbTotal,     setLbTotal]     = useState(0)
+  const [,            setLbTotal]     = useState(0)
   const [loading,     setLoading]     = useState(true)
 
   useEffect(() => {
