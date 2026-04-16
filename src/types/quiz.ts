@@ -33,6 +33,13 @@ export interface XpBreakdown {
   total:   number
 }
 
+export interface PulsesBreakdown {
+  base:    number
+  correct: number
+  streak:  number
+  total:   number
+}
+
 export interface GameResult {
   score: number
   results: QuestionResult[]
@@ -41,6 +48,9 @@ export interface GameResult {
   userRank: number | null
   rankDelta: number | null
   xpBreakdown: XpBreakdown | null
+  pulsesBreakdown: PulsesBreakdown | null
+  achievementXp: number
+  achievementPulses: number
 }
 
 export interface RankingData {

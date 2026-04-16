@@ -1,7 +1,7 @@
 import type { User } from '@supabase/supabase-js'
 import type { AppScreen } from '../App'
 import type { GameSettings } from './useSettings'
-import type { QuestionResult, GameResult, RankingData, AchievementWithStatus, XpBreakdown } from '../types/quiz'
+import type { QuestionResult, GameResult, RankingData, AchievementWithStatus, XpBreakdown, AchievementTier, PulsesBreakdown } from '../types/quiz'
 
 type OnNewAchievements = (achievements: AchievementWithStatus[]) => void
 import { getCloudBestScore, incrementCategoryStats, incrementGlobalStats, addXp } from '../services/cloudStats'
@@ -12,6 +12,8 @@ import { markPlayedAnonymous, computeBestStreak } from '../utils/statsStorage'
 import { createNotification, getNotificationPrefs } from '../services/notifications'
 import { trackGameFinished } from '../services/analytics'
 import { computeXpGained, XP_PER_ACHIEVEMENT } from '../constants/xp'
+import { computePulsesGained, PULSES_PER_ACHIEVEMENT, achievementSource, gameSource } from '../constants/pulses'
+import { addPulses } from '../services/pulses'
 import type React from 'react'
 
 interface Profile {
@@ -33,19 +35,41 @@ interface UseGameOrchestrationParams {
   setRankingData: React.Dispatch<React.SetStateAction<RankingData | null>>
   setNewAchievements: OnNewAchievements
   setLoadingRanking?: (v: boolean) => void
-  showXpGain?: (params: { gameXp: XpBreakdown | null; achievementXp: number }) => void
-  storePendingXp?: (params: { gameXp: XpBreakdown | null; achievementXp: number }) => void
+  showRewardGain?: (params: { gameXp: XpBreakdown | null; achievementXp: number; gamePulses?: PulsesBreakdown | null; achievementPulses?: number }) => void
+  storePendingRewards?: (params: { gameXp: XpBreakdown | null; achievementXp: number; gamePulses: PulsesBreakdown | null; achievementPulses: number }) => void
   onDailyComplete?: () => void
+  bumpPulses?: (amount: number) => void
+  bumpXp?: (amount: number) => void
 }
 
 export function useGameOrchestration(params: UseGameOrchestrationParams) {
-  const { settings, user, profile, setScreen, setGameResult, setRankingData, setNewAchievements, setLoadingRanking = () => {}, showXpGain = () => {}, storePendingXp = () => {}, onDailyComplete } = params
+  const { settings, user, profile, setScreen, setGameResult, setRankingData, setNewAchievements, setLoadingRanking = () => {}, showRewardGain = () => {}, storePendingRewards = () => {}, onDailyComplete, bumpPulses = () => {}, bumpXp = () => {} } = params
+
+  function creditAchievementPulses(unlocked: AchievementWithStatus[]): number {
+    if (unlocked.length === 0) return 0
+    const byTier = unlocked.reduce<Record<AchievementTier, AchievementWithStatus[]>>((acc, a) => {
+      if (!acc[a.tier]) acc[a.tier] = []
+      acc[a.tier].push(a)
+      return acc
+    }, { common: [], rare: [], epic: [], legendary: [] })
+    let total = 0
+    for (const tier of Object.keys(byTier) as AchievementTier[]) {
+      const list = byTier[tier]
+      if (list.length === 0) continue
+      const amount = list.length * PULSES_PER_ACHIEVEMENT[tier]
+      total += amount
+      addPulses(amount, achievementSource(tier), list.map(a => a.id).join(',')).catch(console.error)
+    }
+    if (total > 0) bumpPulses(total)
+    return total
+  }
 
   async function handleFinished(score: number, results: QuestionResult[]): Promise<void> {
     const { mode, difficulty, category, language } = settings
     const maxStreak    = computeBestStreak(results)
     const minAnswerTime = computeMinAnswerTime(results)
-    const xpBreakdown  = user ? computeXpGained(results, mode, score) : null
+    const xpBreakdown     = user ? computeXpGained(results, mode, score) : null
+    const pulsesBreakdown = user ? computePulsesGained(mode, score, results, maxStreak) : null
 
     const lastResult = results[results.length - 1]
     const end_reason = mode === 'compétitif' && lastResult
@@ -64,6 +88,9 @@ export function useGameOrchestration(params: UseGameOrchestrationParams) {
       userRank:  null,
       rankDelta: null,
       xpBreakdown,
+      pulsesBreakdown,
+      achievementXp:     0,
+      achievementPulses: 0,
     }
     setGameResult(immediateResult)
 
@@ -90,8 +117,13 @@ export function useGameOrchestration(params: UseGameOrchestrationParams) {
             bonus:   Math.round((correctCount * 20 + 15) * (multiplier - 1)),
             total:   xpEarned,
           }
-          setGameResult(prev => ({ ...prev, userRank, xpBreakdown: dailyXpBreakdown }))
+          const dailyPulses = computePulsesGained('daily', score, results, maxStreak, multiplier)
+          setGameResult(prev => ({ ...prev, userRank, xpBreakdown: dailyXpBreakdown, pulsesBreakdown: dailyPulses }))
           addXp(xpEarned).catch(console.error)
+          if (dailyPulses.total > 0) {
+            addPulses(dailyPulses.total, gameSource('daily'), today).catch(console.error)
+            bumpPulses(dailyPulses.total)
+          }
 
           // Achievements journaliers
           const prefs = await getNotificationPrefs(uid)
@@ -100,11 +132,13 @@ export function useGameOrchestration(params: UseGameOrchestrationParams) {
             currentStreak: submitResult.current_streak,
             userRank,
           })
-          let achievementXp = 0
+          let achievementXp     = 0
+          let achievementPulses = 0
           if (newlyUnlocked.length > 0) {
             setNewAchievements(newlyUnlocked)
             achievementXp = newlyUnlocked.reduce((sum, a) => sum + XP_PER_ACHIEVEMENT[a.tier], 0)
             if (achievementXp > 0) addXp(achievementXp).catch(console.error)
+            achievementPulses = creditAchievementPulses(newlyUnlocked)
             if (prefs.achievement_unlocked) {
               newlyUnlocked.forEach(a => {
                 createNotification(uid, 'achievement_unlocked', {
@@ -114,9 +148,9 @@ export function useGameOrchestration(params: UseGameOrchestrationParams) {
                 }).catch(console.error)
               })
             }
-            storePendingXp({ gameXp: dailyXpBreakdown, achievementXp })
+            storePendingRewards({ gameXp: dailyXpBreakdown, achievementXp, gamePulses: dailyPulses, achievementPulses })
           } else {
-            showXpGain({ gameXp: dailyXpBreakdown, achievementXp: 0 })
+            showRewardGain({ gameXp: dailyXpBreakdown, achievementXp: 0, gamePulses: dailyPulses, achievementPulses: 0 })
           }
         } catch (err) {
           console.error(err)
@@ -149,6 +183,11 @@ export function useGameOrchestration(params: UseGameOrchestrationParams) {
           .catch(() => {})
 
         incrementCategoryStats(uid, mode, difficulty, category, score, results).catch(console.error)
+        if (pulsesBreakdown && pulsesBreakdown.total > 0) {
+          addPulses(pulsesBreakdown.total, gameSource('normal')).catch(console.error)
+          bumpPulses(pulsesBreakdown.total)
+        }
+        if (xpBreakdown && xpBreakdown.total > 0) bumpXp(xpBreakdown.total)
         // Chaîner le check achievements APRÈS l'incrément des stats globales pour éviter
         // la race condition sur games_played (ex: Centenaire lu à 99 au lieu de 100)
         const gameXp = xpBreakdown?.total ?? 0
@@ -158,26 +197,26 @@ export function useGameOrchestration(params: UseGameOrchestrationParams) {
             getNotificationPrefs(uid),
           ]))
           .then(([newlyUnlocked, prefs]) => {
-            let achievementXp = 0
-            if (newlyUnlocked.length > 0) {
-              setNewAchievements(newlyUnlocked)
-              achievementXp = newlyUnlocked.reduce((sum, a) => sum + XP_PER_ACHIEVEMENT[a.tier], 0)
-              if (achievementXp > 0) addXp(achievementXp).catch(console.error)
-              if (prefs.achievement_unlocked) {
-                newlyUnlocked.forEach(a => {
-                  createNotification(uid, 'achievement_unlocked', {
-                    badge_id: a.id,
-                    badge_name: a.name,
-                    badge_icon: a.icon,
-                  }).catch(console.error)
-                })
-              }
-              // Différer le toast XP après la fermeture de l'overlay achievement
-              storePendingXp({ gameXp: xpBreakdown, achievementXp })
-            } else {
-              // Pas d'achievement — toast immédiat sur l'écran résultat
-              showXpGain({ gameXp: xpBreakdown, achievementXp: 0 })
+            if (newlyUnlocked.length === 0) return
+            setNewAchievements(newlyUnlocked)
+            const achievementXp = newlyUnlocked.reduce((sum, a) => sum + XP_PER_ACHIEVEMENT[a.tier], 0)
+            if (achievementXp > 0) {
+              addXp(achievementXp).catch(console.error)
+              bumpXp(achievementXp)
             }
+            const achievementPulses = creditAchievementPulses(newlyUnlocked)
+            if (prefs.achievement_unlocked) {
+              newlyUnlocked.forEach(a => {
+                createNotification(uid, 'achievement_unlocked', {
+                  badge_id: a.id,
+                  badge_name: a.name,
+                  badge_icon: a.icon,
+                }).catch(console.error)
+              })
+            }
+            // Pas de toast pour normal : la RewardsCard de l'écran résultat
+            // affiche toute la contribution (partie + achievements).
+            setGameResult(prev => ({ ...prev, achievementXp, achievementPulses }))
           })
           .catch(console.error)
       } else if (!user) {
@@ -221,6 +260,12 @@ export function useGameOrchestration(params: UseGameOrchestrationParams) {
         })),
       })
 
+      if (pulsesBreakdown && pulsesBreakdown.total > 0) {
+        addPulses(pulsesBreakdown.total, gameSource('compétitif')).catch(console.error)
+        bumpPulses(pulsesBreakdown.total)
+      }
+      if (xpBreakdown && xpBreakdown.total > 0) bumpXp(xpBreakdown.total)
+
       const newRank = await getUserRank(user.id, language)
       const delta   = newRank !== null && prevRank !== null ? prevRank - newRank : null
 
@@ -244,11 +289,14 @@ export function useGameOrchestration(params: UseGameOrchestrationParams) {
           getNotificationPrefs(uid),
         ]))
         .then(([newlyUnlocked, prefs]) => {
-          let achievementXp = 0
           if (newlyUnlocked.length > 0) {
             setNewAchievements(newlyUnlocked)
-            achievementXp = newlyUnlocked.reduce((sum, a) => sum + XP_PER_ACHIEVEMENT[a.tier], 0)
-            if (achievementXp > 0) addXp(achievementXp).catch(console.error)
+            const achievementXp = newlyUnlocked.reduce((sum, a) => sum + XP_PER_ACHIEVEMENT[a.tier], 0)
+            if (achievementXp > 0) {
+              addXp(achievementXp).catch(console.error)
+              bumpXp(achievementXp)
+            }
+            const achievementPulses = creditAchievementPulses(newlyUnlocked)
             if (prefs.achievement_unlocked) {
               newlyUnlocked.forEach(a => {
                 createNotification(uid, 'achievement_unlocked', {
@@ -258,11 +306,9 @@ export function useGameOrchestration(params: UseGameOrchestrationParams) {
                 }).catch(console.error)
               })
             }
-            // Différer le toast XP après la fermeture de l'overlay achievement
-            storePendingXp({ gameXp: xpBreakdown, achievementXp })
-          } else {
-            // Pas d'achievement — toast immédiat
-            showXpGain({ gameXp: xpBreakdown, achievementXp: 0 })
+            // Pas de toast pour compétitif : la RewardsCard de l'écran résultat
+            // affiche toute la contribution (partie + achievements).
+            setGameResult(prev => ({ ...prev, achievementXp, achievementPulses }))
           }
           if (delta !== null && delta !== 0 && newRank !== null && prefs.rank_change) {
             createNotification(uid, delta > 0 ? 'rank_up' : 'rank_down', {

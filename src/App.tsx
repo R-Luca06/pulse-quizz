@@ -2,15 +2,17 @@ import { useState, useRef, useEffect, lazy, Suspense } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import LandingPage from './components/landing/LandingPage'
 import AchievementUnlockOverlay from './components/achievements/AchievementUnlockOverlay'
-import XpToast from './components/xp/XpToast'
+import RewardToast from './components/xp/RewardToast'
 import { useSettings } from './hooks/useSettings'
 import { useAuth } from './hooks/useAuth'
 import { useGameOrchestration } from './hooks/useGameOrchestration'
-import type { Language, GameResult, RankingData, AchievementWithStatus, AchievementId } from './types/quiz'
+import type { Language, GameResult, RankingData, AchievementWithStatus, AchievementId, PulsesBreakdown, XpBreakdown, AchievementTier } from './types/quiz'
 import type { ProfileTab } from './components/profile/ProfilePage'
 import { trackScreenViewed, trackGameAbandoned } from './services/analytics'
 import { addXp } from './services/cloudStats'
 import { XP_PER_ACHIEVEMENT } from './constants/xp'
+import { PULSES_PER_ACHIEVEMENT, achievementSource } from './constants/pulses'
+import { addPulses } from './services/pulses'
 
 
 const QuizContainer = lazy(() => import('./components/quiz/QuizContainer'))
@@ -33,11 +35,11 @@ const GAME_SCREENS: AppScreen[] = ['quiz', 'launching', 'ranking']
 
 export default function App() {
   const { settings, update, updateTemp, reset } = useSettings()
-  const { user, profile, pendingAchievements, clearPendingAchievements, refreshStats, showXpGain } = useAuth()
+  const { user, profile, pendingAchievements, clearPendingAchievements, refreshStats, showRewardGain, bumpPulses, bumpXp } = useAuth()
 
   const [screen, setScreen] = useState<AppScreen>('landing')
   const [showDailyModal, setShowDailyModal] = useState(false)
-  const [gameResult, setGameResult] = useState<GameResult>({ score: 0, results: [], bestScore: 0, isNewBest: false, userRank: null, rankDelta: null, xpBreakdown: null })
+  const [gameResult, setGameResult] = useState<GameResult>({ score: 0, results: [], bestScore: 0, isNewBest: false, userRank: null, rankDelta: null, xpBreakdown: null, pulsesBreakdown: null, achievementXp: 0, achievementPulses: 0 })
   const [rankingData, setRankingData] = useState<RankingData | null>(null)
   const [newAchievements, setNewAchievements] = useState<AchievementWithStatus[]>([])
   const [pendingAchievementId, setPendingAchievementId] = useState<AchievementId | null>(null)
@@ -48,10 +50,19 @@ export default function App() {
   const screenRef = useRef<AppScreen>('landing')
   useEffect(() => { screenRef.current = screen }, [screen])
 
-  // XP en attente à déclencher après la fermeture de l'overlay achievement
-  const pendingXpRef = useRef<{ gameXp: import('./types/quiz').XpBreakdown | null; achievementXp: number } | null>(null)
-  function storePendingXp(p: { gameXp: import('./types/quiz').XpBreakdown | null; achievementXp: number }) {
-    pendingXpRef.current = p
+  // Récompenses en attente à déclencher après la fermeture de l'overlay achievement
+  interface PendingRewards {
+    gameXp: XpBreakdown | null
+    achievementXp: number
+    gamePulses: PulsesBreakdown | null
+    achievementPulses: number
+    // Pour les achievements hors-partie : les credits cloud (addXp/addPulses) n'ont pas
+    // encore été faits — on les déclenche à la fermeture de l'overlay.
+    creditOnShow: boolean
+  }
+  const pendingRewardsRef = useRef<PendingRewards | null>(null)
+  function storePendingRewards(p: { gameXp: XpBreakdown | null; achievementXp: number; gamePulses: PulsesBreakdown | null; achievementPulses: number }) {
+    pendingRewardsRef.current = { ...p, creditOnShow: false }
   }
 
   // Analytics — screen views (on exclut 'launching' qui est un état transitoire)
@@ -69,10 +80,23 @@ export default function App() {
       overlayOriginRef.current = GAME_SCREENS.includes(origin)
         ? (settings.mode === 'daily' ? 'landing' : 'result')
         : origin
-      // Pour les achievements hors partie, mémoriser l'XP à déclencher après l'animation
+      // Pour les achievements hors partie, mémoriser XP+Pulses à déclencher après l'animation
       if (!fromGame && user) {
-        const xp = unlocked.reduce((sum, a) => sum + XP_PER_ACHIEVEMENT[a.tier], 0)
-        pendingXpRef.current = { gameXp: null, achievementXp: xp }
+        const xp     = unlocked.reduce((sum, a) => sum + XP_PER_ACHIEVEMENT[a.tier], 0)
+        const pulses = unlocked.reduce<Record<AchievementTier, number>>((acc, a) => {
+          acc[a.tier] = (acc[a.tier] ?? 0) + 1
+          return acc
+        }, { common: 0, rare: 0, epic: 0, legendary: 0 })
+        const pulsesTotal = (Object.keys(pulses) as AchievementTier[]).reduce(
+          (sum, tier) => sum + pulses[tier] * PULSES_PER_ACHIEVEMENT[tier], 0,
+        )
+        pendingRewardsRef.current = {
+          gameXp:            null,
+          achievementXp:     xp,
+          gamePulses:        null,
+          achievementPulses: pulsesTotal,
+          creditOnShow:      true,
+        }
       }
     }
     setNewAchievements(unlocked)
@@ -93,7 +117,7 @@ export default function App() {
   }, [pendingAchievements])
 
   const [isLoadingRanking, setIsLoadingRanking] = useState(false)
-  const { handleFinished } = useGameOrchestration({ settings, user, profile, setScreen, setGameResult, setRankingData, setNewAchievements: handleNewGameAchievements, setLoadingRanking: setIsLoadingRanking, showXpGain, storePendingXp, onDailyComplete: handleDailyComplete })
+  const { handleFinished } = useGameOrchestration({ settings, user, profile, setScreen, setGameResult, setRankingData, setNewAchievements: handleNewGameAchievements, setLoadingRanking: setIsLoadingRanking, showRewardGain, storePendingRewards, onDailyComplete: handleDailyComplete, bumpPulses, bumpXp })
   const [returnToSettings, setReturnToSettings] = useState(false)
   const [statsOrigin, setStatsOrigin] = useState<'landing' | 'result'>('landing')
   const [statsDefaultTab, setStatsDefaultTab] = useState<'stats' | 'leaderboard' | 'daily'>('leaderboard')
@@ -129,16 +153,36 @@ export default function App() {
   }
 
   function handleAchievementsDone() {
-    // Déclencher l'XP toast après la fermeture de l'overlay (game ou hors-partie)
-    const pending = pendingXpRef.current
-    pendingXpRef.current = null
+    // Déclencher le toast Récompenses après la fermeture de l'overlay (game ou hors-partie)
+    const pending = pendingRewardsRef.current
+    pendingRewardsRef.current = null
     if (pending) {
-      const total = (pending.gameXp?.total ?? 0) + pending.achievementXp
-      if (total > 0) {
-        // addXp déjà appelé pour les achievements de partie (dans useGameOrchestration)
-        // Pour les achievements hors-partie, il faut l'appeler ici
-        if (!pending.gameXp && pending.achievementXp > 0) addXp(pending.achievementXp).catch(console.error)
-        showXpGain(pending)
+      const totalXpDelta     = (pending.gameXp?.total ?? 0) + pending.achievementXp
+      const totalPulsesDelta = (pending.gamePulses?.total ?? 0) + pending.achievementPulses
+      if (totalXpDelta > 0 || totalPulsesDelta > 0) {
+        // Achievements hors-partie : crédits cloud non encore faits — on les déclenche ici
+        if (pending.creditOnShow) {
+          if (pending.achievementXp > 0) addXp(pending.achievementXp).catch(console.error)
+          // Crédite les Pulses par tier, en parallèle (source `achievement_{tier}`)
+          const byTier = newAchievements.reduce<Record<AchievementTier, AchievementWithStatus[]>>((acc, a) => {
+            if (!acc[a.tier]) acc[a.tier] = []
+            acc[a.tier].push(a)
+            return acc
+          }, { common: [], rare: [], epic: [], legendary: [] })
+          for (const tier of Object.keys(byTier) as AchievementTier[]) {
+            const list = byTier[tier]
+            if (list.length === 0) continue
+            const amount = list.length * PULSES_PER_ACHIEVEMENT[tier]
+            addPulses(amount, achievementSource(tier), list.map(a => a.id).join(',')).catch(console.error)
+          }
+          if (pending.achievementPulses > 0) bumpPulses(pending.achievementPulses)
+        }
+        showRewardGain({
+          gameXp:            pending.gameXp,
+          achievementXp:     pending.achievementXp,
+          gamePulses:        pending.gamePulses,
+          achievementPulses: pending.achievementPulses,
+        })
       }
     }
     setNewAchievements([])
@@ -306,6 +350,10 @@ export default function App() {
                 language={settings.language}
                 userRank={gameResult.userRank}
                 rankDelta={gameResult.rankDelta}
+                xpBreakdown={gameResult.xpBreakdown}
+                pulsesBreakdown={gameResult.pulsesBreakdown}
+                achievementXp={gameResult.achievementXp}
+                achievementPulses={gameResult.achievementPulses}
               />
             </motion.div>
           )}
@@ -466,7 +514,7 @@ export default function App() {
       </AnimatePresence>
 
       {/* ── Toast XP — notification globale après chaque gain d'XP ───────── */}
-      <XpToast />
+      <RewardToast />
 
       {/* ── Profil utilisateur — overlay glissant depuis la droite ────────── */}
       <AnimatePresence>

@@ -7,7 +7,8 @@ import { useAuth } from '../../hooks/useAuth'
 import SignupIncentiveBlock from './SignupIncentiveBlock'
 import ScoreCard from '../share/ScoreCard'
 import ShareModal from '../share/ShareModal'
-import type { QuestionResult, GameMode, Difficulty, Category, Language } from '../../types/quiz'
+import { getLevelProgress } from '../../constants/levels'
+import type { QuestionResult, GameMode, Difficulty, Category, Language, XpBreakdown, PulsesBreakdown } from '../../types/quiz'
 
 interface Props {
   score: number
@@ -26,6 +27,10 @@ interface Props {
   language: Language
   userRank?: number | null
   rankDelta?: number | null
+  xpBreakdown?: XpBreakdown | null
+  pulsesBreakdown?: PulsesBreakdown | null
+  achievementXp?: number
+  achievementPulses?: number
 }
 
 const NORMAL_TIERS = [
@@ -44,8 +49,8 @@ const COMP_TIERS = [
 
 const fadeUp = { hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0 } }
 
-export default function ResultScreen({ score, results, onReplay, onBack, onShowStats, onShowLeaderboard, onOpenAuth, onOpenSignUp, bestScore, isNewBest, gameMode, difficulty, category, language, userRank, rankDelta }: Props) {
-  const { user } = useAuth()
+export default function ResultScreen({ score, results, onReplay, onBack, onShowStats, onShowLeaderboard, onOpenAuth, onOpenSignUp, bestScore, isNewBest, gameMode, difficulty, category, language, userRank, rankDelta, xpBreakdown, pulsesBreakdown, achievementXp = 0, achievementPulses = 0 }: Props) {
+  const { user, totalXp, pulsesBalance } = useAuth()
   const isCompetitif = gameMode === 'compétitif'
   const tiers = isCompetitif ? COMP_TIERS : NORMAL_TIERS
   const tier = tiers.find(t => score >= t.min) ?? tiers[tiers.length - 1]
@@ -242,6 +247,19 @@ export default function ResultScreen({ score, results, onReplay, onBack, onShowS
           {/* Incitation inscription — anonyme + mode normal */}
           {!user && !isCompetitif && (
             <SignupIncentiveBlock onOpenSignUp={onOpenSignUp ?? onOpenAuth} />
+          )}
+
+          {/* Récompenses — connecté uniquement */}
+          {user && (xpBreakdown || pulsesBreakdown) && (
+            <RewardsCard
+              xp={xpBreakdown ?? null}
+              pulses={pulsesBreakdown ?? null}
+              achievementXp={achievementXp}
+              achievementPulses={achievementPulses}
+              totalXp={totalXp}
+              pulsesBalance={pulsesBalance}
+              isCompetitif={isCompetitif}
+            />
           )}
 
           {/* Stats */}
@@ -467,5 +485,131 @@ export default function ResultScreen({ score, results, onReplay, onBack, onShowS
         cardRef={cardRef}
       />
     </div>
+  )
+}
+
+// ─── RewardsCard ──────────────────────────────────────────────────────────────
+
+interface RewardsCardProps {
+  xp: XpBreakdown | null
+  pulses: PulsesBreakdown | null
+  achievementXp: number
+  achievementPulses: number
+  totalXp: number
+  pulsesBalance: number
+  isCompetitif: boolean
+}
+
+function RewardsCard({ xp, pulses, achievementXp, achievementPulses, totalXp, pulsesBalance, isCompetitif }: RewardsCardProps) {
+  const xpTotal     = (xp?.total ?? 0) + achievementXp
+  const pulsesTotal = (pulses?.total ?? 0) + achievementPulses
+  const xpPrev      = Math.max(0, totalXp - xpTotal)
+  const lvlBefore   = getLevelProgress(xpPrev)
+  const lvlAfter    = getLevelProgress(totalXp)
+  const leveledUp   = lvlAfter.level > lvlBefore.level
+
+  return (
+    <motion.div variants={fadeUp} className="w-full">
+      <p className="mb-3 text-[10px] font-bold uppercase tracking-widest text-white/30">Récompenses</p>
+
+      <div className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03]">
+        {/* Header — 2 pills */}
+        <div className="flex items-center gap-2 border-b border-white/5 bg-white/[0.02] px-4 py-3">
+          <span className="flex items-center gap-1.5 rounded-full border border-neon-violet/30 bg-neon-violet/10 px-2.5 py-1 text-[11px] font-black text-neon-violet">
+            <span className="text-[10px]">✦</span>
+            +{xpTotal.toLocaleString('fr-FR')} XP
+          </span>
+          <span className="flex items-center gap-1.5 rounded-full border border-cyan-400/30 bg-cyan-400/10 px-2.5 py-1 text-[11px] font-black text-cyan-300">
+            <span className="text-[10px]">◈</span>
+            +{pulsesTotal.toLocaleString('fr-FR')}
+          </span>
+          {leveledUp && (
+            <span className="ml-auto rounded-full bg-yellow-400/15 px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-yellow-400">
+              Niveau {lvlAfter.level} !
+            </span>
+          )}
+        </div>
+
+        {/* Body — 2 colonnes */}
+        <div className="grid grid-cols-2 divide-x divide-white/5">
+          {/* Col XP */}
+          <div className="flex flex-col gap-2 p-4">
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] font-black leading-none text-neon-violet">✦</span>
+              <span className="text-[10px] font-bold uppercase tracking-widest text-white/40">XP</span>
+            </div>
+            {xp || achievementXp > 0 ? (
+              <ul className="flex flex-col gap-1 text-[11px]">
+                {xp && <RewardRow label="Partie" value={xp.base} />}
+                {xp && <RewardRow label={isCompetitif ? 'Score' : 'Bonnes rép.'} value={xp.correct} />}
+                {xp && xp.bonus > 0 && <RewardRow label="Bonus" value={xp.bonus} accent="violet" />}
+                {achievementXp > 0 && <RewardRow label="Achievement" value={achievementXp} accent="violet" />}
+              </ul>
+            ) : (
+              <span className="text-[11px] text-white/20">—</span>
+            )}
+          </div>
+
+          {/* Col Pulses */}
+          <div className="flex flex-col gap-2 p-4">
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] font-black leading-none text-cyan-400">◈</span>
+              <span className="text-[10px] font-bold uppercase tracking-widest text-white/40">Pulses</span>
+            </div>
+            {pulses || achievementPulses > 0 ? (
+              <ul className="flex flex-col gap-1 text-[11px]">
+                {pulses && <RewardRow label="Partie" value={pulses.base} />}
+                {pulses && <RewardRow label={isCompetitif ? 'Score' : 'Bonnes rép.'} value={pulses.correct} />}
+                {pulses && pulses.streak > 0 && <RewardRow label="Série" value={pulses.streak} accent="cyan" />}
+                {achievementPulses > 0 && <RewardRow label="Achievement" value={achievementPulses} accent="cyan" />}
+              </ul>
+            ) : (
+              <span className="text-[11px] text-white/20">—</span>
+            )}
+          </div>
+        </div>
+
+        {/* XP progress bar */}
+        <div className="flex flex-col gap-1.5 border-t border-white/5 px-4 py-3">
+          <div className="flex items-baseline justify-between">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-white/40">Niveau {lvlAfter.level}</span>
+            <span className="tabular-nums text-[10px] text-white/30">
+              {lvlAfter.progressXp.toLocaleString('fr-FR')}&thinsp;/&thinsp;{lvlAfter.neededXp.toLocaleString('fr-FR')} XP
+            </span>
+          </div>
+          <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/5">
+            <motion.div
+              initial={{ width: `${lvlBefore.level === lvlAfter.level ? lvlBefore.percentage : 0}%` }}
+              animate={{ width: `${lvlAfter.percentage}%` }}
+              transition={{ duration: 0.8, delay: 0.4, ease: 'easeOut' }}
+              className="h-full rounded-full"
+              style={{ background: 'linear-gradient(90deg, #7c3aed, #2563eb)' }}
+            />
+          </div>
+        </div>
+
+        {/* Footer — balance */}
+        <div className="flex items-center justify-between border-t border-white/5 bg-cyan-400/[0.03] px-4 py-2.5">
+          <span className="text-[10px] font-bold uppercase tracking-widest text-cyan-300/60">Solde Pulses</span>
+          <span className="flex items-center gap-1 tabular-nums text-[13px] font-black text-cyan-300">
+            <span className="text-[11px]">◈</span>
+            {pulsesBalance.toLocaleString('fr-FR')}
+          </span>
+        </div>
+      </div>
+    </motion.div>
+  )
+}
+
+function RewardRow({ label, value, accent }: { label: string; value: number; accent?: 'violet' | 'cyan' }) {
+  const valueClass =
+    accent === 'violet' ? 'text-neon-violet'
+    : accent === 'cyan' ? 'text-cyan-300'
+    : 'text-white/70'
+  return (
+    <li className="flex items-baseline justify-between gap-2">
+      <span className="text-white/40">{label}</span>
+      <span className={`tabular-nums font-bold ${valueClass}`}>+{value.toLocaleString('fr-FR')}</span>
+    </li>
   )
 }

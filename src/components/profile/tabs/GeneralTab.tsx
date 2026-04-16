@@ -11,6 +11,7 @@ import {
   DEFAULT_PREFS,
   type NotificationPrefs,
 } from '../../../services/notifications'
+import { getRecentTransactions, getTransactionsSince, type WalletTransaction } from '../../../services/pulses'
 
 // ─── Icônes inline ───────────────────────────────────────────────────────────
 
@@ -95,7 +96,7 @@ function NotifToggle({
 type ActiveField = 'username' | 'email' | 'description' | null
 
 export default function GeneralTab() {
-  const { user, profile, refreshProfile, triggerAchievementCheck, setLocalDescription, totalXp } = useAuth()
+  const { user, profile, refreshProfile, triggerAchievementCheck, setLocalDescription, totalXp, pulsesBalance } = useAuth()
   const xpData = getLevelProgress(totalXp)
   const toast = useToast()
   const initial = (profile?.username?.[0] ?? '?').toUpperCase()
@@ -327,6 +328,9 @@ export default function GeneralTab() {
         </span>
       </div>
 
+      {/* ─── Wallet Pulses ──────────────────────────────────────────────────── */}
+      {user && <WalletCard userId={user.id} balance={pulsesBalance} />}
+
       {/* ─── Section Profil ────────────────────────────────────────────────── */}
       <div className="px-5 py-5">
         <p className="mb-3 text-[10px] font-bold uppercase tracking-widest text-white/30">Profil</p>
@@ -519,6 +523,123 @@ export default function GeneralTab() {
         </div>
       </div>
 
+    </div>
+  )
+}
+
+// ─── WalletCard ───────────────────────────────────────────────────────────────
+
+const SOURCE_LABELS: Record<string, { label: string; icon: string }> = {
+  game_normal:           { label: 'Partie — normal',    icon: '🎯' },
+  game_competitif:       { label: 'Partie — compétitif', icon: '🔥' },
+  game_daily:            { label: 'Défi journalier',    icon: '📅' },
+  achievement_common:    { label: 'Achievement',        icon: '🏆' },
+  achievement_rare:      { label: 'Achievement rare',   icon: '🏆' },
+  achievement_epic:      { label: 'Achievement épique', icon: '🏆' },
+  achievement_legendary: { label: 'Achievement légendaire', icon: '🏆' },
+}
+
+function formatRelative(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime()
+  const min = Math.floor(diff / 60_000)
+  if (min < 1)  return "à l'instant"
+  if (min < 60) return `il y a ${min}min`
+  const h = Math.floor(min / 60)
+  if (h < 24) return `il y a ${h}h`
+  const d = Math.floor(h / 24)
+  if (d < 7)  return `il y a ${d}j`
+  return new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
+}
+
+function WalletCard({ userId, balance }: { userId: string; balance: number }) {
+  const [recent, setRecent] = useState<WalletTransaction[] | null>(null)
+  const [weekly, setWeekly] = useState<number | null>(null)
+  const [expanded, setExpanded] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    Promise.all([
+      getRecentTransactions(userId, 10).catch(() => [] as WalletTransaction[]),
+      getTransactionsSince(userId, 7).catch(() => 0),
+    ]).then(([tx, sum]) => {
+      if (!cancelled) { setRecent(tx); setWeekly(sum) }
+    })
+    return () => { cancelled = true }
+  }, [userId, balance])
+
+  const visibleTx = expanded ? (recent ?? []) : (recent ?? []).slice(0, 3)
+  const hasMoreTx = (recent?.length ?? 0) > 3
+
+  return (
+    <div className="px-5 pt-5">
+      <p className="mb-3 text-[10px] font-bold uppercase tracking-widest text-white/30">Pulses</p>
+
+      <div className="overflow-hidden rounded-xl border border-cyan-400/15 bg-gradient-to-br from-cyan-400/[0.04] to-transparent">
+        {/* Balance + weekly trend */}
+        <div className="flex items-end justify-between gap-3 px-4 py-4">
+          <div className="flex flex-col gap-0.5">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-cyan-300/60">Solde</span>
+            <div className="flex items-baseline gap-1.5">
+              <span className="text-2xl font-black leading-none text-cyan-300">◈</span>
+              <span className="tabular-nums text-2xl font-black leading-none text-white">
+                {balance.toLocaleString('fr-FR')}
+              </span>
+            </div>
+          </div>
+          {weekly !== null && weekly > 0 && (
+            <span className="flex items-center gap-1 rounded-full border border-green-500/20 bg-green-500/10 px-2 py-1 text-[10px] font-bold text-green-400">
+              ↑ +{weekly.toLocaleString('fr-FR')} sur 7j
+            </span>
+          )}
+        </div>
+
+        {/* Recent transactions */}
+        <div className="border-t border-cyan-400/10 bg-game-card/30">
+          {recent === null ? (
+            <div className="flex justify-center py-4">
+              <div className="h-3 w-3 animate-spin rounded-full border-2 border-white/20 border-t-cyan-300" />
+            </div>
+          ) : recent.length === 0 ? (
+            <p className="px-4 py-3 text-center text-[11px] italic text-white/30">
+              Aucun gain pour le moment — joue une partie !
+            </p>
+          ) : (
+            <ul className="divide-y divide-white/[0.04]">
+              {visibleTx.map(tx => {
+                const meta = SOURCE_LABELS[tx.source] ?? { label: tx.source, icon: '◈' }
+                return (
+                  <li key={tx.id} className="flex items-center gap-2.5 px-4 py-2">
+                    <span className="text-sm leading-none" aria-hidden="true">{meta.icon}</span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-xs text-white/60">{meta.label}</p>
+                      <p className="text-[10px] text-white/25">{formatRelative(tx.created_at)}</p>
+                    </div>
+                    <span className="tabular-nums text-xs font-bold text-cyan-300">
+                      +{tx.amount.toLocaleString('fr-FR')}
+                    </span>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+        </div>
+
+        {/* Footer — history link + boutique teaser */}
+        <div className="flex items-center justify-between gap-2 border-t border-cyan-400/10 px-4 py-2.5">
+          {hasMoreTx ? (
+            <button
+              type="button"
+              onClick={() => setExpanded(v => !v)}
+              className="text-[10px] font-semibold text-cyan-300/70 underline-offset-2 transition-colors hover:text-cyan-300 hover:underline"
+            >
+              {expanded ? '← Réduire' : `Voir l'historique complet →`}
+            </button>
+          ) : <span />}
+          <span className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest text-white/40">
+            Boutique bientôt
+          </span>
+        </div>
+      </div>
     </div>
   )
 }

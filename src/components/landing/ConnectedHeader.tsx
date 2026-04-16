@@ -63,7 +63,7 @@ export default function ConnectedHeader({
   onShowSocial,
   onShowDaily,
 }: ConnectedHeaderProps) {
-  const { user, totalXp } = useAuth()
+  const { user, totalXp, pulsesBalance } = useAuth()
   const xpData = getLevelProgress(totalXp)
   const level  = getLevelFromXp(totalXp)
 
@@ -344,8 +344,21 @@ export default function ConnectedHeader({
           <div className="flex-1" />
         )}
 
+        {/* Pulses chip — entre daily et XP */}
+        <button
+          type="button"
+          onClick={() => onShowProfile('general')}
+          aria-label={`Pulses : ${pulsesBalance.toLocaleString('fr-FR')}`}
+          className="lh-strip-pulses group flex shrink-0 items-center gap-1.5 border-l border-white/[0.05] px-3 h-full transition-colors hover:bg-cyan-400/[0.04] focus:outline-none"
+        >
+          <span className="text-[11px] font-black leading-none text-cyan-400" aria-hidden="true">◈</span>
+          <span className="tabular-nums text-[11px] font-bold leading-none text-white/70 group-hover:text-cyan-300">
+            {pulsesBalance.toLocaleString('fr-FR')}
+          </span>
+        </button>
+
         {/* XP bar (right) */}
-        <div className="flex shrink-0 items-center gap-2 px-4 sm:border-l sm:border-white/[0.05] sm:ml-2">
+        <div className="flex shrink-0 items-center gap-2 px-4 sm:border-l sm:border-white/[0.05]">
           <span className="shrink-0 text-[9px] font-black text-neon-violet/70">Niv.{xpData.level}</span>
           <div className="h-1 w-16 overflow-hidden rounded-full bg-white/10 sm:w-20">
             <div

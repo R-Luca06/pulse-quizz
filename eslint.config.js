@@ -9,7 +9,7 @@ export default defineConfig([
   globalIgnores([
     'dist/**',
     'node_modules/**',
-    'previews /**',
+    'previews/**',
     '_bmad/**',
     '_bmad-output/**',
     'scripts/**',
@@ -19,7 +19,7 @@ export default defineConfig([
     '**/*.html',
   ]),
   {
-    files: ['**/*.{ts,tsx}'],
+    files: ['src/**/*.{ts,tsx}'],
     extends: [
       js.configs.recommended,
       tseslint.configs.recommended,

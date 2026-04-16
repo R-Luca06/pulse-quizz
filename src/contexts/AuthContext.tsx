@@ -2,9 +2,10 @@ import { createContext, useContext, useEffect, useRef, useState, type ReactNode 
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '../services/supabase'
 import { checkAndUnlockAchievements, type AchievementContext } from '../services/achievements'
-import type { AchievementWithStatus, XpBreakdown } from '../types/quiz'
+import type { AchievementWithStatus, PulsesBreakdown, XpBreakdown } from '../types/quiz'
 import { identifyUser, resetIdentity, trackUserSignedUp, trackUserSignedIn } from '../services/analytics'
 import { getLevelFromXp } from '../constants/levels'
+import { getWallet } from '../services/pulses'
 
 interface Profile {
   username: string
@@ -12,13 +13,23 @@ interface Profile {
   description: string
 }
 
-export interface XpGainNotification {
+export interface RewardNotification {
   gameXp: XpBreakdown | null
   achievementXp: number
-  total: number
+  gamePulses: PulsesBreakdown | null
+  achievementPulses: number
+  totalXp: number
+  totalPulses: number
   levelBefore: number
   levelAfter: number
   id: number  // unique ID to re-trigger animations on repeated toasts
+}
+
+export interface ShowRewardGainParams {
+  gameXp: XpBreakdown | null
+  achievementXp: number
+  gamePulses?: PulsesBreakdown | null
+  achievementPulses?: number
 }
 
 interface AuthContextValue {
@@ -26,9 +37,10 @@ interface AuthContextValue {
   profile: Profile | null
   loading: boolean
   totalXp: number
-  xpNotification: XpGainNotification | null
-  showXpGain: (params: { gameXp: XpBreakdown | null; achievementXp: number }) => void
-  clearXpNotification: () => void
+  pulsesBalance: number
+  rewardNotification: RewardNotification | null
+  showRewardGain: (params: ShowRewardGainParams) => void
+  clearRewardNotification: () => void
   pendingAchievements: AchievementWithStatus[]
   clearPendingAchievements: () => void
   statsRefreshKey: number
@@ -40,6 +52,9 @@ interface AuthContextValue {
   signIn: (email: string, password: string) => Promise<void>
   signOut: () => Promise<void>
   refreshProfile: () => Promise<void>
+  refreshWallet: () => Promise<void>
+  bumpPulses: (amount: number) => void
+  bumpXp: (amount: number) => void
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
@@ -49,7 +64,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
   const [totalXp, setTotalXp] = useState(0)
-  const [xpNotification, setXpNotification] = useState<XpGainNotification | null>(null)
+  const [pulsesBalance, setPulsesBalance] = useState(0)
+  const [rewardNotification, setRewardNotification] = useState<RewardNotification | null>(null)
   const totalXpRef = useRef(0)
   const toastIdRef = useRef(0)
   const [pendingAchievements, setPendingAchievements] = useState<AchievementWithStatus[]>([])
@@ -71,14 +87,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!user) {
       let cancelled = false
-      queueMicrotask(() => { if (!cancelled) { setProfile(null); setTotalXp(0); resetIdentity() } })
+      queueMicrotask(() => { if (!cancelled) { setProfile(null); setTotalXp(0); setPulsesBalance(0); resetIdentity() } })
       return () => { cancelled = true }
     }
     let cancelled = false
     Promise.all([
       supabase.from('profiles').select('username, featured_badges, description').eq('id', user.id).maybeSingle(),
       supabase.from('user_global_stats').select('total_xp').eq('user_id', user.id).maybeSingle(),
-    ]).then(([profileRes, xpRes]) => {
+      getWallet(user.id).catch(() => ({ balance: 0, lifetime_earned: 0, updated_at: null })),
+    ]).then(([profileRes, xpRes, wallet]) => {
       if (!cancelled) {
         if (profileRes.data) {
           setProfile({ username: profileRes.data.username, featured_badges: profileRes.data.featured_badges ?? [], description: profileRes.data.description ?? '' })
@@ -87,6 +104,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const xp = (xpRes.data as { total_xp: number } | null)?.total_xp ?? 0
         setTotalXp(xp)
         totalXpRef.current = xp
+        setPulsesBalance(wallet.balance ?? 0)
       }
     })
     // Vérification rétroactive silencieuse — fire and forget
@@ -94,18 +112,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => { cancelled = true }
   }, [user])
 
-  function showXpGain({ gameXp, achievementXp }: { gameXp: XpBreakdown | null; achievementXp: number }) {
-    const total = (gameXp?.total ?? 0) + achievementXp
-    if (total <= 0) return
+  function showRewardGain({ gameXp, achievementXp, gamePulses = null, achievementPulses = 0 }: ShowRewardGainParams) {
+    const totalXpDelta     = (gameXp?.total ?? 0) + achievementXp
+    const totalPulsesDelta = (gamePulses?.total ?? 0) + achievementPulses
+    if (totalXpDelta <= 0 && totalPulsesDelta <= 0) return
     const levelBefore = getLevelFromXp(totalXpRef.current)
-    const levelAfter  = getLevelFromXp(totalXpRef.current + total)
-    totalXpRef.current += total
-    setTotalXp(prev => prev + total)
-    setXpNotification({ gameXp, achievementXp, total, levelBefore, levelAfter, id: ++toastIdRef.current })
+    const levelAfter  = getLevelFromXp(totalXpRef.current + totalXpDelta)
+    totalXpRef.current += totalXpDelta
+    if (totalXpDelta > 0) setTotalXp(prev => prev + totalXpDelta)
+    setRewardNotification({
+      gameXp,
+      achievementXp,
+      gamePulses,
+      achievementPulses,
+      totalXp:     totalXpDelta,
+      totalPulses: totalPulsesDelta,
+      levelBefore,
+      levelAfter,
+      id: ++toastIdRef.current,
+    })
   }
 
-  function clearXpNotification() {
-    setXpNotification(null)
+  function clearRewardNotification() {
+    setRewardNotification(null)
   }
 
   function clearPendingAchievements() {
@@ -180,6 +209,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setProfile(null)
     setTotalXp(0)
     totalXpRef.current = 0
+    setPulsesBalance(0)
   }
 
   async function refreshProfile(): Promise<void> {
@@ -192,8 +222,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (data) setProfile({ username: data.username, featured_badges: data.featured_badges ?? [], description: data.description ?? '' })
   }
 
+  async function refreshWallet(): Promise<void> {
+    if (!user) { setPulsesBalance(0); return }
+    const w = await getWallet(user.id).catch(() => null)
+    if (w) setPulsesBalance(w.balance ?? 0)
+  }
+
+  function bumpPulses(amount: number) {
+    if (!Number.isFinite(amount) || amount === 0) return
+    setPulsesBalance(prev => Math.max(0, prev + amount))
+  }
+
+  function bumpXp(amount: number) {
+    if (!Number.isFinite(amount) || amount === 0) return
+    totalXpRef.current = Math.max(0, totalXpRef.current + amount)
+    setTotalXp(prev => Math.max(0, prev + amount))
+  }
+
   return (
-    <AuthContext.Provider value={{ user, profile, loading, totalXp, xpNotification, showXpGain, clearXpNotification, pendingAchievements, clearPendingAchievements, statsRefreshKey, refreshStats, setLocalFeaturedBadges, setLocalDescription, triggerAchievementCheck, signUp, signIn, signOut, refreshProfile }}>
+    <AuthContext.Provider value={{ user, profile, loading, totalXp, pulsesBalance, rewardNotification, showRewardGain, clearRewardNotification, pendingAchievements, clearPendingAchievements, statsRefreshKey, refreshStats, setLocalFeaturedBadges, setLocalDescription, triggerAchievementCheck, signUp, signIn, signOut, refreshProfile, refreshWallet, bumpPulses, bumpXp }}>
       {children}
     </AuthContext.Provider>
   )
