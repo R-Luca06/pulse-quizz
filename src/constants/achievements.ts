@@ -348,6 +348,98 @@ export const ACHIEVEMENTS: Achievement[] = [
     progressTotal: null,
     tier: 'common',
   },
+
+  // ── Défi Journalier — séries ─────────────────────────────────────────────────
+  {
+    id: 'daily_premier_defi',
+    name: 'Premier Défi',
+    description: 'Participer au défi journalier pour la première fois',
+    icon: '📅',
+    progressTotal: 1,
+    tier: 'common',
+  },
+  {
+    id: 'daily_serie_3',
+    name: 'Série de 3',
+    description: 'Jouer 3 défis journaliers consécutifs',
+    icon: '🔥',
+    progressTotal: 3,
+    tier: 'rare',
+  },
+  {
+    id: 'daily_semaine_de_feu',
+    name: 'Semaine de Feu',
+    description: 'Jouer 7 défis journaliers consécutifs',
+    icon: '⚡',
+    progressTotal: 7,
+    tier: 'epic',
+  },
+  {
+    id: 'daily_quinzaine',
+    name: 'Quinzaine',
+    description: 'Jouer 14 défis journaliers consécutifs',
+    icon: '🌩️',
+    progressTotal: 14,
+    tier: 'epic',
+  },
+  {
+    id: 'daily_mois_de_fer',
+    name: 'Mois de Fer',
+    description: 'Jouer 30 défis journaliers consécutifs',
+    icon: '🌟',
+    progressTotal: 30,
+    tier: 'legendary',
+  },
+  {
+    id: 'daily_centenaire',
+    name: 'Centenaire Journalier',
+    description: 'Jouer 100 défis journaliers consécutifs',
+    icon: '💎',
+    progressTotal: 100,
+    tier: 'legendary',
+  },
+
+  // ── Défi Journalier — scores ─────────────────────────────────────────────────
+  {
+    id: 'daily_score_parfait',
+    name: 'Score Parfait',
+    description: 'Réussir un 5/5 au défi journalier',
+    icon: '✨',
+    progressTotal: null,
+    tier: 'common',
+  },
+  {
+    id: 'daily_sniper',
+    name: 'Sniper',
+    description: 'Réussir 5 scores parfaits au défi journalier',
+    icon: '🎯',
+    progressTotal: 5,
+    tier: 'rare',
+  },
+  {
+    id: 'daily_infaillible',
+    name: 'Infaillible',
+    description: 'Score parfait 5/5 avec le multiplicateur ×3 actif',
+    icon: '🔥',
+    progressTotal: null,
+    tier: 'epic',
+  },
+  {
+    id: 'daily_podium',
+    name: 'Podium Journalier',
+    description: 'Terminer dans le top 3 du classement du jour',
+    icon: '🏆',
+    progressTotal: null,
+    tier: 'rare',
+  },
+  {
+    id: 'daily_roi_du_jour',
+    name: 'Roi du Jour',
+    description: 'Terminer #1 du classement du jour',
+    icon: '👑',
+    progressTotal: null,
+    tier: 'legendary',
+  },
 ]
 
 export const ACHIEVEMENT_MAP: Record<AchievementId, Achievement> =

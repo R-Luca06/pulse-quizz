@@ -11,7 +11,7 @@ import type { GameSettings } from '../../../hooks/useSettings'
 
 interface Props {
   isLaunching: boolean
-  onShowStats: (tab?: 'stats' | 'leaderboard') => void
+  onShowStats: (tab?: 'stats' | 'leaderboard' | 'daily') => void
   settings: GameSettings
   onPlay: () => void
   onOpenSettings: () => void
@@ -143,10 +143,10 @@ export default function PodiumScene({ isLaunching, onShowStats, settings, onPlay
       <div className="absolute inset-0 overflow-y-auto lg:hidden" style={{ scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' } as React.CSSProperties}>
         <div className="flex flex-col">
 
-          {/* Zone avatar — portion haute, sous le header (pt-14) */}
+          {/* Zone avatar — portion haute, sous le header + subheader (pt-[5.5rem]) */}
           <motion.div
-            className="flex shrink-0 items-center justify-center pt-14"
-            style={{ height: 'calc(28vh + 56px)' }}
+            className="flex shrink-0 items-center justify-center pt-[5.5rem]"
+            style={{ height: 'calc(40vh + 88px)' }}
             animate={
               isLaunching
                 ? { opacity: 0, scale: 0.85, transition: { duration: 0.25 } }

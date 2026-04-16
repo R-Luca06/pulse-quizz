@@ -16,6 +16,7 @@ export interface QuizParams {
   difficulty: Difficulty
   language: Language
   category: Category
+  limit?: number
 }
 
 export class ApiError extends Error {
@@ -59,12 +60,13 @@ async function fetchQuestionsFromSupabase(
   difficulty: Difficulty,
   category: Category,
   signal?: AbortSignal,
+  limit?: number,
 ): Promise<TriviaQuestion[]> {
   const { data, error } = await supabase.rpc('get_random_questions', {
     p_language:   'fr',
     p_difficulty: difficulty,
     p_category:   category === 'all' ? 'all' : category,
-    p_limit:      QUESTIONS_PER_BATCH,
+    p_limit:      limit ?? QUESTIONS_PER_BATCH,
   })
 
   if (signal?.aborted) throw new ApiError('network_error', 'aborted')
@@ -87,7 +89,7 @@ export async function fetchQuestions(params: QuizParams, signal?: AbortSignal): 
   // Routing conditionnel réservé pour future réactivation d'une source EN :
   // if (params.language === 'en') { return fetchFromExternalSource(...) }
   try {
-    return await fetchQuestionsFromSupabase(params.difficulty, params.category, signal)
+    return await fetchQuestionsFromSupabase(params.difficulty, params.category, signal, params.limit)
   } catch (err) {
     if (err instanceof ApiError) throw err
     throw new ApiError('network_error')
@@ -97,4 +99,26 @@ export async function fetchQuestions(params: QuizParams, signal?: AbortSignal): 
 /** Batch de 10 questions aléatoires pour le mode compétitif */
 export async function fetchCompetitifBatch(language: Language, signal?: AbortSignal): Promise<TriviaQuestion[]> {
   return fetchQuestions({ difficulty: 'mixed', language, category: 'all' }, signal)
+}
+
+/**
+ * Récupère les 5 questions déterministes du défi journalier pour une date donnée.
+ * Utilise la RPC get_daily_questions qui fixe un setseed basé sur la date,
+ * garantissant que tous les joueurs reçoivent exactement les mêmes questions.
+ */
+export async function fetchDailyQuestions(date: string, signal?: AbortSignal): Promise<TriviaQuestion[]> {
+  const { data, error } = await supabase.rpc('get_daily_questions', { p_date: date })
+
+  if (signal?.aborted) throw new ApiError('network_error', 'aborted')
+  if (error) throw new ApiError('api_error', error.message)
+  if (!data || data.length === 0) throw new ApiError('api_error', 'no questions returned')
+
+  return (data as SupabaseQuestionRow[]).map(row => ({
+    question:          row.question,
+    correct_answer:    row.correct_answer,
+    incorrect_answers: row.incorrect_answers,
+    shuffledAnswers:   shuffle([row.correct_answer, ...row.incorrect_answers]),
+    category:          row.category,
+    difficulty:        row.difficulty as TriviaQuestion['difficulty'],
+  }))
 }

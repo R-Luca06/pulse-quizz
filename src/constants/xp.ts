@@ -6,6 +6,7 @@ import { NORMAL_MODE_QUESTIONS } from './game'
 export const XP_PER_GAME: Record<GameMode, number> = {
   'normal':     10,
   'compétitif': 15,
+  'daily':      30,   // base XP participation, le vrai calcul est dans dailyChallenge.ts
 }
 
 export const XP_PER_CORRECT = 5

@@ -19,13 +19,14 @@ interface Props {
   onExplosion: () => void
   screen: AppScreen
   autoOpenSettings?: boolean
-  onShowStats: (tab?: 'stats' | 'leaderboard') => void
+  onShowStats: (tab?: 'stats' | 'leaderboard' | 'daily') => void
   onOpenSignIn: () => void
   onOpenSignUp: () => void
   onShowProfile: () => void
   onShowAchievements: () => void
   onShowSocial?: () => void
   onViewProfile: (username: string) => void
+  onShowDaily?: () => void
 }
 
 export default function LandingPage({
@@ -42,6 +43,7 @@ export default function LandingPage({
   onShowAchievements,
   onShowSocial,
   onViewProfile,
+  onShowDaily,
 }: Props) {
   const { user, profile, loading, signOut } = useAuth()
   const toast = useToast()
@@ -94,6 +96,7 @@ export default function LandingPage({
             onSignOut={() => signOut().then(() => toast.success('Déconnecté'))}
             onShowSocial={onShowSocial}
             onViewProfile={onViewProfile}
+            onShowDaily={onShowDaily}
           />
         </motion.div>
       ) : (
@@ -198,13 +201,14 @@ interface ConnectedBranchProps {
   setOpenSettings: (v: boolean) => void
   showRules: boolean
   setShowRules: (v: boolean) => void
-  onShowStats: (tab?: 'stats' | 'leaderboard') => void
+  onShowStats: (tab?: 'stats' | 'leaderboard' | 'daily') => void
   onShowProfile: () => void
   onShowAchievements: () => void
   username: string
   onSignOut: () => void
   onShowSocial?: () => void
   onViewProfile: (username: string) => void
+  onShowDaily?: () => void
 }
 
 function ConnectedBranch({
@@ -224,6 +228,7 @@ function ConnectedBranch({
   onSignOut,
   onShowSocial,
   onViewProfile,
+  onShowDaily,
 }: ConnectedBranchProps) {
   const isLaunching = screen === 'launching'
   const [launchPhase, setLaunchPhase] = useState<LaunchPhase>('idle')
@@ -276,6 +281,7 @@ function ConnectedBranch({
         onPlay={handleLaunch}
         onOpenSettings={() => setOpenSettings(true)}
         onShowSocial={onShowSocial}
+        onShowDaily={onShowDaily}
       />
 
       {/* GameDock : desktop uniquement (lg+) — le mobile a son dock dans PodiumScene */}

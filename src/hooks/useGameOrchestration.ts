@@ -6,7 +6,8 @@ import type { QuestionResult, GameResult, RankingData, AchievementWithStatus, Xp
 type OnNewAchievements = (achievements: AchievementWithStatus[]) => void
 import { getCloudBestScore, incrementCategoryStats, incrementGlobalStats, addXp } from '../services/cloudStats'
 import { submitScore, getUserBestScore, getUserRank } from '../services/leaderboard'
-import { checkAndUnlockAchievements } from '../services/achievements'
+import { checkAndUnlockAchievements, checkAndUnlockDailyAchievements } from '../services/achievements'
+import { submitDailyEntry, getDailyStreak, getDailyMultiplier, getDailyUserRank, computeDailyXp, getTodayDate } from '../services/dailyChallenge'
 import { markPlayedAnonymous, computeBestStreak } from '../utils/statsStorage'
 import { createNotification, getNotificationPrefs } from '../services/notifications'
 import { trackGameFinished } from '../services/analytics'
@@ -34,10 +35,11 @@ interface UseGameOrchestrationParams {
   setLoadingRanking?: (v: boolean) => void
   showXpGain?: (params: { gameXp: XpBreakdown | null; achievementXp: number }) => void
   storePendingXp?: (params: { gameXp: XpBreakdown | null; achievementXp: number }) => void
+  onDailyComplete?: () => void
 }
 
 export function useGameOrchestration(params: UseGameOrchestrationParams) {
-  const { settings, user, profile, setScreen, setGameResult, setRankingData, setNewAchievements, setLoadingRanking = () => {}, showXpGain = () => {}, storePendingXp = () => {} } = params
+  const { settings, user, profile, setScreen, setGameResult, setRankingData, setNewAchievements, setLoadingRanking = () => {}, showXpGain = () => {}, storePendingXp = () => {}, onDailyComplete } = params
 
   async function handleFinished(score: number, results: QuestionResult[]): Promise<void> {
     const { mode, difficulty, category, language } = settings
@@ -64,6 +66,70 @@ export function useGameOrchestration(params: UseGameOrchestrationParams) {
       xpBreakdown,
     }
     setGameResult(immediateResult)
+
+    // ── Défi journalier ──────────────────────────────────────────────────────
+    // Toujours appeler onDailyComplete pour éviter d'atterrir sur la page result.
+    // La soumission cloud n'est faite que si l'utilisateur est connecté.
+    if (mode === 'daily') {
+      if (user && profile) {
+        const uid = user.id
+        const today = getTodayDate()
+        const correctCount = results.filter(r => r.isCorrect).length
+
+        try {
+          const streak = await getDailyStreak(uid)
+          const multiplier = getDailyMultiplier(streak.current_streak)
+          const xpEarned = computeDailyXp(correctCount, multiplier)
+
+          const submitResult = await submitDailyEntry({ date: today, score, multiplier, correctAnswers: correctCount })
+          const userRank = await getDailyUserRank(uid, today)
+
+          const dailyXpBreakdown: XpBreakdown = {
+            base:    15,
+            correct: correctCount * 20,
+            bonus:   Math.round((correctCount * 20 + 15) * (multiplier - 1)),
+            total:   xpEarned,
+          }
+          setGameResult(prev => ({ ...prev, userRank, xpBreakdown: dailyXpBreakdown }))
+          addXp(xpEarned).catch(console.error)
+
+          // Achievements journaliers
+          const prefs = await getNotificationPrefs(uid)
+          const newlyUnlocked = await checkAndUnlockDailyAchievements(uid, {
+            score: correctCount,
+            currentStreak: submitResult.current_streak,
+            userRank,
+          })
+          let achievementXp = 0
+          if (newlyUnlocked.length > 0) {
+            setNewAchievements(newlyUnlocked)
+            achievementXp = newlyUnlocked.reduce((sum, a) => sum + XP_PER_ACHIEVEMENT[a.tier], 0)
+            if (achievementXp > 0) addXp(achievementXp).catch(console.error)
+            if (prefs.achievement_unlocked) {
+              newlyUnlocked.forEach(a => {
+                createNotification(uid, 'achievement_unlocked', {
+                  badge_id: a.id,
+                  badge_name: a.name,
+                  badge_icon: a.icon,
+                }).catch(console.error)
+              })
+            }
+            storePendingXp({ gameXp: dailyXpBreakdown, achievementXp })
+          } else {
+            showXpGain({ gameXp: dailyXpBreakdown, achievementXp: 0 })
+          }
+        } catch (err) {
+          console.error(err)
+        }
+      }
+
+      if (onDailyComplete) {
+        onDailyComplete()
+      } else {
+        setScreen('daily')
+      }
+      return
+    }
 
     // ── Chemin non-compétitif ou non-connecté ─────────────────────────────────
     if (!user || mode !== 'compétitif' || !profile) {

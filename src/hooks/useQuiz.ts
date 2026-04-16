@@ -1,9 +1,11 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { fetchQuestions, fetchCompetitifBatch, ApiError } from '../services/api'
+import { fetchQuestions, fetchCompetitifBatch, fetchDailyQuestions, ApiError } from '../services/api'
+import { getTodayDate } from '../services/dailyChallenge'
 import { playCorrect, playWrong, playTimeout } from '../utils/sounds'
 import {
   FEEDBACK_DURATION,
   NORMAL_MODE_QUESTIONS,
+  DAILY_MODE_QUESTIONS,
   COMP_BASE_POINTS,
   COMP_PREFETCH_THRESHOLD,
   COMP_SPEED_TIERS,
@@ -70,10 +72,13 @@ export function useQuiz(
       const s = settingsRef.current
       const qs = s.gameMode === 'compétitif'
         ? await fetchCompetitifBatch(s.language, controller.signal)
+        : s.gameMode === 'daily'
+        ? await fetchDailyQuestions(getTodayDate(), controller.signal)
         : await fetchQuestions({
             difficulty: s.difficulty,
             language: s.language,
             category: s.category,
+            limit: NORMAL_MODE_QUESTIONS,
           }, controller.signal)
       if (controller.signal.aborted) return
       setQuestions(qs)
@@ -111,7 +116,7 @@ export function useQuiz(
   useEffect(() => {
     if (phase === 'playing') {
       questionStartTime.current = Date.now()
-      if (settingsRef.current.gameMode === 'compétitif') {
+      if (settingsRef.current.gameMode === 'compétitif' || settingsRef.current.gameMode === 'daily') {
         queueMicrotask(() => setCurrentMultiplier(COMP_SPEED_TIERS[0].multiplier))
         if (multiplierTimer.current) clearInterval(multiplierTimer.current)
         multiplierTimer.current = setInterval(() => {
@@ -143,7 +148,9 @@ export function useQuiz(
 
   const advance = useCallback(
     (nextIndex: number, currentScore: number, questionsArr: TriviaQuestion[]) => {
-      if (settings.gameMode === 'normal' && nextIndex >= NORMAL_MODE_QUESTIONS) {
+      const isNormalDone  = settings.gameMode === 'normal' && nextIndex >= NORMAL_MODE_QUESTIONS
+      const isDailyDone   = settings.gameMode === 'daily'  && nextIndex >= DAILY_MODE_QUESTIONS
+      if (isNormalDone || isDailyDone) {
         setPhase('finished')
         onFinished(currentScore, resultsRef.current)
       } else if (settings.gameMode === 'compétitif' && nextIndex >= questionsArr.length) {
@@ -201,7 +208,7 @@ export function useQuiz(
       let multiplier: number | undefined
       let newScore = score
 
-      if (isCorrect && settings.gameMode === 'compétitif') {
+      if (isCorrect && (settings.gameMode === 'compétitif' || settings.gameMode === 'daily')) {
         multiplier = getSpeedTier(timeSpent).multiplier
         pointsEarned = Math.round(COMP_BASE_POINTS * multiplier)
         newScore = score + pointsEarned

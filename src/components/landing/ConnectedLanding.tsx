@@ -10,7 +10,7 @@ type ShakeControls = ReturnType<typeof useAnimationControls>
 
 interface Props {
   isLaunching: boolean
-  onShowStats: (tab?: 'stats' | 'leaderboard') => void
+  onShowStats: (tab?: 'stats' | 'leaderboard' | 'daily') => void
   onShowProfile: () => void
   onShowAchievements: () => void
   onSignOut: () => void
@@ -21,6 +21,7 @@ interface Props {
   onPlay?: () => void
   onOpenSettings?: () => void
   onShowSocial?: () => void
+  onShowDaily?: () => void
 }
 
 export default function ConnectedLanding({
@@ -36,6 +37,7 @@ export default function ConnectedLanding({
   onPlay,
   onOpenSettings,
   onShowSocial,
+  onShowDaily,
 }: Props) {
   return (
     <>
@@ -47,6 +49,7 @@ export default function ConnectedLanding({
         username={username}
         onViewProfile={onViewProfile ?? noop}
         onShowSocial={onShowSocial}
+        onShowDaily={onShowDaily}
       />
 
       <motion.div

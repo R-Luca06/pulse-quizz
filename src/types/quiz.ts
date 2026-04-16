@@ -9,7 +9,7 @@ export interface TriviaQuestion {
 
 export type AnswerState = 'idle' | 'correct' | 'wrong' | 'timeout'
 export type QuizPhase = 'loading' | 'playing' | 'feedback' | 'finished' | 'error'
-export type GameMode   = 'normal' | 'compétitif'
+export type GameMode   = 'normal' | 'compétitif' | 'daily'
 export type AchievementTier = 'common' | 'rare' | 'epic' | 'legendary'
 export type LegendaryEffect = 'fire' | 'electric' | 'gold' | 'prismatic'
 export type Difficulty = 'mixed' | 'easy' | 'medium' | 'hard'
@@ -22,8 +22,8 @@ export interface QuestionResult {
   userAnswer: string | null  // null = timeout
   isCorrect: boolean
   timeSpent: number          // secondes, arrondi à 1 décimale
-  pointsEarned?: number      // mode compétitif uniquement
-  multiplier?: number        // mode compétitif uniquement (ex: 3, 2, 1.5, 1.2, 1)
+  pointsEarned?: number      // modes compétitif et daily
+  multiplier?: number        // modes compétitif et daily (ex: 3, 2, 1.5, 1.2, 1)
 }
 
 export interface XpBreakdown {
@@ -115,6 +115,19 @@ export type AchievementId =
   | 'reinvention'
   | 'nouveau_visage'
   | 'mon_histoire'
+  // Défi Journalier — séries
+  | 'daily_premier_defi'
+  | 'daily_serie_3'
+  | 'daily_semaine_de_feu'
+  | 'daily_quinzaine'
+  | 'daily_mois_de_fer'
+  | 'daily_centenaire'
+  // Défi Journalier — scores
+  | 'daily_score_parfait'
+  | 'daily_sniper'
+  | 'daily_infaillible'
+  | 'daily_podium'
+  | 'daily_roi_du_jour'
 
 export interface Achievement {
   id: AchievementId
@@ -134,4 +147,45 @@ export interface AchievementWithStatus extends Achievement {
   unlocked: boolean
   unlocked_at: string | null
   progress: { current: number; total: number } | null
+}
+
+// ─── Daily Challenge ───────────────────────────────────────────────────────────
+
+export interface DailyTheme {
+  date: string          // 'YYYY-MM-DD'
+  title: string
+  emoji: string
+  description: string | null
+  category_tags: string[]
+}
+
+export interface DailyEntry {
+  id: string
+  user_id: string
+  date: string
+  score: number         // speed-based points (anciennement 0–10 bonnes réponses)
+  xp_earned: number
+  multiplier: number
+  streak_day: number
+  completed_at: string
+}
+
+export interface DailyStreak {
+  user_id: string
+  current_streak: number
+  longest_streak: number
+  last_played_date: string | null
+}
+
+export interface DailyLeaderboardEntry {
+  id: string
+  user_id: string
+  username: string
+  score: number
+  xp_earned: number
+  multiplier: number
+  streak_day: number
+  completed_at: string
+  rank: number
+  featured_badges: string[]
 }

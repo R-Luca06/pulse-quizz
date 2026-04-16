@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { EMPTY_CATEGORY_STATS, EMPTY_GLOBAL_STATS } from '../../utils/statsStorage'
 import type { CategoryStats, GlobalStats } from '../../utils/statsStorage'
@@ -6,6 +6,8 @@ import { fetchAllStats } from '../../services/cloudStats'
 import type { CloudCategoryStatRow, CloudGlobalStatRow } from '../../services/cloudStats'
 import { getCompLeaderboardPage, getCompLeaderboardCount, getCompEntryGameData, getUserRank } from '../../services/leaderboard'
 import type { LeaderboardEntry, CompGameData } from '../../services/leaderboard'
+import { getDailyLeaderboard, getDailyThemeDates, getDailyUserRank, getTodayDate } from '../../services/dailyChallenge'
+import type { DailyLeaderboardEntry } from '../../types/quiz'
 import { FR_CATEGORIES, DIFFICULTIES, LANGUAGES, btnBaseSm, btnSelected, btnIdleSm } from '../../constants/quiz'
 import { useAuth } from '../../hooks/useAuth'
 import type { Difficulty, Language } from '../../types/quiz'
@@ -13,12 +15,13 @@ import MiniBadge from '../shared/MiniBadge'
 
 interface Props {
   onBack: () => void
-  defaultTab?: 'stats' | 'leaderboard'
+  defaultTab?: 'stats' | 'leaderboard' | 'daily'
   initialDiff?: Difficulty
   initialLang?: Language
   hideNav?: boolean
   onViewProfile?: (username: string) => void
 }
+
 
 function StatTile({ label, value, accent }: { label: string; value: string | number; accent?: string }) {
   return (
@@ -95,9 +98,9 @@ const STATS_DIFFICULTIES: { value: Difficulty; label: string }[] = [
   ...DIFFICULTIES,
 ]
 
-export default function StatsPage({ onBack, defaultTab = 'stats', initialDiff, initialLang, hideNav = false, onViewProfile }: Props) {
+export default function StatsPage({ onBack, defaultTab = 'leaderboard', initialDiff, initialLang, hideNav = false, onViewProfile }: Props) {
   const { user } = useAuth()
-  const [activeTab, setActiveTab] = useState<'stats' | 'leaderboard'>(defaultTab)
+  const [activeTab, setActiveTab] = useState<'stats' | 'leaderboard' | 'daily'>(defaultTab)
   const [filterDiff, setFilterDiff] = useState<Difficulty>(initialDiff ?? 'mixed')
   const [filterLang, setFilterLang] = useState<Language>(initialLang ?? 'fr')
   const [statsLang, setStatsLang] = useState<Language>(initialLang ?? 'fr')
@@ -118,6 +121,15 @@ export default function StatsPage({ onBack, defaultTab = 'stats', initialDiff, i
   const [cloudGlobal, setCloudGlobal] = useState<CloudGlobalStatRow | null>(null)
   const [cloudLoading, setCloudLoading] = useState(() => user !== null)
 
+  // ── Daily leaderboard state ─────────────────────────────────────────────────
+  const [dailyDates, setDailyDates]         = useState<string[]>([])
+  const [selectedDate, setSelectedDate]     = useState<string>(getTodayDate())
+  const [dailyEntries, setDailyEntries]     = useState<DailyLeaderboardEntry[]>([])
+  const [dailyTotal, setDailyTotal]         = useState(0)
+  const [dailyPage, setDailyPage]           = useState(0)
+  const [dailyLoading, setDailyLoading]     = useState(false)
+  const [userRankInDailyLb, setUserRankInDailyLb] = useState<number | null>(null)
+
   useEffect(() => {
     if (!user) {
       setCloudCats([])
@@ -133,6 +145,35 @@ export default function StatsPage({ onBack, defaultTab = 'stats', initialDiff, i
       .catch(console.error)
       .finally(() => setCloudLoading(false))
   }, [user])
+
+  const loadDailyLeaderboard = useCallback(async (date: string, page: number) => {
+    setDailyLoading(true)
+    try {
+      const [{ entries, total }, rank] = await Promise.all([
+        getDailyLeaderboard(date, page, PAGE_SIZE),
+        page === 0 && user ? getDailyUserRank(user.id, date) : Promise.resolve(null),
+      ])
+      setDailyEntries(entries)
+      setDailyTotal(total)
+      setDailyPage(page)
+      if (page === 0) setUserRankInDailyLb(rank)
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setDailyLoading(false)
+    }
+  }, [user]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (activeTab !== 'daily') return
+    getDailyThemeDates().then(dates => {
+      setDailyDates(dates)
+      const d = dates.includes(getTodayDate()) ? getTodayDate() : (dates[0] ?? getTodayDate())
+      setSelectedDate(d)
+      loadDailyLeaderboard(d, 0)
+    }).catch(console.error)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab])
 
   useEffect(() => {
     if (activeTab !== 'leaderboard') return
@@ -268,16 +309,16 @@ export default function StatsPage({ onBack, defaultTab = 'stats', initialDiff, i
               className="flex gap-2"
             >
               <button
-                onClick={() => setActiveTab('stats')}
-                className={[btnBaseSm, 'px-3 py-1', activeTab === 'stats' ? btnSelected : btnIdleSm].join(' ')}
-              >
-                Mes stats
-              </button>
-              <button
                 onClick={() => setActiveTab('leaderboard')}
                 className={[btnBaseSm, 'px-3 py-1', activeTab === 'leaderboard' ? btnSelected : btnIdleSm].join(' ')}
               >
-                Classement
+                Compétitif
+              </button>
+              <button
+                onClick={() => setActiveTab('daily')}
+                className={[btnBaseSm, 'px-3 py-1', activeTab === 'daily' ? btnSelected : btnIdleSm].join(' ')}
+              >
+                Journalier
               </button>
             </motion.div>
             <div className="w-20" />
@@ -285,7 +326,7 @@ export default function StatsPage({ onBack, defaultTab = 'stats', initialDiff, i
         )}
 
         {/* Contenu — 1 colonne mobile, 2 colonnes lg */}
-        <div className="flex flex-col gap-6 lg:grid lg:grid-cols-[260px_1fr] lg:items-start lg:gap-10">
+        <div className="flex flex-col gap-6 lg:items-start lg:gap-10 lg:grid lg:grid-cols-[260px_1fr]">
 
           {/* Colonne gauche — Global + Filtres */}
           <motion.div
@@ -329,6 +370,22 @@ export default function StatsPage({ onBack, defaultTab = 'stats', initialDiff, i
                         {l.label}
                       </button>
                     ))}
+                  </div>
+                ) : activeTab === 'daily' ? (
+                  /* Journalier : sélecteur de dates */
+                  <div className="flex flex-col gap-1.5">
+                    {dailyDates.slice(0, 14).map(d => (
+                      <button
+                        key={d}
+                        onClick={() => { setSelectedDate(d); loadDailyLeaderboard(d, 0) }}
+                        className={[btnBaseSm, 'text-left', d === selectedDate ? btnSelected : btnIdleSm].join(' ')}
+                      >
+                        {new Date(d + 'T00:00:00').toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
+                      </button>
+                    ))}
+                    {dailyDates.length === 0 && (
+                      <span className="text-[10px] text-white/25">Aucune date disponible</span>
+                    )}
                   </div>
                 ) : (
                   /* Stats : langue + difficulté */
@@ -377,6 +434,7 @@ export default function StatsPage({ onBack, defaultTab = 'stats', initialDiff, i
                 <p className="mb-3 text-[10px] font-bold uppercase tracking-widest text-white/30">
                   Par catégorie <span className="text-white/25">· Mode Normal</span>
                 </p>
+
                 <div className="flex flex-col gap-2 lg:grid lg:grid-cols-2 lg:gap-3">
                   {sorted.map((cat, i) => {
                     const s = cat.stats
@@ -420,7 +478,7 @@ export default function StatsPage({ onBack, defaultTab = 'stats', initialDiff, i
                   })}
                 </div>
               </>
-            ) : (
+            ) : activeTab === 'leaderboard' ? (
               <>
                 {/* Header + quick-jump buttons */}
                 <div className="mb-3 flex items-center justify-between">
@@ -664,6 +722,159 @@ export default function StatsPage({ onBack, defaultTab = 'stats', initialDiff, i
                   </>
                 )}
               </>
+            ) : null}
+
+            {/* ── Onglet Journalier ── */}
+            {activeTab === 'daily' && (
+              <div className="flex flex-col gap-4">
+                {/* Header classement */}
+                <div className="mb-3 flex items-center justify-between">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-white/30">
+                    Classement <span className="text-neon-violet/60">· Journalier</span>
+                    {dailyTotal > 0 && <span className="ml-1 text-white/20">· {dailyTotal}</span>}
+                  </p>
+                  <div className="flex items-center gap-1.5">
+                    {dailyPage !== 0 && (
+                      <button
+                        onClick={() => loadDailyLeaderboard(selectedDate, 0)}
+                        disabled={dailyLoading}
+                        className="rounded-lg border border-white/[0.08] bg-white/[0.03] px-2 py-1 text-[10px] font-bold text-white/40 transition-colors hover:border-white/20 hover:text-white/70 disabled:opacity-30"
+                      >
+                        ↑ Top
+                      </button>
+                    )}
+                    {userRankInDailyLb !== null && dailyPage !== Math.floor((userRankInDailyLb - 1) / PAGE_SIZE) && (
+                      <button
+                        onClick={() => loadDailyLeaderboard(selectedDate, Math.floor((userRankInDailyLb - 1) / PAGE_SIZE))}
+                        disabled={dailyLoading}
+                        className="rounded-lg border border-neon-violet/30 bg-neon-violet/10 px-2 py-1 text-[10px] font-bold text-neon-violet/80 transition-colors hover:bg-neon-violet/20 disabled:opacity-30"
+                      >
+                        Mon rang #{userRankInDailyLb}
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Leaderboard */}
+                {dailyLoading ? (
+                  <div className="flex items-center justify-center py-16">
+                    <div className="h-5 w-5 animate-spin rounded-full border-2 border-white/20 border-t-white/60" />
+                  </div>
+                ) : dailyEntries.length === 0 ? (
+                  <p className="text-xs text-white/30">Aucun participant ce jour-là</p>
+                ) : (
+                  <>
+                    <div className="flex flex-col gap-1.5">
+                      {dailyEntries.map((e, i) => {
+                        const isPlayer = user?.id === e.user_id
+                        const rankColor  = isPlayer ? '#8B5CF6' : 'rgba(255,255,255,0.25)'
+                        const scoreColor = isPlayer ? '#8B5CF6' : undefined
+                        return (
+                          <motion.div
+                            key={e.id}
+                            initial={{ opacity: 0, y: 8 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: i * 0.04 }}
+                            className={[
+                              'flex items-center gap-3 rounded-xl px-4 py-3',
+                              isPlayer
+                                ? 'border border-neon-violet/30 bg-neon-violet/[0.08] shadow-[0_0_12px_rgba(139,92,246,0.15)]'
+                                : 'border border-white/[0.06] bg-white/[0.02]',
+                            ].join(' ')}
+                          >
+                            <span
+                              className="w-6 shrink-0 text-center text-xs font-black tabular-nums"
+                              style={{ color: rankColor }}
+                            >
+                              #{e.rank}
+                            </span>
+                            <div className="flex flex-1 min-w-0 items-center gap-1.5">
+                              <span
+                                className={[
+                                  'truncate text-sm font-bold',
+                                  isPlayer ? 'text-neon-violet' : 'text-white',
+                                  onViewProfile ? 'cursor-pointer underline decoration-transparent decoration-1 underline-offset-2 transition-colors hover:decoration-neon-violet' : '',
+                                ].join(' ')}
+                                onClick={onViewProfile ? () => onViewProfile(e.username) : undefined}
+                              >
+                                {e.username}
+                              </span>
+                              {e.featured_badges.length > 0 && (
+                                <div className="flex shrink-0 items-center gap-0.5">
+                                  {e.featured_badges.slice(0, 2).map(b => (
+                                    <MiniBadge key={b} achievementId={b} size={18} />
+                                  ))}
+                                </div>
+                              )}
+                              {e.streak_day > 1 && (
+                                <span className="shrink-0 text-[10px] text-warning/70">🔥{e.streak_day}</span>
+                              )}
+                            </div>
+                            <div className="flex shrink-0 flex-col items-end gap-0.5">
+                              <span
+                                className={`text-sm font-black tabular-nums ${isPlayer ? '' : 'text-orange-400'}`}
+                                style={scoreColor ? { color: scoreColor } : undefined}
+                              >
+                                {e.score.toLocaleString('fr-FR')}
+                                <span className="text-[10px] font-medium opacity-50"> pts</span>
+                              </span>
+                              {e.multiplier > 1 && (
+                                <span className="text-[10px] font-bold text-warning/70">×{Number(e.multiplier).toFixed(1)} · {e.xp_earned} XP</span>
+                              )}
+                            </div>
+                          </motion.div>
+                        )
+                      })}
+                    </div>
+
+                    {/* Pagination */}
+                    {Math.ceil(dailyTotal / PAGE_SIZE) > 1 && (
+                      <div className="mt-4 flex items-center justify-center gap-3">
+                        <button
+                          onClick={() => loadDailyLeaderboard(selectedDate, dailyPage - 1)}
+                          disabled={dailyPage === 0 || dailyLoading}
+                          className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/[0.08] bg-white/[0.03] text-white/50 transition-colors disabled:opacity-30 enabled:hover:border-white/20 enabled:hover:text-white"
+                        >‹</button>
+
+                        <div className="flex items-center gap-1">
+                          {Array.from({ length: Math.ceil(dailyTotal / PAGE_SIZE) }, (_, i) => {
+                            const totalPages = Math.ceil(dailyTotal / PAGE_SIZE)
+                            const show = i === 0 || i === totalPages - 1 || Math.abs(i - dailyPage) <= 1
+                            if (!show) {
+                              const prevShown = i - 1 === 0 || i - 1 === totalPages - 1 || Math.abs(i - 1 - dailyPage) <= 1
+                              if (!prevShown) return null
+                              return <span key={`ellipsis-${i}`} className="px-1 text-xs text-white/20">…</span>
+                            }
+                            const isUserPage = userRankInDailyLb !== null && i === Math.floor((userRankInDailyLb - 1) / PAGE_SIZE)
+                            return (
+                              <button
+                                key={i}
+                                onClick={() => loadDailyLeaderboard(selectedDate, i)}
+                                className={[
+                                  'h-7 min-w-[28px] rounded-lg px-2 text-xs font-bold transition-colors',
+                                  i === dailyPage
+                                    ? 'bg-neon-violet/20 text-neon-violet border border-neon-violet/30'
+                                    : isUserPage
+                                    ? 'text-neon-violet/60 hover:text-neon-violet'
+                                    : 'text-white/40 hover:text-white/70',
+                                ].join(' ')}
+                              >
+                                {i + 1}
+                              </button>
+                            )
+                          })}
+                        </div>
+
+                        <button
+                          onClick={() => loadDailyLeaderboard(selectedDate, dailyPage + 1)}
+                          disabled={dailyPage >= Math.ceil(dailyTotal / PAGE_SIZE) - 1 || dailyLoading}
+                          className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/[0.08] bg-white/[0.03] text-white/50 transition-colors disabled:opacity-30 enabled:hover:border-white/20 enabled:hover:text-white"
+                        >›</button>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
             )}
           </div>
         </div>

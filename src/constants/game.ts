@@ -16,6 +16,10 @@ export const FEEDBACK_DURATION = 1500
 /** Nombre de questions en mode normal */
 export const NORMAL_MODE_QUESTIONS = 10
 
+// ─── Mode défi journalier ─────────────────────────────────────────────────────
+/** Nombre de questions dans le défi journalier */
+export const DAILY_MODE_QUESTIONS = 10
+
 // ─── Combo ───────────────────────────────────────────────────────────────────
 /** Paliers de streak déclenchant l'overlay combo */
 export const COMBO_MILESTONES = [3, 5, 7, 10]

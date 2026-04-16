@@ -73,4 +73,17 @@ export const BADGE_TIER: Record<AchievementId, AchievementTier> = {
   reinvention:           'common',
   nouveau_visage:        'common',
   mon_histoire:          'common',
+  // Défi Journalier — séries
+  daily_premier_defi:    'common',
+  daily_serie_3:         'rare',
+  daily_semaine_de_feu:  'epic',
+  daily_quinzaine:       'epic',
+  daily_mois_de_fer:     'legendary',
+  daily_centenaire:      'legendary',
+  // Défi Journalier — scores
+  daily_score_parfait:   'common',
+  daily_sniper:          'rare',
+  daily_infaillible:     'epic',
+  daily_podium:          'rare',
+  daily_roi_du_jour:     'legendary',
 }

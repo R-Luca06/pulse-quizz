@@ -204,3 +204,86 @@ export async function checkAndUnlockAchievements(
     progress: null,
   }))
 }
+
+// ─── Daily Challenge Achievements ────────────────────────────────────────────
+
+export interface DailyAchievementContext {
+  score: number            // nombre de bonnes réponses (0–10), pas les points
+  currentStreak: number    // série après cette partie
+  userRank: number | null  // rang dans le leaderboard du jour
+}
+
+export async function checkAndUnlockDailyAchievements(
+  userId: string,
+  context: DailyAchievementContext,
+): Promise<AchievementWithStatus[]> {
+  // 1. Achievements déjà débloqués
+  const { data: existing, error: fetchError } = await supabase
+    .from('user_achievements')
+    .select('achievement_id')
+    .eq('user_id', userId)
+  if (fetchError) throw new AppError('db_error', fetchError.message)
+
+  const alreadyUnlocked = new Set(
+    (existing ?? []).map((r: { achievement_id: string }) => r.achievement_id)
+  )
+
+  // 2. Compte les scores parfaits en daily
+  const { count: perfectCount } = await supabase
+    .from('daily_challenge_entries')
+    .select('*', { count: 'exact', head: true })
+    .eq('user_id', userId)
+    .eq('score', 10)
+
+  const { count: totalDaily } = await supabase
+    .from('daily_challenge_entries')
+    .select('*', { count: 'exact', head: true })
+    .eq('user_id', userId)
+
+  const { data: streakData } = await supabase
+    .from('daily_streaks')
+    .select('current_streak, longest_streak')
+    .eq('user_id', userId)
+    .maybeSingle()
+  const longestStreak = (streakData as { longest_streak: number } | null)?.longest_streak ?? context.currentStreak
+
+  const toUnlock: AchievementId[] = []
+
+  function check(id: AchievementId, condition: boolean) {
+    if (!alreadyUnlocked.has(id) && condition) toUnlock.push(id)
+  }
+
+  // Séries (basées sur la plus longue série atteinte)
+  check('daily_premier_defi',     (totalDaily ?? 0) >= 1)
+  check('daily_serie_3',          longestStreak >= 3)
+  check('daily_semaine_de_feu',   longestStreak >= 7)
+  check('daily_quinzaine',        longestStreak >= 14)
+  check('daily_mois_de_fer',      longestStreak >= 30)
+  check('daily_centenaire',       longestStreak >= 100)
+
+  // Scores (évalués à la fin de la partie)
+  check('daily_score_parfait',    context.score === 10)
+  check('daily_sniper',           (perfectCount ?? 0) >= 5)
+  check('daily_infaillible',      context.score === 10 && context.currentStreak >= 30)
+
+  // Classement (daily_podium / daily_roi_du_jour) — évalués en fin de journée
+  // via la fonction SQL `check_daily_rank_achievements(p_date)` (scripts/daily_challenge_schema.sql)
+  // car le rang peut changer tout au long de la journée.
+
+  if (toUnlock.length === 0) return []
+
+  const { error: insertError } = await supabase
+    .from('user_achievements')
+    .upsert(
+      toUnlock.map(id => ({ user_id: userId, achievement_id: id })),
+      { onConflict: 'user_id,achievement_id', ignoreDuplicates: true },
+    )
+  if (insertError) throw new AppError('db_error', insertError.message)
+
+  return toUnlock.map(id => ({
+    ...ACHIEVEMENT_MAP[id],
+    unlocked: true,
+    unlocked_at: new Date().toISOString(),
+    progress: null,
+  }))
+}

@@ -21,8 +21,10 @@ const ProfilePage = lazy(() => import('./components/profile/ProfilePage'))
 const AchievementsPage = lazy(() => import('./components/achievements/AchievementsPage'))
 const UserProfilePanel = lazy(() => import('./pages/PublicProfilePage'))
 const SocialPage = lazy(() => import('./components/social/SocialPage'))
+const DailyChallengePage = lazy(() => import('./components/daily/DailyChallengePage'))
+const DailyChallengeModal = lazy(() => import('./components/daily/DailyChallengeModal'))
 
-export type AppScreen = 'landing' | 'launching' | 'quiz' | 'ranking' | 'result' | 'stats' | 'profile' | 'achievements' | 'social'
+export type AppScreen = 'landing' | 'launching' | 'quiz' | 'ranking' | 'result' | 'stats' | 'profile' | 'achievements' | 'social' | 'daily'
 
 // Écrans pendant lesquels l'overlay d'achievement doit être mis en attente
 const GAME_SCREENS: AppScreen[] = ['quiz', 'launching', 'ranking']
@@ -32,6 +34,7 @@ export default function App() {
   const { user, profile, pendingAchievements, clearPendingAchievements, refreshStats, showXpGain } = useAuth()
 
   const [screen, setScreen] = useState<AppScreen>('landing')
+  const [showDailyModal, setShowDailyModal] = useState(false)
   const [gameResult, setGameResult] = useState<GameResult>({ score: 0, results: [], bestScore: 0, isNewBest: false, userRank: null, rankDelta: null, xpBreakdown: null })
   const [rankingData, setRankingData] = useState<RankingData | null>(null)
   const [newAchievements, setNewAchievements] = useState<AchievementWithStatus[]>([])
@@ -51,16 +54,19 @@ export default function App() {
 
   // Analytics — screen views (on exclut 'launching' qui est un état transitoire)
   useEffect(() => {
-    const trackable: AppScreen[] = ['landing', 'result', 'ranking', 'stats', 'profile', 'achievements', 'social']
+    const trackable: AppScreen[] = ['landing', 'result', 'ranking', 'stats', 'profile', 'achievements', 'social', 'daily']
     if (trackable.includes(screen)) trackScreenViewed(screen)
   }, [screen])
   const overlayOriginRef = useRef<AppScreen>('result')
 
   function handleNewAchievements(unlocked: AchievementWithStatus[], fromGame = false) {
     if (unlocked.length > 0) {
-      // Si les achievements arrivent pendant une partie, l'overlay apparaîtra sur 'result'
+      // Si les achievements arrivent pendant une partie, l'overlay retourne vers 'result'
+      // sauf pour le mode daily où on revient sur la page journalière
       const origin = screenRef.current
-      overlayOriginRef.current = GAME_SCREENS.includes(origin) ? 'result' : origin
+      overlayOriginRef.current = GAME_SCREENS.includes(origin)
+        ? (settings.mode === 'daily' ? 'landing' : 'result')
+        : origin
       // Pour les achievements hors partie, mémoriser l'XP à déclencher après l'animation
       if (!fromGame && user) {
         const xp = unlocked.reduce((sum, a) => sum + XP_PER_ACHIEVEMENT[a.tier], 0)
@@ -85,10 +91,10 @@ export default function App() {
   }, [pendingAchievements])
 
   const [isLoadingRanking, setIsLoadingRanking] = useState(false)
-  const { handleFinished } = useGameOrchestration({ settings, user, profile, setScreen, setGameResult, setRankingData, setNewAchievements: handleNewGameAchievements, setLoadingRanking: setIsLoadingRanking, showXpGain, storePendingXp })
+  const { handleFinished } = useGameOrchestration({ settings, user, profile, setScreen, setGameResult, setRankingData, setNewAchievements: handleNewGameAchievements, setLoadingRanking: setIsLoadingRanking, showXpGain, storePendingXp, onDailyComplete: handleDailyComplete })
   const [returnToSettings, setReturnToSettings] = useState(false)
   const [statsOrigin, setStatsOrigin] = useState<'landing' | 'result'>('landing')
-  const [statsDefaultTab, setStatsDefaultTab] = useState<'stats' | 'leaderboard'>('stats')
+  const [statsDefaultTab, setStatsDefaultTab] = useState<'stats' | 'leaderboard' | 'daily'>('leaderboard')
   const [statsInitialDiff, setStatsInitialDiff] = useState<typeof settings.difficulty | undefined>(undefined)
   const [statsInitialLang, setStatsInitialLang] = useState<Language | undefined>(undefined)
   const [authModal, setAuthModal] = useState<{ open: boolean; tab: 'signin' | 'signup' }>({ open: false, tab: 'signin' })
@@ -140,20 +146,44 @@ export default function App() {
     setScreen(overlayOriginRef.current)
   }
 
+  function handleShowDaily() { setShowDailyModal(true) }
+
+  function handleCloseDailyModal() { setShowDailyModal(false) }
+
+  function handleShowDailyLeaderboard() {
+    setShowDailyModal(false)
+    handleShowStats('landing', 'daily')
+  }
+
+  // Called when a daily game completes: go back to landing + reopen the card modal
+  function handleDailyComplete() { setScreen('landing'); setShowDailyModal(true) }
+
+  function handleStartDailyGame() {
+    setShowDailyModal(false)
+    update({ mode: 'daily', difficulty: 'mixed', category: 'all' })
+    setScreen('launching')
+  }
+
   function handleStart() { setScreen('launching') }
 
   function handleExplosion() { setScreen('quiz') }
 
   function handleQuit() {
-    if (screenRef.current === 'quiz') {
+    if (screenRef.current === 'quiz' && settings.mode !== 'daily') {
       trackGameAbandoned({ mode: settings.mode, difficulty: settings.difficulty, category: settings.category, language: settings.language })
     }
-    setReturnToSettings(false); setNewAchievements([]); setPendingAchievementId(null); setScreen('landing')
+    setReturnToSettings(false); setNewAchievements([]); setPendingAchievementId(null)
+    if (settings.mode === 'daily') {
+      setScreen('landing')
+      setShowDailyModal(true)
+    } else {
+      setScreen('landing')
+    }
   }
 
   function handleReplay() { setNewAchievements([]); setPendingAchievementId(null); setScreen('quiz') }
 
-  function handleShowStats(from: 'landing' | 'result', tab: 'stats' | 'leaderboard' = 'stats') {
+  function handleShowStats(from: 'landing' | 'result', tab: 'stats' | 'leaderboard' | 'daily' = 'leaderboard') {
     setStatsOrigin(from)
     setStatsDefaultTab(tab)
     if (from === 'result') {
@@ -195,6 +225,7 @@ export default function App() {
                 onShowAchievements={() => handleShowAchievements('landing')}
                 onShowSocial={() => setScreen('social')}
                 onViewProfile={setViewingUsername}
+                onShowDaily={handleShowDaily}
               />
             </motion.div>
           )}
@@ -331,9 +362,59 @@ export default function App() {
               </Suspense>
             </motion.div>
           )}
+
+          {screen === 'daily' && (
+            <motion.div
+              key="daily"
+              initial={{ opacity: 0, y: 40 }}
+              animate={{ opacity: 1, y: 0, transition: { duration: 0.5, delay: 0.1, ease: 'easeOut' } }}
+              exit={{ opacity: 0, transition: { duration: 0.25 } }}
+              className="absolute inset-0 z-10"
+            >
+              <Suspense fallback={<div className="absolute inset-0 bg-game-bg" />}>
+                <DailyChallengePage
+                  onBack={() => setScreen('landing')}
+                  onStartGame={handleStartDailyGame}
+                />
+              </Suspense>
+            </motion.div>
+          )}
         </AnimatePresence>
         </Suspense>
       </div>
+
+      {/* ── Daily challenge dropdown (below nav bar, like notifications) ──── */}
+      <AnimatePresence>
+        {showDailyModal && (
+          <motion.div
+            key="daily-modal-overlay"
+            className="fixed inset-0 z-50"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15 }}
+          >
+            {/* Invisible backdrop — click outside to dismiss */}
+            <div className="absolute inset-0" onClick={handleCloseDailyModal} />
+            {/* Dropdown panel anchored below the nav bar + sub-header */}
+            <div
+              className={[
+                'absolute left-4 z-10 w-[360px] max-w-[calc(100vw-32px)]',
+                'max-h-[calc(100vh-120px)] overflow-y-auto',
+                user ? 'top-[90px]' : 'top-[60px]',
+              ].join(' ')}
+            >
+              <Suspense fallback={<div className="h-48 w-full rounded-2xl bg-game-card animate-pulse" />}>
+                <DailyChallengeModal
+                  onClose={handleCloseDailyModal}
+                  onStartGame={handleStartDailyGame}
+                  onShowLeaderboard={handleShowDailyLeaderboard}
+                />
+              </Suspense>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <Suspense fallback={null}>
         <AnimatePresence>
