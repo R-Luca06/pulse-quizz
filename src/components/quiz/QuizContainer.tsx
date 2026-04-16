@@ -191,7 +191,7 @@ export default function QuizContainer({ onFinished, onQuit, gameMode, difficulty
           <button
             onClick={onQuit}
             aria-label="Quitter la partie"
-            className="flex h-7 w-7 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/30 transition-colors hover:border-white/20 hover:text-white/60"
+            className={`flex h-7 w-7 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/30 transition-colors hover:border-white/20 hover:text-white/60 ${gameMode === 'daily' ? 'invisible pointer-events-none' : ''}`}
           >
             <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
               <path d="M1 1l8 8M9 1L1 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
