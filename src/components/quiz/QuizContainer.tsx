@@ -8,7 +8,7 @@ import TimerBar from './TimerBar'
 import StreakIndicator from './StreakIndicator'
 
 import type { QuestionResult, GameMode, Difficulty, Language, Category } from '../../types/quiz'
-import { QUESTION_DURATION, URGENT_THRESHOLD, COMBO_MILESTONES, COMP_SPEED_TIERS } from '../../constants/game'
+import { QUESTION_DURATION, URGENT_THRESHOLD, COMBO_MILESTONES } from '../../constants/game'
 
 interface Props {
   onFinished: (score: number, results: QuestionResult[]) => void
