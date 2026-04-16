@@ -41,10 +41,11 @@ CREATE TABLE IF NOT EXISTS daily_challenge_entries (
   id           uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id      uuid        NOT NULL REFERENCES auth.users (id) ON DELETE CASCADE,
   date         date        NOT NULL,
-  score        int         NOT NULL CHECK (score >= 0 AND score <= 10),
-  xp_earned    int         NOT NULL CHECK (xp_earned >= 0),
-  multiplier   numeric(4,2) NOT NULL DEFAULT 1.0,
-  streak_day   int         NOT NULL DEFAULT 1,
+  score            int          NOT NULL CHECK (score >= 0),
+  correct_answers  int          NOT NULL DEFAULT 0 CHECK (correct_answers >= 0 AND correct_answers <= 10),
+  xp_earned        int          NOT NULL CHECK (xp_earned >= 0),
+  multiplier       numeric(4,2) NOT NULL DEFAULT 1.0,
+  streak_day       int          NOT NULL DEFAULT 1,
   completed_at timestamptz NOT NULL DEFAULT now(),
   UNIQUE (user_id, date)
 );
@@ -83,10 +84,11 @@ CREATE POLICY "streaks write"  ON daily_streaks FOR ALL USING (auth.uid() = user
 -- • Retourne l'entrée créée + nouvelle série
 
 CREATE OR REPLACE FUNCTION submit_daily_entry(
-  p_date       date,
-  p_score      int,
-  p_xp_earned  int,
-  p_multiplier numeric
+  p_date            date,
+  p_score           int,
+  p_xp_earned       int,
+  p_multiplier      numeric,
+  p_correct_answers int DEFAULT 0
 )
 RETURNS jsonb
 LANGUAGE plpgsql
@@ -135,8 +137,8 @@ BEGIN
   v_streak_day := v_new_streak;
 
   -- Insérer l'entrée
-  INSERT INTO daily_challenge_entries (user_id, date, score, xp_earned, multiplier, streak_day)
-    VALUES (v_user_id, p_date, p_score, p_xp_earned, p_multiplier, v_streak_day)
+  INSERT INTO daily_challenge_entries (user_id, date, score, correct_answers, xp_earned, multiplier, streak_day)
+    VALUES (v_user_id, p_date, p_score, p_correct_answers, p_xp_earned, p_multiplier, v_streak_day)
     RETURNING id INTO v_entry_id;
 
   -- Upsert la série

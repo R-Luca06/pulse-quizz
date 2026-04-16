@@ -120,10 +120,11 @@ export async function submitDailyEntry(params: SubmitDailyParams): Promise<Submi
   const xp_earned = computeDailyXp(correctAnswers, multiplier)
 
   const { data, error } = await supabase.rpc('submit_daily_entry', {
-    p_date:       date,
-    p_score:      score,
-    p_xp_earned:  xp_earned,
-    p_multiplier: multiplier,
+    p_date:             date,
+    p_score:            score,
+    p_xp_earned:        xp_earned,
+    p_multiplier:       multiplier,
+    p_correct_answers:  correctAnswers,
   })
 
   if (error) {
@@ -215,7 +216,7 @@ export async function getDailyPerfectCount(userId: string): Promise<number> {
     .from('daily_challenge_entries')
     .select('*', { count: 'exact', head: true })
     .eq('user_id', userId)
-    .eq('score', 10)
+    .eq('correct_answers', 10)
 
   if (error) throw new AppError('db_error', error.message)
   return count ?? 0
