@@ -101,9 +101,6 @@ export default function ShareModal({
   }
 
   // Card preview (mini — HTML only, not from ref)
-  const modeDotBg = isCompetitif
-    ? 'linear-gradient(135deg, #F97316, #EF4444)'
-    : 'linear-gradient(135deg, #8B5CF6, #60A5FA)'
   const modePillBg = isCompetitif ? 'rgba(249,115,22,0.1)' : 'rgba(139,92,246,0.1)'
   const modePillBorder = isCompetitif ? 'rgba(249,115,22,0.2)' : 'rgba(139,92,246,0.2)'
   const modePillColor = isCompetitif ? 'rgba(251,146,60,0.75)' : 'rgba(167,139,250,0.75)'
@@ -124,8 +121,24 @@ export default function ShareModal({
     }}>
       {/* Brand row */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-          <div style={{ width: 7, height: 7, borderRadius: '50%', background: modeDotBg }} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <svg width="14" height="12" viewBox="0 0 200 160" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <defs>
+              <linearGradient id="share-mini-logo-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#8B5CF6" />
+                <stop offset="50%" stopColor="#3B82F6" />
+                <stop offset="100%" stopColor="#06B6D4" />
+              </linearGradient>
+            </defs>
+            <path
+              d="M 35 145 L 35 25 A 28 28 0 0 1 35 81 L 75 81 Q 92 52 108 81 T 142 81 L 170 81"
+              fill="none"
+              stroke="url(#share-mini-logo-grad)"
+              strokeWidth="20"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
           <span style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase' as const, color: 'rgba(255,255,255,0.38)' }}>
             Pulse Quizz
           </span>

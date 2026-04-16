@@ -5,6 +5,7 @@ import GuestHeader from './GuestHeader'
 import FinalCtaSection from './sections/FinalCtaSection'
 import ConstellationBackground from './ConstellationBackground'
 import ReturningAnonymousBanner from './ReturningAnonymousBanner'
+import PulseLogo from '../brand/PulseLogo'
 import { unlockAudio } from '../../utils/sounds'
 import { isReturningAnonymous } from '../../utils/statsStorage'
 
@@ -100,11 +101,21 @@ function Hero({ onPlay, onOpenSignIn, onOpenSignUp }: { onPlay: () => void; onOp
       />
       <ConstellationBackground />
 
+      {/* Logo principal */}
+      <motion.div
+        initial={{ opacity: 0, scale: 0.85 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.6, type: 'spring', stiffness: 180 }}
+        className="relative mb-6"
+      >
+        <PulseLogo size={120} />
+      </motion.div>
+
       {/* Wordmark — h1 */}
       <motion.h1
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
+        transition={{ duration: 0.5, delay: 0.1 }}
         className="relative text-5xl font-black leading-none tracking-tight text-white sm:text-6xl md:text-7xl"
       >
         Pulse
@@ -416,9 +427,12 @@ function FaqItem({ question, answer }: { question: string; answer: string }) {
 function Footer() {
   return (
     <footer className="w-full border-t border-white/5 px-6 py-10 text-center">
-      <p className="text-sm font-black tracking-tight text-white">
-        Pulse<span className="text-neon-violet">Quizz</span>
-      </p>
+      <div className="flex items-center justify-center gap-2">
+        <PulseLogo size={22} />
+        <p className="text-sm font-black tracking-tight text-white">
+          Pulse<span className="text-neon-violet">Quizz</span>
+        </p>
+      </div>
       <p className="mt-2 text-xs text-white/60">
         Quiz compétitif en français · Rejoins la communauté
       </p>

@@ -42,9 +42,6 @@ const ScoreCard = forwardRef<HTMLDivElement, Props>(function ScoreCard(
 
   const bgColor = isCompetitif ? '#120a05' : '#0f0f1c'
   const borderColor = isCompetitif ? 'rgba(249,115,22,0.22)' : 'rgba(139,92,246,0.22)'
-  const modeDotBg = isCompetitif
-    ? 'linear-gradient(135deg, #F97316, #EF4444)'
-    : 'linear-gradient(135deg, #8B5CF6, #60A5FA)'
   const modePillBg = isCompetitif ? 'rgba(249,115,22,0.12)' : 'rgba(139,92,246,0.12)'
   const modePillBorder = isCompetitif ? 'rgba(249,115,22,0.25)' : 'rgba(139,92,246,0.25)'
   const modePillColor = isCompetitif ? 'rgba(251,146,60,0.85)' : 'rgba(167,139,250,0.85)'
@@ -92,8 +89,24 @@ const ScoreCard = forwardRef<HTMLDivElement, Props>(function ScoreCard(
 
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <div style={{ width: 8, height: 8, borderRadius: '50%', background: modeDotBg }} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+          <svg width="18" height="15" viewBox="0 0 200 160" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <defs>
+              <linearGradient id="scorecard-logo-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#8B5CF6" />
+                <stop offset="50%" stopColor="#3B82F6" />
+                <stop offset="100%" stopColor="#06B6D4" />
+              </linearGradient>
+            </defs>
+            <path
+              d="M 35 145 L 35 25 A 28 28 0 0 1 35 81 L 75 81 Q 92 52 108 81 T 142 81 L 170 81"
+              fill="none"
+              stroke="url(#scorecard-logo-grad)"
+              strokeWidth="18"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
           <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.09em', textTransform: 'uppercase' as const, color: 'rgba(255,255,255,0.38)' }}>
             Pulse Quizz
           </span>

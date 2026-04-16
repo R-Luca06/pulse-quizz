@@ -8,6 +8,7 @@ import NotificationBell from '../notifications/NotificationBell'
 import { getLevelProgress, getLevelFromXp } from '../../constants/levels'
 import { getDailyTheme, getDailyEntry, getDailyStreak, getTodayDate } from '../../services/dailyChallenge'
 import type { DailyTheme, DailyEntry, DailyStreak } from '../../types/quiz'
+import PulseLogo from '../brand/PulseLogo'
 
 interface ConnectedHeaderProps {
   onShowStats: (tab?: 'stats' | 'leaderboard' | 'daily') => void
@@ -122,8 +123,9 @@ export default function ConnectedHeader({
     >
       {/* ── Gauche : logo + défi journalier ── */}
       <div className="flex items-center gap-3 sm:gap-5">
-        <span className="select-none text-base font-black tracking-tight text-white">
-          Pulse<span className="text-neon-violet">Quizz</span>
+        <span className="flex select-none items-center gap-1.5 text-base font-black tracking-tight text-white">
+          <PulseLogo size={24} />
+          <span className="hidden sm:inline">Pulse<span className="text-neon-violet">Quizz</span></span>
         </span>
 
         {/* Défi journalier — visible sur tous les écrans */}
