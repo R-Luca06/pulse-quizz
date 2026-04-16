@@ -1,10 +1,12 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { CATEGORY_LABELS, DIFFICULTY_LABELS, MODE_LABELS, LANGUAGE_LABELS } from '../../constants/quiz'
 import { NORMAL_MODE_QUESTIONS } from '../../constants/game'
 import { computeBestStreak } from '../../utils/statsStorage'
 import { useAuth } from '../../hooks/useAuth'
 import SignupIncentiveBlock from './SignupIncentiveBlock'
+import ScoreCard from '../share/ScoreCard'
+import ShareModal from '../share/ShareModal'
 import type { QuestionResult, GameMode, Difficulty, Category, Language } from '../../types/quiz'
 
 interface Props {
@@ -49,6 +51,8 @@ export default function ResultScreen({ score, results, onReplay, onBack, onShowS
   const tier = tiers.find(t => score >= t.min) ?? tiers[tiers.length - 1]
   const [displayed, setDisplayed] = useState(0)
   const [recapOpen, setRecapOpen] = useState(false)
+  const [shareOpen, setShareOpen] = useState(false)
+  const cardRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
     if (score === 0) return
     let current = 0
@@ -122,6 +126,17 @@ export default function ResultScreen({ score, results, onReplay, onBack, onShowS
                 <rect x="18" y="3" width="4" height="18" rx="1"/>
                 <rect x="10" y="8" width="4" height="13" rx="1"/>
                 <rect x="2" y="13" width="4" height="8" rx="1"/>
+              </svg>
+            </button>
+            <button
+              onClick={() => setShareOpen(true)}
+              aria-label="Partager mon score"
+              className="flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/30 transition-colors hover:border-white/20 hover:text-white/60"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/>
+                <polyline points="16 6 12 2 8 6"/>
+                <line x1="12" y1="2" x2="12" y2="15"/>
               </svg>
             </button>
           </motion.div>
@@ -426,6 +441,31 @@ export default function ResultScreen({ score, results, onReplay, onBack, onShowS
           )}
         </motion.div>
       </div>
+
+      {/* Offscreen ScoreCard for capture */}
+      <div style={{ position: 'absolute', left: -9999, top: -9999, pointerEvents: 'none' }}>
+        <ScoreCard
+          ref={cardRef}
+          score={score}
+          results={results}
+          gameMode={gameMode}
+          difficulty={difficulty}
+          category={category}
+          username={user?.user_metadata?.username ?? user?.email?.split('@')[0] ?? null}
+          userRank={userRank}
+        />
+      </div>
+
+      <ShareModal
+        open={shareOpen}
+        onClose={() => setShareOpen(false)}
+        score={score}
+        results={results}
+        gameMode={gameMode}
+        username={user?.user_metadata?.username ?? user?.email?.split('@')[0] ?? null}
+        userRank={userRank}
+        cardRef={cardRef}
+      />
     </div>
   )
 }
