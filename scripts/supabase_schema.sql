@@ -2,8 +2,14 @@
 -- Pulse Quizz — Schéma complet Supabase
 -- ═══════════════════════════════════════════════════════════════════════════════
 --
--- Source de vérité pour toute la base de données.
--- Remplace scripts/supabase_questions.sql (qui ne couvrait que la table questions).
+-- Source de vérité unique de la base de données.
+-- Remplace et consolide tous les fichiers par feature :
+--   - scripts/daily_challenge_schema.sql
+--   - scripts/pulses_schema.sql
+--   - scripts/user_badges.sql
+--   - scripts/migrations/001_public_profile.sql
+--   - scripts/migrations/002_achievement_dates.sql
+-- (conservés pour référence historique uniquement).
 --
 -- Exécution :
 --   Supabase Dashboard → SQL Editor → New query → coller ce fichier → Run
@@ -12,16 +18,40 @@
 -- Ordre : respecter l'ordre du fichier (dépendances FK).
 --
 -- Tables :
---   1. profiles              — profils utilisateurs (lié à auth.users)
---   2. questions             — banque de questions de quiz
---   3. leaderboard           — classements (normal + compétitif)
---   4. user_stats            — stats par catégorie / mode / difficulté
---   5. user_global_stats     — totaux agrégés par utilisateur
---   6. user_achievements     — achievements débloqués
+--   1.  profiles                    — profils utilisateurs (lié à auth.users)
+--   2.  questions                   — banque de questions de quiz
+--   3.  leaderboard                 — classements (normal + compétitif)
+--   4.  user_stats                  — stats par catégorie / mode / difficulté
+--   5.  user_global_stats           — totaux agrégés (games, XP, comp score)
+--   6.  user_achievements           — achievements débloqués
+--   7.  user_badges                 — possession unifiée de badges (toutes sources)
+--   8.  friendships                 — relations d'amitié
+--   9.  notifications               — notifications in-app (20 max / user)
+--   10. daily_themes                — thème pré-curé par date
+--   11. daily_challenge_entries     — participations journalières (1 / user / date)
+--   12. daily_streaks               — séries journalières par utilisateur
+--   13. user_wallet                 — solde Pulses ◈
+--   14. wallet_transactions         — ledger immuable des gains de Pulses
 --
 -- Fonctions RPC :
---   - get_random_questions   — sélection aléatoire de N questions
---   - delete_user            — suppression complète du compte
+--   - get_random_questions          — sélection aléatoire via pivot UUID
+--   - submit_score                  — seul point d'écriture dans leaderboard
+--   - increment_category_stats      — upsert atomique de user_stats
+--   - increment_global_stats        — upsert atomique de user_global_stats (+ XP)
+--   - add_xp                        — crédit ponctuel d'XP
+--   - add_pulses                    — ledger + wallet upsert atomique
+--   - submit_daily_entry            — insert + calcul de série (UNIQUE user/date)
+--   - mark_daily_recap_seen         — flag recap_seen=true pour une entrée journalière
+--   - get_daily_leaderboard         — classement journalier paginé
+--   - check_daily_rank_achievements — unlock rang-based daily (pg_cron en fin de jour)
+--   - get_public_profile            — profil public + stats + rang + achievements
+--   - delete_user                   — suppression complète du compte
+--
+-- Triggers :
+--   - sync_achievement_to_badge     — user_achievements → user_badges
+--   - sync_username_to_leaderboard  — profiles → leaderboard (changement de pseudo)
+--   - trim_notifications            — garde les 20 dernières par utilisateur
+--   - update_friendships_updated_at — maintient friendships.updated_at
 --
 -- ═══════════════════════════════════════════════════════════════════════════════
 
@@ -30,14 +60,15 @@
 -- 1. profiles
 -- ─────────────────────────────────────────────────────────────────────────────
 -- Créé lors de l'inscription (AuthContext.signUp).
--- Le username est affiché dans le leaderboard (dénormalisé dans leaderboard.username
--- pour éviter les JOINs en lecture).
+-- `username` est affiché partout (leaderboard, public profile) — dénormalisé
+-- dans leaderboard.username pour éviter les JOINs en lecture ; synchronisé
+-- lors d'un changement de pseudo via profile.ts.
 
 CREATE TABLE IF NOT EXISTS profiles (
   id                  uuid        PRIMARY KEY REFERENCES auth.users (id) ON DELETE CASCADE,
   username            text        NOT NULL,
-  featured_badges     text[]      NOT NULL DEFAULT '{}',  -- jusqu'à 3 achievement_id épinglés sur le leaderboard
-  description         text,                               -- bio libre de l'utilisateur
+  featured_badges     text[]      NOT NULL DEFAULT '{}',  -- jusqu'à 3 badge_id épinglés
+  description         text        NOT NULL DEFAULT '',    -- bio libre (max 120 char côté client)
   username_changed    boolean     NOT NULL DEFAULT false,
   avatar_changed      boolean     NOT NULL DEFAULT false,
   description_changed boolean     NOT NULL DEFAULT false,
@@ -46,24 +77,21 @@ CREATE TABLE IF NOT EXISTS profiles (
 );
 
 -- Unicité insensible à la casse : index fonctionnel sur lower(username).
--- Remplace l'ancienne contrainte UNIQUE (username) qui était case-sensitive.
--- 'Alice' et 'alice' sont désormais considérés comme le même username.
+-- 'Alice' et 'alice' = même username.
 CREATE UNIQUE INDEX IF NOT EXISTS profiles_username_lower_unique
   ON profiles (lower(username));
 
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 
--- Lecture publique (affichage leaderboard, vérification unicité username)
+-- Lecture publique (leaderboard, vérif unicité pseudo, profil public)
 CREATE POLICY "profiles_select_public"
   ON profiles FOR SELECT
   USING (true);
 
--- Insertion : uniquement son propre profil
 CREATE POLICY "profiles_insert_own"
   ON profiles FOR INSERT
   WITH CHECK (auth.uid() = id);
 
--- Modification : uniquement son propre profil
 CREATE POLICY "profiles_update_own"
   ON profiles FOR UPDATE
   USING (auth.uid() = id)
@@ -73,36 +101,28 @@ CREATE POLICY "profiles_update_own"
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 2. questions
 -- ─────────────────────────────────────────────────────────────────────────────
--- Banque de questions importée via scripts/import-openquizzdb.mjs
--- ou scripts/import-custom.mjs. Lecture seule depuis le client.
+-- Banque alimentée via scripts/import-custom.mjs (lecture seule depuis le client).
 
 CREATE TABLE IF NOT EXISTS questions (
   id                uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
-  language          text        NOT NULL,                                     -- 'fr' (futur : 'en')
-  category          text        NOT NULL,                                     -- ex: 'Géographie', 'Histoire'
+  language          text        NOT NULL,                                     -- 'fr'
+  category          text        NOT NULL,
   difficulty        text        NOT NULL CHECK (difficulty IN ('easy', 'medium', 'hard')),
   question          text        NOT NULL,
   correct_answer    text        NOT NULL,
   incorrect_answers text[]      NOT NULL,                                     -- 3 mauvaises réponses
-  anecdote          text,                                                     -- explication (future learning mode)
+  anecdote          text,
   source            text        NOT NULL DEFAULT 'openquizzdb',
   created_at        timestamptz NOT NULL DEFAULT now()
 );
 
--- Index couvrant : (language, difficulty, category, id)
--- Le champ id en fin de colonne permet au pivot UUID (get_random_questions) de faire
--- un range scan id >= pivot directement dans l'index, sans retour à la heap.
--- Remplace les deux anciens index partiels (lang_diff, lang_cat).
+-- Index couvrant pour le pivot UUID (get_random_questions) : range scan direct
+-- dans l'index, aucun retour heap.
 CREATE INDEX IF NOT EXISTS idx_questions_lang_diff_cat_id
   ON questions (language, difficulty, category, id);
 
--- Anciens index partiels devenus redondants — à dropper après création de l'index ci-dessus.
--- DROP INDEX IF EXISTS idx_questions_lang_diff;
--- DROP INDEX IF EXISTS idx_questions_lang_cat;
-
 ALTER TABLE questions ENABLE ROW LEVEL SECURITY;
 
--- Lecture publique, écriture interdite depuis le client
 CREATE POLICY "questions_read_public"
   ON questions FOR SELECT
   USING (true);
@@ -111,13 +131,8 @@ CREATE POLICY "questions_read_public"
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 3. leaderboard
 -- ─────────────────────────────────────────────────────────────────────────────
--- Stocke le meilleur score de chaque utilisateur par configuration de jeu.
---
 -- Mode normal     : une entrée par (user_id, 'normal', difficulty, language)
 -- Mode compétitif : une entrée par (user_id, 'compétitif', 'mixed', language)
---
--- Le username est dénormalisé pour les lectures du classement.
--- Il est synchronisé dans profile.ts lors d'un changement de pseudo.
 
 CREATE TABLE IF NOT EXISTS leaderboard (
   id         uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -129,42 +144,33 @@ CREATE TABLE IF NOT EXISTS leaderboard (
   language   text        NOT NULL DEFAULT 'fr',
   game_data  jsonb,                                                           -- détail des réponses (compétitif)
   updated_at timestamptz NOT NULL DEFAULT now(),
-
-  -- Une seule entrée par utilisateur / mode / difficulté / langue
   CONSTRAINT leaderboard_user_mode_unique UNIQUE (user_id, mode, difficulty, language)
 );
 
--- Classement compétitif : filtre mode + language, tri par score DESC
 CREATE INDEX IF NOT EXISTS idx_leaderboard_comp
   ON leaderboard (mode, language, score DESC)
   WHERE mode = 'compétitif';
 
--- Classement normal : filtre mode + difficulty, tri par score DESC
 CREATE INDEX IF NOT EXISTS idx_leaderboard_normal
   ON leaderboard (mode, difficulty, score DESC)
   WHERE mode != 'compétitif';
 
--- Lookup rapide par utilisateur (submitScore, getUserBestScore)
 CREATE INDEX IF NOT EXISTS idx_leaderboard_user
   ON leaderboard (user_id, mode);
 
 ALTER TABLE leaderboard ENABLE ROW LEVEL SECURITY;
 
--- Lecture publique (le classement est visible par tous)
+-- Lecture publique. INSERT/UPDATE interdits directement → seuls les appels à
+-- submit_score (SECURITY DEFINER + GREATEST) peuvent écrire.
 CREATE POLICY "leaderboard_select_public"
   ON leaderboard FOR SELECT
   USING (true);
 
--- INSERT et UPDATE directs supprimés : toute écriture passe par la RPC submit_score
--- (SECURITY DEFINER) qui valide l'authentification et garantit GREATEST(old, new)
--- côté serveur. Cela empêche un utilisateur d'écrire un score arbitraire via REST.
-
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- 4. user_stats (stats par catégorie / mode / difficulté)
+-- 4. user_stats
 -- ─────────────────────────────────────────────────────────────────────────────
--- Incrémenté après chaque partie via cloudStats.incrementCategoryStats().
--- Clé composite = une ligne par combinaison (user, mode, difficulty, category).
+-- Incrémenté via la RPC increment_category_stats après chaque partie.
 
 CREATE TABLE IF NOT EXISTS user_stats (
   user_id         uuid        NOT NULL REFERENCES auth.users (id) ON DELETE CASCADE,
@@ -174,98 +180,269 @@ CREATE TABLE IF NOT EXISTS user_stats (
   games_played    integer     NOT NULL DEFAULT 0,
   total_questions integer     NOT NULL DEFAULT 0,
   total_correct   integer     NOT NULL DEFAULT 0,
-  total_time      real        NOT NULL DEFAULT 0,                             -- somme des temps de réponse (secondes)
+  total_time      real        NOT NULL DEFAULT 0,
   best_score      integer     NOT NULL DEFAULT 0,
   best_streak     integer     NOT NULL DEFAULT 0,
   fastest_perfect real,                                                       -- meilleur temps pour un 10/10 (null si jamais)
   updated_at      timestamptz NOT NULL DEFAULT now(),
-
   PRIMARY KEY (user_id, mode, difficulty, category)
 );
 
 ALTER TABLE user_stats ENABLE ROW LEVEL SECURITY;
-
--- Un utilisateur ne voit et ne modifie que ses propres stats
-CREATE POLICY "user_stats_select_own"
-  ON user_stats FOR SELECT
-  USING (auth.uid() = user_id);
-
-CREATE POLICY "user_stats_insert_own"
-  ON user_stats FOR INSERT
-  WITH CHECK (auth.uid() = user_id);
-
-CREATE POLICY "user_stats_update_own"
-  ON user_stats FOR UPDATE
-  USING (auth.uid() = user_id)
-  WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "user_stats_select_own"  ON user_stats FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "user_stats_insert_own"  ON user_stats FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "user_stats_update_own"  ON user_stats FOR UPDATE USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- 5. user_global_stats (totaux agrégés par utilisateur)
+-- 5. user_global_stats
 -- ─────────────────────────────────────────────────────────────────────────────
--- Incrémenté après chaque partie via cloudStats.incrementGlobalStats().
--- Une seule ligne par utilisateur.
+-- Une seule ligne par utilisateur. Incrémentée via increment_global_stats.
 
 CREATE TABLE IF NOT EXISTS user_global_stats (
-  user_id          uuid        PRIMARY KEY REFERENCES auth.users (id) ON DELETE CASCADE,
-  games_played     integer     NOT NULL DEFAULT 0,
-  total_questions  integer     NOT NULL DEFAULT 0,
-  total_correct    integer     NOT NULL DEFAULT 0,
-  best_streak      integer     NOT NULL DEFAULT 0,
-  fastest_perfect  real,                                                      -- meilleur temps pour un 10/10 (null si jamais)
-  comp_total_score integer     NOT NULL DEFAULT 0,                            -- score cumulé compétitif (toutes parties)
-  updated_at       timestamptz NOT NULL DEFAULT now()
+  user_id           uuid        PRIMARY KEY REFERENCES auth.users (id) ON DELETE CASCADE,
+  games_played      integer     NOT NULL DEFAULT 0,
+  comp_games_played integer     NOT NULL DEFAULT 0,                           -- compteur compétitif (achievements Combattant/Gladiateur/Légende)
+  total_questions   integer     NOT NULL DEFAULT 0,
+  total_correct     integer     NOT NULL DEFAULT 0,
+  best_streak       integer     NOT NULL DEFAULT 0,
+  fastest_perfect   real,
+  comp_total_score  integer     NOT NULL DEFAULT 0,                           -- score cumulé compétitif (toutes parties)
+  total_xp          integer     NOT NULL DEFAULT 0,                           -- XP cumulé (système de niveaux)
+  updated_at        timestamptz NOT NULL DEFAULT now()
 );
 
 ALTER TABLE user_global_stats ENABLE ROW LEVEL SECURITY;
-
--- Un utilisateur ne voit et ne modifie que ses propres stats globales
-CREATE POLICY "user_global_stats_select_own"
-  ON user_global_stats FOR SELECT
-  USING (auth.uid() = user_id);
-
-CREATE POLICY "user_global_stats_insert_own"
-  ON user_global_stats FOR INSERT
-  WITH CHECK (auth.uid() = user_id);
-
-CREATE POLICY "user_global_stats_update_own"
-  ON user_global_stats FOR UPDATE
-  USING (auth.uid() = user_id)
-  WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "user_global_stats_select_own" ON user_global_stats FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "user_global_stats_insert_own" ON user_global_stats FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "user_global_stats_update_own" ON user_global_stats FOR UPDATE USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 6. user_achievements
 -- ─────────────────────────────────────────────────────────────────────────────
--- Inséré via achievements.checkAndUnlockAchievements().
--- Upsert avec ignoreDuplicates pour éviter les doublons en race condition.
---
--- Achievements définis côté client dans constants/achievements.ts :
---   premiers_pas       — créer son compte
---   premier_competiteur — terminer une partie compétitive
---   serie_de_feu       — 10 bonnes réponses d'affilée
---   perfectionniste    — score parfait 10/10 en normal
---   centenaire         — 100 parties jouées (tous modes)
+-- Inséré via achievements.checkAndUnlockAchievements() et
+-- checkAndUnlockDailyAchievements(). Upsert avec ignoreDuplicates.
+-- Ids définis côté client dans src/constants/achievements.ts.
 
 CREATE TABLE IF NOT EXISTS user_achievements (
   user_id        uuid        NOT NULL REFERENCES auth.users (id) ON DELETE CASCADE,
   achievement_id text        NOT NULL,
   unlocked_at    timestamptz NOT NULL DEFAULT now(),
-
   PRIMARY KEY (user_id, achievement_id)
 );
 
 ALTER TABLE user_achievements ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "user_achievements_select_own" ON user_achievements FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "user_achievements_insert_own" ON user_achievements FOR INSERT WITH CHECK (auth.uid() = user_id);
 
--- Un utilisateur ne voit que ses propres achievements
-CREATE POLICY "user_achievements_select_own"
-  ON user_achievements FOR SELECT
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 7. user_badges
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Possession unifiée de badges, toutes sources confondues.
+-- Alimentée automatiquement pour la source 'achievement' par le trigger
+-- sync_achievement_to_badge. Les sources 'shop'/'season'/'rank' seront
+-- alimentées par leurs flux dédiés.
+
+CREATE TABLE IF NOT EXISTS user_badges (
+  user_id     uuid        NOT NULL REFERENCES auth.users (id) ON DELETE CASCADE,
+  badge_id    text        NOT NULL,
+  source      text        NOT NULL CHECK (source IN ('achievement', 'shop', 'season', 'rank')),
+  obtained_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (user_id, badge_id)
+);
+
+ALTER TABLE user_badges ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "user_badges_select_own"
+  ON user_badges FOR SELECT
   USING (auth.uid() = user_id);
 
--- Un utilisateur ne peut débloquer que ses propres achievements
-CREATE POLICY "user_achievements_insert_own"
-  ON user_achievements FOR INSERT
+-- L'insertion directe est permise (WITH CHECK own), mais en pratique elle passe
+-- par le trigger SECURITY DEFINER ou des flux service-role (shop/season).
+CREATE POLICY "user_badges_insert_service"
+  ON user_badges FOR INSERT
   WITH CHECK (auth.uid() = user_id);
+
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 8. friendships
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Relation symétrique (une seule ligne par paire).
+-- Les deux sens sont lus via OR(requester_id=me, addressee_id=me).
+
+CREATE TABLE IF NOT EXISTS friendships (
+  id           uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+  requester_id uuid        NOT NULL REFERENCES auth.users (id) ON DELETE CASCADE,
+  addressee_id uuid        NOT NULL REFERENCES auth.users (id) ON DELETE CASCADE,
+  status       text        NOT NULL DEFAULT 'pending'
+                           CHECK (status IN ('pending', 'accepted', 'rejected')),
+  created_at   timestamptz NOT NULL DEFAULT now(),
+  updated_at   timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT friendships_no_self_loop  CHECK (requester_id <> addressee_id),
+  CONSTRAINT friendships_unique_pair   UNIQUE (requester_id, addressee_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_friendships_requester ON friendships (requester_id);
+CREATE INDEX IF NOT EXISTS idx_friendships_addressee ON friendships (addressee_id);
+
+ALTER TABLE friendships ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "friendships_select_own"
+  ON friendships FOR SELECT
+  USING (auth.uid() = requester_id OR auth.uid() = addressee_id);
+
+CREATE POLICY "friendships_insert_own"
+  ON friendships FOR INSERT
+  WITH CHECK (auth.uid() = requester_id);
+
+-- Seul l'addressee peut changer le statut (accept/reject).
+-- Le requester annule via DELETE.
+CREATE POLICY "friendships_update_addressee"
+  ON friendships FOR UPDATE
+  USING (auth.uid() = addressee_id)
+  WITH CHECK (
+    auth.uid() = addressee_id
+    AND status IN ('accepted', 'rejected')
+  );
+
+CREATE POLICY "friendships_delete_own"
+  ON friendships FOR DELETE
+  USING (auth.uid() = requester_id OR auth.uid() = addressee_id);
+
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 9. notifications
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Historique in-app des 20 dernières notifications par utilisateur.
+-- Types :
+--   achievement_unlocked — data: { badge_id, badge_name, badge_icon }
+--   rank_up              — data: { new_rank, delta }
+--   rank_down            — data: { new_rank, delta }
+-- Créées depuis le client (useGameOrchestration) après chaque partie.
+
+CREATE TABLE IF NOT EXISTS notifications (
+  id          uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id     uuid        NOT NULL REFERENCES auth.users (id) ON DELETE CASCADE,
+  type        text        NOT NULL CHECK (type IN (
+                'achievement_unlocked', 'rank_up', 'rank_down'
+              )),
+  data        jsonb       NOT NULL DEFAULT '{}',
+  read        boolean     NOT NULL DEFAULT false,
+  created_at  timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_notifications_user_created
+  ON notifications (user_id, created_at DESC);
+
+ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "notifications_select_own" ON notifications FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "notifications_insert_own" ON notifications FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "notifications_update_own" ON notifications FOR UPDATE USING (auth.uid() = user_id);
+
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 10. daily_themes
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Alimenté manuellement via le dashboard Supabase ou scripts/daily_week_*.sql.
+
+CREATE TABLE IF NOT EXISTS daily_themes (
+  date          date        PRIMARY KEY,
+  title         text        NOT NULL,
+  emoji         text        NOT NULL DEFAULT '📅',
+  description   text,
+  category_tags text[]      NOT NULL DEFAULT '{}'
+);
+
+ALTER TABLE daily_themes ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "daily_themes read" ON daily_themes FOR SELECT USING (true);
+
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 11. daily_challenge_entries
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Une participation par (user, date). Enforce via UNIQUE + RPC SECURITY DEFINER.
+
+CREATE TABLE IF NOT EXISTS daily_challenge_entries (
+  id               uuid         PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id          uuid         NOT NULL REFERENCES auth.users (id) ON DELETE CASCADE,
+  date             date         NOT NULL,
+  score            int          NOT NULL CHECK (score >= 0),
+  correct_answers  int          NOT NULL DEFAULT 0 CHECK (correct_answers >= 0 AND correct_answers <= 10),
+  xp_earned        int          NOT NULL CHECK (xp_earned >= 0),
+  multiplier       numeric(4,2) NOT NULL DEFAULT 1.0,
+  streak_day       int          NOT NULL DEFAULT 1,
+  completed_at     timestamptz  NOT NULL DEFAULT now(),
+  recap_seen       boolean      NOT NULL DEFAULT false,
+  question_results jsonb        NOT NULL DEFAULT '[]'::jsonb,
+  UNIQUE (user_id, date)
+);
+
+CREATE INDEX IF NOT EXISTS daily_entries_date_score
+  ON daily_challenge_entries (date, score DESC, completed_at ASC);
+
+ALTER TABLE daily_challenge_entries ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "entries read"   ON daily_challenge_entries FOR SELECT USING (true);
+CREATE POLICY "entries insert" ON daily_challenge_entries FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 12. daily_streaks
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Calculé par submit_daily_entry (SECURITY DEFINER).
+
+CREATE TABLE IF NOT EXISTS daily_streaks (
+  user_id          uuid  PRIMARY KEY REFERENCES auth.users (id) ON DELETE CASCADE,
+  current_streak   int   NOT NULL DEFAULT 0,
+  longest_streak   int   NOT NULL DEFAULT 0,
+  last_played_date date
+);
+
+ALTER TABLE daily_streaks ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "streaks read"  ON daily_streaks FOR SELECT USING (true);
+CREATE POLICY "streaks write" ON daily_streaks FOR ALL USING (auth.uid() = user_id);
+
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 13. user_wallet
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Solde de Pulses ◈ par utilisateur. Écritures uniquement via add_pulses (RPC).
+
+CREATE TABLE IF NOT EXISTS user_wallet (
+  user_id         uuid        PRIMARY KEY REFERENCES auth.users (id) ON DELETE CASCADE,
+  balance         int         NOT NULL DEFAULT 0 CHECK (balance >= 0),
+  lifetime_earned int         NOT NULL DEFAULT 0 CHECK (lifetime_earned >= 0),
+  updated_at      timestamptz NOT NULL DEFAULT now()
+);
+
+ALTER TABLE user_wallet ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "wallet read own" ON user_wallet FOR SELECT USING (auth.uid() = user_id);
+
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 14. wallet_transactions
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Ledger immuable (INSERT only, jamais UPDATE/DELETE).
+-- source : 'game_normal' | 'game_competitif' | 'game_daily'
+--        | 'achievement_common' | 'achievement_rare' | 'achievement_epic' | 'achievement_legendary'
+--        | 'daily_streak_bonus' | ...
+-- source_ref : référence optionnelle (id partie, achievement_id, date, …)
+
+CREATE TABLE IF NOT EXISTS wallet_transactions (
+  id         uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id    uuid        NOT NULL REFERENCES auth.users (id) ON DELETE CASCADE,
+  amount     int         NOT NULL CHECK (amount > 0),
+  source     text        NOT NULL,
+  source_ref text,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS wallet_tx_user_created
+  ON wallet_transactions (user_id, created_at DESC);
+
+ALTER TABLE wallet_transactions ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "tx read own" ON wallet_transactions FOR SELECT USING (auth.uid() = user_id);
 
 
 -- ═══════════════════════════════════════════════════════════════════════════════
@@ -274,187 +451,11 @@ CREATE POLICY "user_achievements_insert_own"
 
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- increment_category_stats
--- ─────────────────────────────────────────────────────────────────────────────
--- Remplace le pattern read-modify-write de cloudStats.incrementCategoryStats().
--- INSERT ... ON CONFLICT DO UPDATE atomique : pas de race condition si deux
--- parties se terminent simultanément (double onglet, reconnexion réseau).
--- Les deltas (p_questions, p_correct, p_time) sont additionnés côté serveur.
--- Les maxima (p_score, p_streak) utilisent GREATEST. p_fastest_perfect utilise LEAST.
-
-CREATE OR REPLACE FUNCTION increment_category_stats(
-  p_mode            text,
-  p_difficulty      text,
-  p_category        text,
-  p_questions       integer,
-  p_correct         integer,
-  p_time            real,
-  p_score           integer,
-  p_streak          integer,
-  p_fastest_perfect real    DEFAULT NULL
-)
-RETURNS void
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-BEGIN
-  IF auth.uid() IS NULL THEN
-    RAISE EXCEPTION 'Not authenticated' USING ERRCODE = '42501';
-  END IF;
-
-  INSERT INTO user_stats (
-    user_id, mode, difficulty, category,
-    games_played, total_questions, total_correct, total_time,
-    best_score, best_streak, fastest_perfect, updated_at
-  )
-  VALUES (
-    auth.uid(), p_mode, p_difficulty, p_category,
-    1, p_questions, p_correct, p_time,
-    p_score, p_streak, p_fastest_perfect, now()
-  )
-  ON CONFLICT (user_id, mode, difficulty, category) DO UPDATE SET
-    games_played    = user_stats.games_played    + 1,
-    total_questions = user_stats.total_questions + EXCLUDED.total_questions,
-    total_correct   = user_stats.total_correct   + EXCLUDED.total_correct,
-    total_time      = user_stats.total_time      + EXCLUDED.total_time,
-    best_score      = GREATEST(user_stats.best_score,  EXCLUDED.best_score),
-    best_streak     = GREATEST(user_stats.best_streak, EXCLUDED.best_streak),
-    fastest_perfect = CASE
-      WHEN EXCLUDED.fastest_perfect IS NULL         THEN user_stats.fastest_perfect
-      WHEN user_stats.fastest_perfect IS NULL       THEN EXCLUDED.fastest_perfect
-      ELSE LEAST(user_stats.fastest_perfect, EXCLUDED.fastest_perfect)
-    END,
-    updated_at = now();
-END;
-$$;
-
-REVOKE ALL ON FUNCTION increment_category_stats(text,text,text,integer,integer,real,integer,integer,real) FROM public, anon;
-GRANT EXECUTE ON FUNCTION increment_category_stats(text,text,text,integer,integer,real,integer,integer,real) TO authenticated;
-
-
--- ─────────────────────────────────────────────────────────────────────────────
--- increment_global_stats
--- ─────────────────────────────────────────────────────────────────────────────
--- Remplace cloudStats.incrementGlobalStats(). Même logique atomique.
--- p_comp_score : score de la partie si mode compétitif, 0 sinon.
-
-CREATE OR REPLACE FUNCTION increment_global_stats(
-  p_mode            text,
-  p_questions       integer,
-  p_correct         integer,
-  p_streak          integer,
-  p_comp_score      integer,
-  p_fastest_perfect real    DEFAULT NULL
-)
-RETURNS void
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-BEGIN
-  IF auth.uid() IS NULL THEN
-    RAISE EXCEPTION 'Not authenticated' USING ERRCODE = '42501';
-  END IF;
-
-  INSERT INTO user_global_stats (
-    user_id,
-    games_played, comp_games_played, total_questions, total_correct,
-    best_streak, fastest_perfect, comp_total_score, updated_at
-  )
-  VALUES (
-    auth.uid(),
-    1,
-    CASE WHEN p_mode = 'compétitif' THEN 1 ELSE 0 END,
-    p_questions, p_correct,
-    p_streak, p_fastest_perfect, p_comp_score, now()
-  )
-  ON CONFLICT (user_id) DO UPDATE SET
-    games_played      = user_global_stats.games_played + 1,
-    comp_games_played = user_global_stats.comp_games_played +
-                        CASE WHEN p_mode = 'compétitif' THEN 1 ELSE 0 END,
-    total_questions   = user_global_stats.total_questions + EXCLUDED.total_questions,
-    total_correct     = user_global_stats.total_correct   + EXCLUDED.total_correct,
-    best_streak       = GREATEST(user_global_stats.best_streak, EXCLUDED.best_streak),
-    fastest_perfect   = CASE
-      WHEN EXCLUDED.fastest_perfect IS NULL              THEN user_global_stats.fastest_perfect
-      WHEN user_global_stats.fastest_perfect IS NULL     THEN EXCLUDED.fastest_perfect
-      ELSE LEAST(user_global_stats.fastest_perfect, EXCLUDED.fastest_perfect)
-    END,
-    comp_total_score  = user_global_stats.comp_total_score + EXCLUDED.comp_total_score,
-    updated_at        = now();
-END;
-$$;
-
-REVOKE ALL ON FUNCTION increment_global_stats(text,integer,integer,integer,integer,real) FROM public, anon;
-GRANT EXECUTE ON FUNCTION increment_global_stats(text,integer,integer,integer,integer,real) TO authenticated;
-
-
--- ─────────────────────────────────────────────────────────────────────────────
--- submit_score
--- ─────────────────────────────────────────────────────────────────────────────
--- Seul point d'entrée pour écrire dans leaderboard.
--- INSERT ... ON CONFLICT DO UPDATE avec GREATEST(old, new) garantit côté serveur
--- que le score ne peut qu'augmenter — impossible à contourner via REST.
--- SECURITY DEFINER : s'exécute en tant que postgres (bypasse RLS).
--- L'auth.uid() IS NULL check remplace la garantie NFR9 que donnaient les policies
--- INSERT/UPDATE (qui ont été supprimées).
-
-CREATE OR REPLACE FUNCTION submit_score(
-  p_mode       text,
-  p_difficulty text,
-  p_language   text,
-  p_score      integer,
-  p_username   text,
-  p_game_data  jsonb DEFAULT NULL
-)
-RETURNS void
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-BEGIN
-  IF auth.uid() IS NULL THEN
-    RAISE EXCEPTION 'Not authenticated' USING ERRCODE = '42501';
-  END IF;
-
-  INSERT INTO leaderboard (
-    user_id, username, score, mode, difficulty, language, game_data, updated_at
-  )
-  VALUES (
-    auth.uid(), p_username, p_score, p_mode, p_difficulty, p_language, p_game_data, now()
-  )
-  ON CONFLICT (user_id, mode, difficulty, language) DO UPDATE
-    SET score      = GREATEST(leaderboard.score, EXCLUDED.score),
-        username   = EXCLUDED.username,
-        game_data  = CASE
-                       WHEN EXCLUDED.score > leaderboard.score THEN EXCLUDED.game_data
-                       ELSE leaderboard.game_data
-                     END,
-        updated_at = CASE
-                       WHEN EXCLUDED.score > leaderboard.score THEN now()
-                       ELSE leaderboard.updated_at
-                     END;
-END;
-$$;
-
-REVOKE ALL ON FUNCTION submit_score(text, text, text, integer, text, jsonb) FROM public, anon;
-GRANT EXECUTE ON FUNCTION submit_score(text, text, text, integer, text, jsonb) TO authenticated;
-
-
--- ─────────────────────────────────────────────────────────────────────────────
 -- get_random_questions
 -- ─────────────────────────────────────────────────────────────────────────────
 -- Appelée par api.ts pour chaque partie.
--- Filtre par langue, difficulté (ou 'mixed' = toutes), catégorie (ou 'all').
--- Retourne N questions dans un ordre aléatoire.
---
--- Stratégie : pivot UUID aléatoire pour éviter ORDER BY RANDOM() sur l'ensemble filtré.
---   1. Génère un UUID pivot aléatoire.
---   2. Prend jusqu'à p_limit lignes avec id >= pivot (scan d'index ascendant).
---   3. Complète avec des lignes id < pivot si nécessaire (scan descendant).
---   4. Mélange seulement les p_limit candidats finaux (≤ 2×p_limit lignes max).
--- Requiert idx_questions_lang_diff_cat_id pour le range scan id.
+-- Stratégie : pivot UUID aléatoire pour éviter ORDER BY RANDOM() sur l'ensemble
+-- filtré. Scan d'index (idx_questions_lang_diff_cat_id).
 
 CREATE OR REPLACE FUNCTION get_random_questions(
   p_language   text,
@@ -516,343 +517,114 @@ $$;
 
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- delete_user
+-- submit_score
 -- ─────────────────────────────────────────────────────────────────────────────
--- Appelée par profile.ts pour la suppression de compte.
---
--- SECURITY DEFINER : s'exécute avec les droits du propriétaire (postgres),
--- nécessaire pour supprimer dans auth.users.
--- search_path verrouillé pour éviter les injections de schéma.
---
--- Les FK ON DELETE CASCADE s'occupent des tables enfants,
--- mais on supprime explicitement d'abord pour être déterministe
--- et ne pas dépendre de l'ordre de cascade.
+-- Seul point d'entrée autorisé pour écrire dans leaderboard.
+-- GREATEST(old, new) serveur-side empêche l'écriture d'un score arbitraire.
 
-CREATE OR REPLACE FUNCTION delete_user()
+CREATE OR REPLACE FUNCTION submit_score(
+  p_mode       text,
+  p_difficulty text,
+  p_language   text,
+  p_score      integer,
+  p_username   text,
+  p_game_data  jsonb DEFAULT NULL
+)
 RETURNS void
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
 AS $$
-DECLARE
-  uid uuid := auth.uid();
 BEGIN
-  IF uid IS NULL THEN
-    RAISE EXCEPTION 'Not authenticated';
+  IF auth.uid() IS NULL THEN
+    RAISE EXCEPTION 'Not authenticated' USING ERRCODE = '42501';
   END IF;
 
-  -- Suppression explicite (enfants d'abord, respect des FK)
-  DELETE FROM user_achievements  WHERE user_id = uid;
-  DELETE FROM user_stats         WHERE user_id = uid;
-  DELETE FROM user_global_stats  WHERE user_id = uid;
-  DELETE FROM leaderboard        WHERE user_id = uid;
-  DELETE FROM profiles           WHERE id      = uid;
-
-  -- Suppression du compte auth
-  DELETE FROM auth.users         WHERE id      = uid;
+  INSERT INTO leaderboard (
+    user_id, username, score, mode, difficulty, language, game_data, updated_at
+  )
+  VALUES (
+    auth.uid(), p_username, p_score, p_mode, p_difficulty, p_language, p_game_data, now()
+  )
+  ON CONFLICT (user_id, mode, difficulty, language) DO UPDATE
+    SET score      = GREATEST(leaderboard.score, EXCLUDED.score),
+        username   = EXCLUDED.username,
+        game_data  = CASE
+                       WHEN EXCLUDED.score > leaderboard.score THEN EXCLUDED.game_data
+                       ELSE leaderboard.game_data
+                     END,
+        updated_at = CASE
+                       WHEN EXCLUDED.score > leaderboard.score THEN now()
+                       ELSE leaderboard.updated_at
+                     END;
 END;
 $$;
 
--- Restreindre l'accès : seuls les utilisateurs connectés peuvent appeler delete_user
-REVOKE ALL ON FUNCTION delete_user() FROM public, anon;
-GRANT EXECUTE ON FUNCTION delete_user() TO authenticated;
-
-
--- ═══════════════════════════════════════════════════════════════════════════════
--- Migrations (à exécuter sur une base existante)
--- ═══════════════════════════════════════════════════════════════════════════════
-
--- ─────────────────────────────────────────────────────────────────────────────
--- user_global_stats : compteur de parties compétitives
--- ─────────────────────────────────────────────────────────────────────────────
--- Incrémenté dans cloudStats.incrementGlobalStats() quand mode = 'compétitif'.
--- Utilisé par les achievements Combattant (50), Gladiateur (100), Légende (1000).
-
-ALTER TABLE user_global_stats
-  ADD COLUMN IF NOT EXISTS comp_games_played integer NOT NULL DEFAULT 0;
+REVOKE ALL ON FUNCTION submit_score(text, text, text, integer, text, jsonb) FROM public, anon;
+GRANT EXECUTE ON FUNCTION submit_score(text, text, text, integer, text, jsonb) TO authenticated;
 
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- profiles : unicité username insensible à la casse
+-- increment_category_stats
 -- ─────────────────────────────────────────────────────────────────────────────
--- Remplace la contrainte UNIQUE (username) case-sensitive par un index
--- fonctionnel sur lower(username). À exécuter sur une base existante.
+-- Upsert atomique — pas de race condition si deux parties se terminent en
+-- parallèle (double onglet, reconnexion réseau).
 
-ALTER TABLE profiles DROP CONSTRAINT IF EXISTS profiles_username_unique;
-CREATE UNIQUE INDEX IF NOT EXISTS profiles_username_lower_unique
-  ON profiles (lower(username));
-
-
-
--- ─────────────────────────────────────────────────────────────────────────────
--- get_public_profile
--- ─────────────────────────────────────────────────────────────────────────────
--- Appelée par publicProfile.ts pour afficher le profil public d'un joueur.
--- Retourne null si le username n'existe pas.
---
--- Optimisations vs version précédente :
---   - Rang calculé via COUNT(*) WHERE score > v_best_comp + 1, O(1) avec
---     idx_leaderboard_comp, au lieu de RANK() OVER (...) qui triait tous les joueurs.
---   - Les 4 requêtes indépendantes (stats, leaderboard, rang, achievements) sont
---     regroupées dans un seul bloc via des SELECTs enchaînés sans roundtrips inutiles.
---   - Les deux jsonb_agg sur user_achievements sont fusionnées en un seul parcours.
-
-CREATE OR REPLACE FUNCTION get_public_profile(p_username text)
-RETURNS jsonb
+CREATE OR REPLACE FUNCTION increment_category_stats(
+  p_mode            text,
+  p_difficulty      text,
+  p_category        text,
+  p_questions       integer,
+  p_correct         integer,
+  p_time            real,
+  p_score           integer,
+  p_streak          integer,
+  p_fastest_perfect real    DEFAULT NULL
+)
+RETURNS void
 LANGUAGE plpgsql
-STABLE
 SECURITY DEFINER
 SET search_path = public
 AS $$
-DECLARE
-  v_user_id   uuid;
-  v_username  text;
-  v_desc      text;
-  v_featured  text[];
-  v_games     integer := 0;
-  v_correct   integer := 0;
-  v_streak    integer := 0;
-  v_best_comp integer := 0;
-  v_rank      bigint  := NULL;
-  v_total     bigint  := 0;
-  v_ach       jsonb   := '[]'::jsonb;
-  v_ach_dates jsonb   := '[]'::jsonb;
 BEGIN
-  -- Profil de base
-  SELECT id, username, description, featured_badges
-  INTO v_user_id, v_username, v_desc, v_featured
-  FROM profiles WHERE lower(username) = lower(p_username);
-
-  IF NOT FOUND THEN RETURN NULL; END IF;
-
-  -- Stats globales
-  SELECT COALESCE(games_played, 0), COALESCE(total_correct, 0), COALESCE(best_streak, 0)
-  INTO v_games, v_correct, v_streak
-  FROM user_global_stats WHERE user_id = v_user_id;
-
-  -- Meilleur score compétitif
-  SELECT COALESCE(score, 0) INTO v_best_comp
-  FROM leaderboard
-  WHERE user_id = v_user_id AND mode = 'compétitif'
-  LIMIT 1;
-
-  -- Total joueurs compétitifs (langue fr)
-  SELECT COUNT(*) INTO v_total
-  FROM leaderboard WHERE mode = 'compétitif' AND language = 'fr';
-
-  -- Rang : nombre de joueurs avec un score STRICTEMENT supérieur + 1.
-  -- O(1) avec idx_leaderboard_comp (mode, language, score DESC).
-  -- Remplace RANK() OVER (...) qui triait l'ensemble complet des joueurs.
-  -- Si le joueur n'a pas de score compétitif, v_rank reste NULL.
-  IF v_best_comp > 0 THEN
-    SELECT COUNT(*) + 1 INTO v_rank
-    FROM leaderboard
-    WHERE mode = 'compétitif'
-      AND language = 'fr'
-      AND score > v_best_comp;
+  IF auth.uid() IS NULL THEN
+    RAISE EXCEPTION 'Not authenticated' USING ERRCODE = '42501';
   END IF;
 
-  -- Achievements : un seul parcours, deux agrégats
-  SELECT
-    jsonb_agg(achievement_id        ORDER BY unlocked_at),
-    jsonb_agg(jsonb_build_object('id', achievement_id, 'unlocked_at', unlocked_at)
-              ORDER BY unlocked_at)
-  INTO v_ach, v_ach_dates
-  FROM user_achievements WHERE user_id = v_user_id;
-
-  RETURN jsonb_build_object(
-    'username',          v_username,
-    'avatar_emoji',      '',
-    'avatar_color',      '',
-    'description',       COALESCE(v_desc, ''),
-    'featured_badges',   COALESCE(to_jsonb(v_featured), '[]'::jsonb),
-    'games_played',      v_games,
-    'total_correct',     v_correct,
-    'best_streak',       v_streak,
-    'best_comp_score',   v_best_comp,
-    'rank',              v_rank,
-    'total_players',     v_total,
-    'achievements',      COALESCE(v_ach,      '[]'::jsonb),
-    'achievement_dates', COALESCE(v_ach_dates, '[]'::jsonb)
-  );
+  INSERT INTO user_stats (
+    user_id, mode, difficulty, category,
+    games_played, total_questions, total_correct, total_time,
+    best_score, best_streak, fastest_perfect, updated_at
+  )
+  VALUES (
+    auth.uid(), p_mode, p_difficulty, p_category,
+    1, p_questions, p_correct, p_time,
+    p_score, p_streak, p_fastest_perfect, now()
+  )
+  ON CONFLICT (user_id, mode, difficulty, category) DO UPDATE SET
+    games_played    = user_stats.games_played    + 1,
+    total_questions = user_stats.total_questions + EXCLUDED.total_questions,
+    total_correct   = user_stats.total_correct   + EXCLUDED.total_correct,
+    total_time      = user_stats.total_time      + EXCLUDED.total_time,
+    best_score      = GREATEST(user_stats.best_score,  EXCLUDED.best_score),
+    best_streak     = GREATEST(user_stats.best_streak, EXCLUDED.best_streak),
+    fastest_perfect = CASE
+      WHEN EXCLUDED.fastest_perfect IS NULL         THEN user_stats.fastest_perfect
+      WHEN user_stats.fastest_perfect IS NULL       THEN EXCLUDED.fastest_perfect
+      ELSE LEAST(user_stats.fastest_perfect, EXCLUDED.fastest_perfect)
+    END,
+    updated_at = now();
 END;
 $$;
 
--- Accessible aux utilisateurs connectés et anonymes (profil public)
-GRANT EXECUTE ON FUNCTION get_public_profile(text) TO authenticated, anon;
-
-
--- ═══════════════════════════════════════════════════════════════════════════════
--- 7. friendships
--- ═══════════════════════════════════════════════════════════════════════════════
--- Relation symétrique d'amitié entre deux utilisateurs.
--- requester_id  : celui qui envoie la demande
--- addressee_id  : celui qui reçoit la demande
--- status        : 'pending' → 'accepted' | 'rejected'
---
--- Contrainte UNIQUE(requester_id, addressee_id) : une seule ligne par paire
--- ordonnée. La paire inverse (addressee→requester) n'existe pas une fois acceptée ;
--- on lit les deux sens avec un OR dans les requêtes.
--- ─────────────────────────────────────────────────────────────────────────────
-
-CREATE TABLE IF NOT EXISTS friendships (
-  id           uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
-  requester_id uuid        NOT NULL REFERENCES auth.users (id) ON DELETE CASCADE,
-  addressee_id uuid        NOT NULL REFERENCES auth.users (id) ON DELETE CASCADE,
-  status       text        NOT NULL DEFAULT 'pending'
-                           CHECK (status IN ('pending', 'accepted', 'rejected')),
-  created_at   timestamptz NOT NULL DEFAULT now(),
-  updated_at   timestamptz NOT NULL DEFAULT now(),
-
-  CONSTRAINT friendships_no_self_loop  CHECK (requester_id <> addressee_id),
-  CONSTRAINT friendships_unique_pair   UNIQUE (requester_id, addressee_id)
-);
-
--- Index pour accélérer les lectures dans les deux sens
-CREATE INDEX IF NOT EXISTS idx_friendships_requester ON friendships (requester_id);
-CREATE INDEX IF NOT EXISTS idx_friendships_addressee ON friendships (addressee_id);
-
-ALTER TABLE friendships ENABLE ROW LEVEL SECURITY;
-
--- Un utilisateur peut voir toutes les lignes où il est impliqué
-CREATE POLICY "friendships_select_own"
-  ON friendships FOR SELECT
-  USING (auth.uid() = requester_id OR auth.uid() = addressee_id);
-
--- Seul le requester peut créer une demande (en son nom)
-CREATE POLICY "friendships_insert_own"
-  ON friendships FOR INSERT
-  WITH CHECK (auth.uid() = requester_id);
-
--- Mise à jour : seul l'addressee peut changer le statut (accepted / rejected).
--- Le requester n'a pas besoin d'UPDATE : il annule sa demande via DELETE.
--- WITH CHECK garantit que seuls les statuts valides sont écrits et que
--- l'addressee ne peut pas se réaffecter la relation (addressee_id inchangé).
-CREATE POLICY "friendships_update_addressee"
-  ON friendships FOR UPDATE
-  USING (auth.uid() = addressee_id)
-  WITH CHECK (
-    auth.uid() = addressee_id
-    AND status IN ('accepted', 'rejected')
-  );
-
--- Suppression : les deux parties peuvent supprimer (retrait d'ami, annulation)
-CREATE POLICY "friendships_delete_own"
-  ON friendships FOR DELETE
-  USING (auth.uid() = requester_id OR auth.uid() = addressee_id);
-
--- Trigger pour mettre à jour updated_at automatiquement
-CREATE OR REPLACE FUNCTION update_friendships_updated_at()
-RETURNS TRIGGER LANGUAGE plpgsql AS $$
-BEGIN
-  NEW.updated_at = now();
-  RETURN NEW;
-END;
-$$;
-
-CREATE OR REPLACE TRIGGER friendships_updated_at
-  BEFORE UPDATE ON friendships
-  FOR EACH ROW EXECUTE FUNCTION update_friendships_updated_at();
-
-
--- ═══════════════════════════════════════════════════════════════════════════════
--- 8. notifications
--- ═══════════════════════════════════════════════════════════════════════════════
--- Historique des 20 dernières notifications par utilisateur.
--- Types :
---   achievement_unlocked — data: { badge_id, badge_name, badge_icon }
---   rank_up              — data: { new_rank, delta }
---   rank_down            — data: { new_rank, delta }
---
--- Créées depuis le client (useGameOrchestration) après chaque partie.
--- Élagage automatique à 20 par utilisateur via trigger.
--- ═══════════════════════════════════════════════════════════════════════════════
-
-
--- ── Table notifications ───────────────────────────────────────────────────────
-
-CREATE TABLE IF NOT EXISTS notifications (
-  id          uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id     uuid        NOT NULL REFERENCES auth.users (id) ON DELETE CASCADE,
-  type        text        NOT NULL CHECK (type IN (
-                'achievement_unlocked', 'rank_up', 'rank_down'
-              )),
-  data        jsonb       NOT NULL DEFAULT '{}',
-  read        boolean     NOT NULL DEFAULT false,
-  created_at  timestamptz NOT NULL DEFAULT now()
-);
-
-CREATE INDEX IF NOT EXISTS idx_notifications_user_created
-  ON notifications (user_id, created_at DESC);
-
-ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
-
--- Lecture : uniquement ses propres notifications
-CREATE POLICY "notifications_select_own"
-  ON notifications FOR SELECT
-  USING (auth.uid() = user_id);
-
--- Insertion depuis le client (achievements, rank) — triggers SECURITY DEFINER bypass RLS
-CREATE POLICY "notifications_insert_own"
-  ON notifications FOR INSERT
-  WITH CHECK (auth.uid() = user_id);
-
--- Mise à jour (marquer lu) : uniquement ses propres
-CREATE POLICY "notifications_update_own"
-  ON notifications FOR UPDATE
-  USING (auth.uid() = user_id);
-
--- ── Trigger : élagage → 20 dernières par utilisateur ────────────────────────
-
-CREATE OR REPLACE FUNCTION trim_notifications()
-RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER AS $$
-BEGIN
-  DELETE FROM notifications
-  WHERE id IN (
-    SELECT id FROM notifications
-    WHERE user_id = NEW.user_id
-    ORDER BY created_at DESC
-    OFFSET 20
-  );
-  RETURN NEW;
-END;
-$$;
-
-CREATE OR REPLACE TRIGGER notifications_trim
-  AFTER INSERT ON notifications
-  FOR EACH ROW EXECUTE FUNCTION trim_notifications();
+REVOKE ALL ON FUNCTION increment_category_stats(text,text,text,integer,integer,real,integer,integer,real) FROM public, anon;
+GRANT EXECUTE ON FUNCTION increment_category_stats(text,text,text,integer,integer,real,integer,integer,real) TO authenticated;
 
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- leaderboard : suppression des policies INSERT/UPDATE directes
+-- increment_global_stats
 -- ─────────────────────────────────────────────────────────────────────────────
--- Toute écriture dans leaderboard passe désormais par submit_score (RPC
--- SECURITY DEFINER). Les policies directes sont supprimées pour empêcher
--- l'écriture de scores arbitraires via l'API REST.
-
-DROP POLICY IF EXISTS "leaderboard_insert_own" ON leaderboard;
-DROP POLICY IF EXISTS "leaderboard_update_own" ON leaderboard;
-REVOKE INSERT, UPDATE ON leaderboard FROM authenticated;
-
-
--- ═══════════════════════════════════════════════════════════════════════════════
--- Système XP
--- ═══════════════════════════════════════════════════════════════════════════════
-
-
--- ─────────────────────────────────────────────────────────────────────────────
--- user_global_stats : colonne total_xp
--- ─────────────────────────────────────────────────────────────────────────────
-
-ALTER TABLE user_global_stats
-  ADD COLUMN IF NOT EXISTS total_xp integer NOT NULL DEFAULT 0;
-
-
--- ─────────────────────────────────────────────────────────────────────────────
--- increment_global_stats : ajout du paramètre p_xp
--- ─────────────────────────────────────────────────────────────────────────────
--- Remplace la version précédente (sans XP). total_xp est incrémenté atomiquement
--- en même temps que les autres stats de la partie.
+-- Incrémente user_global_stats (games, comp_games, XP, comp_total_score, …).
 
 CREATE OR REPLACE FUNCTION increment_global_stats(
   p_mode            text,
@@ -908,10 +680,9 @@ GRANT EXECUTE ON FUNCTION increment_global_stats(text,integer,integer,integer,in
 
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- add_xp : ajout d'XP ponctuel (achievements débloqués)
+-- add_xp
 -- ─────────────────────────────────────────────────────────────────────────────
--- Appelée séparément après checkAndUnlockAchievements pour créditer l'XP
--- des achievements débloqués lors de la partie.
+-- Crédit ponctuel d'XP : achievements débloqués, bonus daily, …
 
 CREATE OR REPLACE FUNCTION add_xp(p_amount integer)
 RETURNS void
@@ -937,8 +708,324 @@ GRANT EXECUTE ON FUNCTION add_xp(integer) TO authenticated;
 
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- get_public_profile : exposer total_xp
+-- add_pulses
 -- ─────────────────────────────────────────────────────────────────────────────
+-- Insère une ligne dans wallet_transactions + upsert atomique sur user_wallet.
+-- Retourne { balance } (nouveau solde).
+
+CREATE OR REPLACE FUNCTION add_pulses(
+  p_amount     int,
+  p_source     text,
+  p_source_ref text DEFAULT NULL
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_user_id uuid := auth.uid();
+  v_balance int;
+BEGIN
+  IF v_user_id IS NULL THEN
+    RAISE EXCEPTION 'not_authenticated';
+  END IF;
+  IF p_amount IS NULL OR p_amount <= 0 THEN
+    RAISE EXCEPTION 'invalid_amount';
+  END IF;
+
+  INSERT INTO wallet_transactions (user_id, amount, source, source_ref)
+  VALUES (v_user_id, p_amount, p_source, p_source_ref);
+
+  INSERT INTO user_wallet (user_id, balance, lifetime_earned, updated_at)
+  VALUES (v_user_id, p_amount, p_amount, now())
+  ON CONFLICT (user_id) DO UPDATE
+    SET balance         = user_wallet.balance         + EXCLUDED.balance,
+        lifetime_earned = user_wallet.lifetime_earned + EXCLUDED.lifetime_earned,
+        updated_at      = now()
+  RETURNING balance INTO v_balance;
+
+  RETURN jsonb_build_object('balance', v_balance);
+END;
+$$;
+
+REVOKE ALL ON FUNCTION add_pulses(int, text, text) FROM public, anon;
+GRANT EXECUTE ON FUNCTION add_pulses(int, text, text) TO authenticated;
+
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- submit_daily_entry
+-- ─────────────────────────────────────────────────────────────────────────────
+-- • UNIQUE(user_id, date) → erreur 'already_played' si déjà joué aujourd'hui.
+-- • Calcule la nouvelle série (current_streak, longest_streak).
+-- • Retourne { entry_id, streak_day, current_streak, longest_streak }.
+
+CREATE OR REPLACE FUNCTION submit_daily_entry(
+  p_date             date,
+  p_score            int,
+  p_xp_earned        int,
+  p_multiplier       numeric,
+  p_correct_answers  int   DEFAULT 0,
+  p_question_results jsonb DEFAULT '[]'::jsonb
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_user_id    uuid := auth.uid();
+  v_streak     record;
+  v_new_streak int;
+  v_longest    int;
+  v_streak_day int;
+  v_entry_id   uuid;
+BEGIN
+  IF v_user_id IS NULL THEN
+    RAISE EXCEPTION 'not_authenticated';
+  END IF;
+
+  SELECT current_streak, longest_streak, last_played_date
+    INTO v_streak
+    FROM daily_streaks
+    WHERE user_id = v_user_id;
+
+  IF NOT FOUND THEN
+    v_streak.current_streak   := 0;
+    v_streak.longest_streak   := 0;
+    v_streak.last_played_date := NULL;
+  END IF;
+
+  IF v_streak.last_played_date IS NULL THEN
+    v_new_streak := 1;
+  ELSIF v_streak.last_played_date = p_date - 1 THEN
+    v_new_streak := v_streak.current_streak + 1;
+  ELSIF v_streak.last_played_date = p_date THEN
+    RAISE EXCEPTION 'already_played';
+  ELSE
+    v_new_streak := 1;
+  END IF;
+
+  v_longest    := GREATEST(v_new_streak, v_streak.longest_streak);
+  v_streak_day := v_new_streak;
+
+  INSERT INTO daily_challenge_entries (user_id, date, score, correct_answers, xp_earned, multiplier, streak_day, question_results)
+    VALUES (v_user_id, p_date, p_score, p_correct_answers, p_xp_earned, p_multiplier, v_streak_day, p_question_results)
+    RETURNING id INTO v_entry_id;
+
+  INSERT INTO daily_streaks (user_id, current_streak, longest_streak, last_played_date)
+    VALUES (v_user_id, v_new_streak, v_longest, p_date)
+    ON CONFLICT (user_id) DO UPDATE
+      SET current_streak   = EXCLUDED.current_streak,
+          longest_streak   = EXCLUDED.longest_streak,
+          last_played_date = EXCLUDED.last_played_date;
+
+  RETURN jsonb_build_object(
+    'entry_id',       v_entry_id,
+    'streak_day',     v_streak_day,
+    'current_streak', v_new_streak,
+    'longest_streak', v_longest
+  );
+END;
+$$;
+
+REVOKE ALL ON FUNCTION submit_daily_entry(date, int, int, numeric, int, jsonb) FROM public, anon;
+GRANT EXECUTE ON FUNCTION submit_daily_entry(date, int, int, numeric, int, jsonb) TO authenticated;
+
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- mark_daily_recap_seen
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Marque l'entrée journalière comme "recap vu" pour éviter de la remontrer.
+-- SECURITY DEFINER + WHERE user_id = auth.uid() pour restreindre à la colonne
+-- recap_seen du propriétaire uniquement.
+
+CREATE OR REPLACE FUNCTION mark_daily_recap_seen(p_date date)
+RETURNS void
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  UPDATE daily_challenge_entries
+     SET recap_seen = true
+   WHERE user_id = auth.uid()
+     AND date    = p_date;
+$$;
+
+REVOKE ALL ON FUNCTION mark_daily_recap_seen(date) FROM public, anon;
+GRANT EXECUTE ON FUNCTION mark_daily_recap_seen(date) TO authenticated;
+
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- get_daily_leaderboard
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Classement journalier paginé — joint profiles pour username + featured_badges.
+-- Rang = ROW_NUMBER (score DESC, completed_at ASC → plus rapide gagne).
+
+CREATE OR REPLACE FUNCTION get_daily_leaderboard(
+  p_date      date,
+  p_offset    int  DEFAULT 0,
+  p_limit     int  DEFAULT 10
+)
+RETURNS TABLE (
+  id              uuid,
+  user_id         uuid,
+  username        text,
+  score           int,
+  xp_earned       int,
+  multiplier      numeric,
+  streak_day      int,
+  completed_at    timestamptz,
+  rank            bigint,
+  featured_badges text[]
+)
+LANGUAGE sql
+STABLE
+AS $$
+  SELECT
+    e.id,
+    e.user_id,
+    p.username,
+    e.score,
+    e.xp_earned,
+    e.multiplier,
+    e.streak_day,
+    e.completed_at,
+    ROW_NUMBER() OVER (ORDER BY e.score DESC, e.completed_at ASC) AS rank,
+    COALESCE(p.featured_badges, '{}') AS featured_badges
+  FROM daily_challenge_entries e
+  JOIN profiles p ON p.id = e.user_id
+  WHERE e.date = p_date
+  ORDER BY e.score DESC, e.completed_at ASC
+  LIMIT p_limit OFFSET p_offset;
+$$;
+
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- check_daily_rank_achievements
+-- ─────────────────────────────────────────────────────────────────────────────
+-- À appeler une fois par jour (pg_cron) pour la date de la veille.
+-- Débloque daily_podium (top 3, tier legendary) et daily_roi_du_jour (rank 1,
+-- tier legendary), crédite XP + Pulses selon le tier, et crée la notification.
+-- Délibérément hors du flux end-of-game car le rang fluctue pendant la journée.
+--
+-- pg_cron (voir scripts/migrations/003_fix_username_sync_and_daily_rank.sql) :
+--   SELECT cron.schedule(
+--     'daily-rank-achievements',
+--     '5 0 * * *',
+--     $$ SELECT check_daily_rank_achievements((CURRENT_DATE - 1)::date); $$
+--   );
+
+CREATE OR REPLACE FUNCTION check_daily_rank_achievements(p_date date DEFAULT CURRENT_DATE)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  rec               RECORD;
+  v_inserted_podium int;
+  v_inserted_king   int;
+BEGIN
+  FOR rec IN
+    SELECT
+      e.user_id,
+      ROW_NUMBER() OVER (ORDER BY e.score DESC, e.completed_at ASC) AS rank
+    FROM daily_challenge_entries e
+    WHERE e.date = p_date
+    ORDER BY e.score DESC, e.completed_at ASC
+    LIMIT 3
+  LOOP
+    -- daily_podium (tier legendary) — 500 XP, 200 Pulses
+    WITH ins AS (
+      INSERT INTO user_achievements (user_id, achievement_id)
+      VALUES (rec.user_id, 'daily_podium')
+      ON CONFLICT (user_id, achievement_id) DO NOTHING
+      RETURNING 1
+    )
+    SELECT COUNT(*) INTO v_inserted_podium FROM ins;
+
+    IF v_inserted_podium > 0 THEN
+      INSERT INTO user_global_stats (user_id, total_xp)
+      VALUES (rec.user_id, 500)
+      ON CONFLICT (user_id) DO UPDATE SET
+        total_xp   = user_global_stats.total_xp + 500,
+        updated_at = now();
+
+      INSERT INTO wallet_transactions (user_id, amount, source, source_ref)
+      VALUES (rec.user_id, 200, 'achievement_legendary', 'daily_podium:' || p_date::text);
+
+      INSERT INTO user_wallet (user_id, balance, lifetime_earned, updated_at)
+      VALUES (rec.user_id, 200, 200, now())
+      ON CONFLICT (user_id) DO UPDATE
+        SET balance         = user_wallet.balance         + 200,
+            lifetime_earned = user_wallet.lifetime_earned + 200,
+            updated_at      = now();
+
+      INSERT INTO notifications (user_id, type, data)
+      VALUES (
+        rec.user_id,
+        'achievement_unlocked',
+        jsonb_build_object(
+          'badge_id',   'daily_podium',
+          'badge_name', 'Podium Journalier',
+          'badge_icon', '🏆',
+          'date',       p_date::text
+        )
+      );
+    END IF;
+
+    -- daily_roi_du_jour (tier legendary) — 500 XP, 200 Pulses
+    IF rec.rank = 1 THEN
+      WITH ins AS (
+        INSERT INTO user_achievements (user_id, achievement_id)
+        VALUES (rec.user_id, 'daily_roi_du_jour')
+        ON CONFLICT (user_id, achievement_id) DO NOTHING
+        RETURNING 1
+      )
+      SELECT COUNT(*) INTO v_inserted_king FROM ins;
+
+      IF v_inserted_king > 0 THEN
+        INSERT INTO user_global_stats (user_id, total_xp)
+        VALUES (rec.user_id, 500)
+        ON CONFLICT (user_id) DO UPDATE SET
+          total_xp   = user_global_stats.total_xp + 500,
+          updated_at = now();
+
+        INSERT INTO wallet_transactions (user_id, amount, source, source_ref)
+        VALUES (rec.user_id, 200, 'achievement_legendary', 'daily_roi_du_jour:' || p_date::text);
+
+        INSERT INTO user_wallet (user_id, balance, lifetime_earned, updated_at)
+        VALUES (rec.user_id, 200, 200, now())
+        ON CONFLICT (user_id) DO UPDATE
+          SET balance         = user_wallet.balance         + 200,
+              lifetime_earned = user_wallet.lifetime_earned + 200,
+              updated_at      = now();
+
+        INSERT INTO notifications (user_id, type, data)
+        VALUES (
+          rec.user_id,
+          'achievement_unlocked',
+          jsonb_build_object(
+            'badge_id',   'daily_roi_du_jour',
+            'badge_name', 'Roi du Jour',
+            'badge_icon', '👑',
+            'date',       p_date::text
+          )
+        );
+      END IF;
+    END IF;
+  END LOOP;
+END;
+$$;
+
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- get_public_profile
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Profil public : stats globales, meilleur score comp, rang, achievements.
+-- SECURITY DEFINER pour contourner les RLS own-only de user_global_stats /
+-- user_achievements. Accessible authenticated + anon.
 
 CREATE OR REPLACE FUNCTION get_public_profile(p_username text)
 RETURNS jsonb
@@ -979,12 +1066,14 @@ BEGIN
   SELECT COUNT(*) INTO v_total
   FROM leaderboard WHERE mode = 'compétitif' AND language = 'fr';
 
+  -- Rang O(1) via idx_leaderboard_comp (mode, language, score DESC).
   IF v_best_comp > 0 THEN
     SELECT COUNT(*) + 1 INTO v_rank
     FROM leaderboard
     WHERE mode = 'compétitif' AND language = 'fr' AND score > v_best_comp;
   END IF;
 
+  -- Achievements : un seul parcours, deux agrégats (ids + id+date).
   SELECT
     jsonb_agg(achievement_id        ORDER BY unlocked_at),
     jsonb_agg(jsonb_build_object('id', achievement_id, 'unlocked_at', unlocked_at)
@@ -1005,11 +1094,166 @@ BEGIN
     'best_comp_score',   v_best_comp,
     'rank',              v_rank,
     'total_players',     v_total,
-    'achievements',      COALESCE(v_ach,      '[]'::jsonb),
+    'achievements',      COALESCE(v_ach,       '[]'::jsonb),
     'achievement_dates', COALESCE(v_ach_dates, '[]'::jsonb)
   );
 END;
 $$;
 
-GRANT EXECUTE ON FUNCTION get_public_profile(text) TO authenticated, anon;
+REVOKE EXECUTE ON FUNCTION get_public_profile(text) FROM PUBLIC;
+GRANT  EXECUTE ON FUNCTION get_public_profile(text) TO authenticated, anon;
 
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- delete_user
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Suppression complète du compte (profile.ts).
+-- Les FK ON DELETE CASCADE couvrent les enfants, mais on supprime explicitement
+-- d'abord pour être déterministe et ne pas dépendre de l'ordre de cascade.
+
+CREATE OR REPLACE FUNCTION delete_user()
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  uid uuid := auth.uid();
+BEGIN
+  IF uid IS NULL THEN
+    RAISE EXCEPTION 'Not authenticated';
+  END IF;
+
+  DELETE FROM wallet_transactions      WHERE user_id = uid;
+  DELETE FROM user_wallet              WHERE user_id = uid;
+  DELETE FROM notifications            WHERE user_id = uid;
+  DELETE FROM friendships              WHERE requester_id = uid OR addressee_id = uid;
+  DELETE FROM daily_challenge_entries  WHERE user_id = uid;
+  DELETE FROM daily_streaks            WHERE user_id = uid;
+  DELETE FROM user_badges              WHERE user_id = uid;
+  DELETE FROM user_achievements        WHERE user_id = uid;
+  DELETE FROM user_stats               WHERE user_id = uid;
+  DELETE FROM user_global_stats        WHERE user_id = uid;
+  DELETE FROM leaderboard              WHERE user_id = uid;
+  DELETE FROM profiles                 WHERE id      = uid;
+
+  DELETE FROM auth.users               WHERE id      = uid;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION delete_user() FROM public, anon;
+GRANT EXECUTE ON FUNCTION delete_user() TO authenticated;
+
+
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- Triggers
+-- ═══════════════════════════════════════════════════════════════════════════════
+
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- sync_achievement_to_badge : user_achievements → user_badges (source 'achievement')
+-- ─────────────────────────────────────────────────────────────────────────────
+
+CREATE OR REPLACE FUNCTION sync_achievement_to_badge()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  INSERT INTO user_badges (user_id, badge_id, source, obtained_at)
+  VALUES (
+    NEW.user_id,
+    NEW.achievement_id,
+    'achievement',
+    COALESCE(NEW.unlocked_at, now())
+  )
+  ON CONFLICT (user_id, badge_id) DO NOTHING;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS on_achievement_unlock ON user_achievements;
+CREATE TRIGGER on_achievement_unlock
+  AFTER INSERT ON user_achievements
+  FOR EACH ROW EXECUTE FUNCTION sync_achievement_to_badge();
+
+-- Backfill one-shot pour les bases existantes
+INSERT INTO user_badges (user_id, badge_id, source, obtained_at)
+SELECT user_id, achievement_id, 'achievement', COALESCE(unlocked_at, now())
+FROM user_achievements
+ON CONFLICT (user_id, badge_id) DO NOTHING;
+
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- sync_username_to_leaderboard : profiles.username → leaderboard.username
+-- ─────────────────────────────────────────────────────────────────────────────
+-- RLS interdit l'UPDATE direct de leaderboard côté client ; on propage le
+-- changement de pseudo automatiquement via ce trigger SECURITY DEFINER.
+
+CREATE OR REPLACE FUNCTION sync_username_to_leaderboard()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  UPDATE leaderboard
+  SET    username = NEW.username
+  WHERE  user_id  = NEW.id
+    AND  username IS DISTINCT FROM NEW.username;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_sync_username_to_leaderboard ON profiles;
+CREATE TRIGGER trg_sync_username_to_leaderboard
+  AFTER UPDATE OF username ON profiles
+  FOR EACH ROW
+  WHEN (OLD.username IS DISTINCT FROM NEW.username)
+  EXECUTE FUNCTION sync_username_to_leaderboard();
+
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- trim_notifications : garde les 20 dernières par utilisateur
+-- ─────────────────────────────────────────────────────────────────────────────
+
+CREATE OR REPLACE FUNCTION trim_notifications()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+  DELETE FROM notifications
+  WHERE id IN (
+    SELECT id FROM notifications
+    WHERE user_id = NEW.user_id
+    ORDER BY created_at DESC
+    OFFSET 20
+  );
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS notifications_trim ON notifications;
+CREATE TRIGGER notifications_trim
+  AFTER INSERT ON notifications
+  FOR EACH ROW EXECUTE FUNCTION trim_notifications();
+
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- update_friendships_updated_at : maintient friendships.updated_at
+-- ─────────────────────────────────────────────────────────────────────────────
+
+CREATE OR REPLACE FUNCTION update_friendships_updated_at()
+RETURNS TRIGGER LANGUAGE plpgsql AS $$
+BEGIN
+  NEW.updated_at = now();
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS friendships_updated_at ON friendships;
+CREATE TRIGGER friendships_updated_at
+  BEFORE UPDATE ON friendships
+  FOR EACH ROW EXECUTE FUNCTION update_friendships_updated_at();

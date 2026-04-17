@@ -5,6 +5,7 @@ export interface TriviaQuestion {
   shuffledAnswers: string[]
   category: string
   difficulty: 'easy' | 'medium' | 'hard'
+  anecdote?: string | null
 }
 
 export type AnswerState = 'idle' | 'correct' | 'wrong' | 'timeout'
@@ -24,6 +25,7 @@ export interface QuestionResult {
   timeSpent: number          // secondes, arrondi à 1 décimale
   pointsEarned?: number      // modes compétitif et daily
   multiplier?: number        // modes compétitif et daily (ex: 3, 2, 1.5, 1.2, 1)
+  anecdote?: string | null   // utilisé par la Daily Recap (phase 4)
 }
 
 export interface XpBreakdown {
@@ -174,10 +176,13 @@ export interface DailyEntry {
   user_id: string
   date: string
   score: number         // speed-based points (anciennement 0–10 bonnes réponses)
+  correct_answers: number
   xp_earned: number
   multiplier: number
   streak_day: number
   completed_at: string
+  recap_seen: boolean
+  question_results: QuestionResult[]
 }
 
 export interface DailyStreak {
@@ -198,4 +203,17 @@ export interface DailyLeaderboardEntry {
   completed_at: string
   rank: number
   featured_badges: string[]
+}
+
+export interface DailyRecapData {
+  entry:                DailyEntry
+  theme:                DailyTheme | null
+  questions:            QuestionResult[]
+  rank:                 number | null
+  totalPlayers:         number
+  topThree:             DailyLeaderboardEntry[]
+  streak:               DailyStreak
+  unlockedAchievements: AchievementWithStatus[]
+  pulsesEarned:         number
+  totalXpNow:           number
 }

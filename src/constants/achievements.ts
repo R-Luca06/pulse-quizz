@@ -430,7 +430,7 @@ export const ACHIEVEMENTS: Achievement[] = [
     description: 'Terminer dans le top 3 du classement du jour',
     icon: '🏆',
     progressTotal: null,
-    tier: 'rare',
+    tier: 'legendary',
   },
   {
     id: 'daily_roi_du_jour',

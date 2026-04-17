@@ -108,7 +108,7 @@ export function useGameOrchestration(params: UseGameOrchestrationParams) {
           const multiplier = getDailyMultiplier(streak.current_streak)
           const xpEarned = computeDailyXp(correctCount, multiplier)
 
-          const submitResult = await submitDailyEntry({ date: today, score, multiplier, correctAnswers: correctCount })
+          const submitResult = await submitDailyEntry({ date: today, score, multiplier, correctAnswers: correctCount, questionResults: results })
           const userRank = await getDailyUserRank(uid, today)
 
           const dailyXpBreakdown: XpBreakdown = {

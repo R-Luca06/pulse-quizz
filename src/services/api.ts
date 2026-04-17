@@ -80,6 +80,7 @@ async function fetchQuestionsFromSupabase(
     shuffledAnswers:   shuffle([row.correct_answer, ...row.incorrect_answers]),
     category:          row.category,
     difficulty:        row.difficulty as TriviaQuestion['difficulty'],
+    anecdote:          row.anecdote,
   }))
 }
 
@@ -120,5 +121,6 @@ export async function fetchDailyQuestions(date: string, signal?: AbortSignal): P
     shuffledAnswers:   shuffle([row.correct_answer, ...row.incorrect_answers]),
     category:          row.category,
     difficulty:        row.difficulty as TriviaQuestion['difficulty'],
+    anecdote:          row.anecdote,
   }))
 }

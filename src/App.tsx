@@ -6,13 +6,14 @@ import RewardToast from './components/xp/RewardToast'
 import { useSettings } from './hooks/useSettings'
 import { useAuth } from './hooks/useAuth'
 import { useGameOrchestration } from './hooks/useGameOrchestration'
-import type { Language, GameResult, RankingData, AchievementWithStatus, AchievementId, PulsesBreakdown, XpBreakdown, AchievementTier } from './types/quiz'
+import type { Language, GameResult, RankingData, AchievementWithStatus, AchievementId, PulsesBreakdown, XpBreakdown, AchievementTier, DailyRecapData } from './types/quiz'
 import type { ProfileTab } from './components/profile/ProfilePage'
 import { trackScreenViewed, trackGameAbandoned } from './services/analytics'
 import { addXp } from './services/cloudStats'
 import { XP_PER_ACHIEVEMENT } from './constants/xp'
 import { PULSES_PER_ACHIEVEMENT, achievementSource } from './constants/pulses'
 import { addPulses } from './services/pulses'
+import { getPendingDailyRecap, markDailyRecapSeen } from './services/dailyChallenge'
 
 
 const QuizContainer = lazy(() => import('./components/quiz/QuizContainer'))
@@ -27,6 +28,7 @@ const SocialPage = lazy(() => import('./components/social/SocialPage'))
 const DailyChallengePage = lazy(() => import('./components/daily/DailyChallengePage'))
 const DailyChallengeModal = lazy(() => import('./components/daily/DailyChallengeModal'))
 const CollectionPage = lazy(() => import('./components/collection/CollectionPage'))
+const DailyRecapOverlay = lazy(() => import('./components/daily/DailyRecapOverlay'))
 
 export type AppScreen = 'landing' | 'launching' | 'quiz' | 'ranking' | 'result' | 'stats' | 'profile' | 'achievements' | 'social' | 'daily' | 'collection'
 
@@ -44,6 +46,7 @@ export default function App() {
   const [newAchievements, setNewAchievements] = useState<AchievementWithStatus[]>([])
   const [pendingAchievementId, setPendingAchievementId] = useState<AchievementId | null>(null)
   const [pendingBadgeRect, setPendingBadgeRect] = useState<DOMRect | null>(null)
+  const [dailyRecap, setDailyRecap] = useState<DailyRecapData | null>(null)
 
   // Capture la page active au moment où les achievements sont débloqués
   // (pour y revenir après l'animation, quel que soit le screen parcouru)
@@ -115,6 +118,26 @@ export default function App() {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingAchievements])
+
+  // Daily recap — fetch la dernière entry non vue d'une date passée à la reconnexion
+  useEffect(() => {
+    if (!user) { setDailyRecap(null); return }
+    let cancelled = false
+    getPendingDailyRecap(user.id)
+      .then(data => { if (!cancelled && data) setDailyRecap(data) })
+      .catch(console.error)
+    return () => { cancelled = true }
+  }, [user])
+
+  function handleCloseRecap() {
+    if (dailyRecap) markDailyRecapSeen(dailyRecap.entry.date).catch(console.error)
+    setDailyRecap(null)
+  }
+
+  function handlePlayDailyFromRecap() {
+    handleCloseRecap()
+    handleShowDaily()
+  }
 
   const [isLoadingRanking, setIsLoadingRanking] = useState(false)
   const { handleFinished } = useGameOrchestration({ settings, user, profile, setScreen, setGameResult, setRankingData, setNewAchievements: handleNewGameAchievements, setLoadingRanking: setIsLoadingRanking, showRewardGain, storePendingRewards, onDailyComplete: handleDailyComplete, bumpPulses, bumpXp })
@@ -502,7 +525,7 @@ export default function App() {
       </Suspense>
 
       <AnimatePresence>
-        {newAchievements.length > 0 && screen !== 'quiz' && screen !== 'launching' && screen !== 'ranking' && (
+        {newAchievements.length > 0 && !dailyRecap && screen !== 'quiz' && screen !== 'launching' && screen !== 'ranking' && (
           <AchievementUnlockOverlay
             key="achievement-overlay"
             achievements={newAchievements}
@@ -510,6 +533,20 @@ export default function App() {
             onDone={handleAchievementsDone}
             pendingBadgeRect={pendingBadgeRect}
           />
+        )}
+      </AnimatePresence>
+
+      {/* ── Daily Recap — overlay cinématique pour un défi passé non vu ──── */}
+      <AnimatePresence>
+        {dailyRecap && (
+          <Suspense fallback={null}>
+            <DailyRecapOverlay
+              key="daily-recap"
+              data={dailyRecap}
+              onClose={handleCloseRecap}
+              onPlayDailyToday={handlePlayDailyFromRecap}
+            />
+          </Suspense>
         )}
       </AnimatePresence>
 

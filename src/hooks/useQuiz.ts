@@ -224,6 +224,7 @@ export function useQuiz(
         timeSpent,
         ...(pointsEarned !== undefined && { pointsEarned }),
         ...(multiplier !== undefined && { multiplier }),
+        anecdote: questions[currentIndex].anecdote ?? null,
       })
       setTotalAnswered(prev => prev + 1)
 
@@ -254,6 +255,7 @@ export function useQuiz(
       userAnswer: null,
       isCorrect: false,
       timeSpent,
+      anecdote: questions[currentIndex].anecdote ?? null,
     })
     setTotalAnswered(prev => prev + 1)
 
