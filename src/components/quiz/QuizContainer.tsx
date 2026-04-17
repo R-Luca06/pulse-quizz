@@ -13,6 +13,7 @@ import { QUESTION_DURATION, URGENT_THRESHOLD, COMBO_MILESTONES } from '../../con
 interface Props {
   onFinished: (score: number, results: QuestionResult[]) => void
   onQuit: () => void
+  onCheatDetected?: () => void
   gameMode: GameMode
   difficulty: Difficulty
   language: Language
@@ -41,7 +42,7 @@ const BALLS: BallConfig[] = Array.from({ length: 40 }, (_, i) => ({
   delay:    parseFloat((-8 + Math.random() * 8).toFixed(1)),
 }))
 
-export default function QuizContainer({ onFinished, onQuit, gameMode, difficulty, language, category, isLoadingRanking = false }: Props) {
+export default function QuizContainer({ onFinished, onQuit, onCheatDetected, gameMode, difficulty, language, category, isLoadingRanking = false }: Props) {
   const {
     phase,
     isRetrying,
@@ -56,7 +57,7 @@ export default function QuizContainer({ onFinished, onQuit, gameMode, difficulty
     handleAnswer,
     handleTimeout,
     retry,
-  } = useQuiz(onFinished, { gameMode, difficulty, language, category })
+  } = useQuiz(onFinished, { gameMode, difficulty, language, category }, onCheatDetected)
 
   const { timeLeft, progress } = useTimer(
     QUESTION_DURATION,

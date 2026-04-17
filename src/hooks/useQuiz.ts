@@ -39,6 +39,7 @@ interface UseQuizReturn {
 export function useQuiz(
   onFinished: (score: number, results: QuestionResult[]) => void,
   settings: QuizSettings = { gameMode: 'normal', difficulty: 'mixed', language: 'fr', category: 'all' },
+  onCheat?: () => void,
 ): UseQuizReturn {
   const [phase, setPhase] = useState<QuizPhase>('loading')
   const [isRetrying, setIsRetrying] = useState(false)
@@ -267,6 +268,24 @@ export function useQuiz(
 
     scheduleNext(score, settings.gameMode === 'compétitif')
   }, [answerState, questions, currentIndex, score, scheduleNext, settings.gameMode])
+
+  const onCheatRef = useRef(onCheat)
+  useEffect(() => { onCheatRef.current = onCheat })
+
+  // Anti-triche : quitter l'onglet pendant une question = faux (comme timeout)
+  useEffect(() => {
+    if (phase !== 'playing') return
+    const triggerCheat = () => {
+      handleTimeout()
+      onCheatRef.current?.()
+    }
+    if (document.hidden) { triggerCheat(); return }
+    const onVisibilityChange = () => {
+      if (document.hidden) triggerCheat()
+    }
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', onVisibilityChange)
+  }, [phase, handleTimeout])
 
   return {
     phase,

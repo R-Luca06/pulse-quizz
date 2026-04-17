@@ -139,6 +139,25 @@ export default function App() {
     handleShowDaily()
   }
 
+  const [cheatAlert, setCheatAlert] = useState(false)
+
+  // Auto-dismiss de l'alerte anti-triche — démarre uniquement quand l'utilisateur est de retour
+  useEffect(() => {
+    if (!cheatAlert) return
+    let timer: ReturnType<typeof setTimeout> | null = null
+    const startDismiss = () => {
+      if (timer) return
+      timer = setTimeout(() => setCheatAlert(false), 6000)
+    }
+    if (!document.hidden) startDismiss()
+    const onVisibilityChange = () => { if (!document.hidden) startDismiss() }
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+      if (timer) clearTimeout(timer)
+    }
+  }, [cheatAlert])
+
   const [isLoadingRanking, setIsLoadingRanking] = useState(false)
   const { handleFinished } = useGameOrchestration({ settings, user, profile, setScreen, setGameResult, setRankingData, setNewAchievements: handleNewGameAchievements, setLoadingRanking: setIsLoadingRanking, showRewardGain, storePendingRewards, onDailyComplete: handleDailyComplete, bumpPulses, bumpXp })
   const [returnToSettings, setReturnToSettings] = useState(false)
@@ -322,6 +341,7 @@ export default function App() {
               <QuizContainer
                 onFinished={handleFinished}
                 onQuit={handleQuit}
+                onCheatDetected={() => setCheatAlert(true)}
                 gameMode={settings.mode}
                 difficulty={settings.difficulty}
                 language={settings.language}
@@ -547,6 +567,41 @@ export default function App() {
               onPlayDailyToday={handlePlayDailyFromRecap}
             />
           </Suspense>
+        )}
+      </AnimatePresence>
+
+      {/* ── Alerte anti-triche — changement d'onglet détecté pendant un quiz ── */}
+      <AnimatePresence>
+        {cheatAlert && (
+          <motion.div
+            key="cheat-alert"
+            className="fixed inset-x-0 top-6 z-[70] flex justify-center px-4"
+            initial={{ opacity: 0, y: -24, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -16, scale: 0.96 }}
+            transition={{ type: 'spring', stiffness: 420, damping: 28 }}
+          >
+            <div className="flex items-start gap-3 rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-3 shadow-[0_0_40px_rgba(239,68,68,0.35)] backdrop-blur-md">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="mt-0.5 shrink-0 text-red-400">
+                <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"/>
+                <line x1="12" y1="9" x2="12" y2="13"/>
+                <line x1="12" y1="17" x2="12.01" y2="17"/>
+              </svg>
+              <div className="flex flex-col gap-0.5">
+                <p className="text-sm font-bold text-red-300">Changement d'onglet détecté</p>
+                <p className="text-xs text-white/70">Question comptée comme ratée (anti-triche).</p>
+              </div>
+              <button
+                onClick={() => setCheatAlert(false)}
+                aria-label="Fermer"
+                className="ml-2 flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-white/40 transition-colors hover:bg-white/5 hover:text-white/80"
+              >
+                <svg width="12" height="12" viewBox="0 0 10 10" fill="none">
+                  <path d="M1 1l8 8M9 1L1 9" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+                </svg>
+              </button>
+            </div>
+          </motion.div>
         )}
       </AnimatePresence>
 
