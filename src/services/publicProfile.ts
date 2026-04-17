@@ -1,5 +1,5 @@
 import { supabase } from './supabase'
-import type { AchievementId } from '../types/quiz'
+import type { AchievementId, EquippedCosmetics } from '../types/quiz'
 
 export interface PublicProfile {
   userId:            string
@@ -18,6 +18,7 @@ export interface PublicProfile {
   achievements:      AchievementId[]
   /** id → date ISO de déblocage */
   achievement_dates: Record<string, string>
+  equipped:          EquippedCosmetics
 }
 
 export async function getPublicProfile(username: string): Promise<PublicProfile | null> {
@@ -47,5 +48,12 @@ export async function getPublicProfile(username: string): Promise<PublicProfile 
       ((raw.achievement_dates as { id: string; unlocked_at: string }[]) ?? [])
         .map(a => [a.id, a.unlocked_at])
     ),
+    equipped: {
+      emblem_id:      (raw.equipped_emblem_id      as string | null) ?? null,
+      background_id:  (raw.equipped_background_id  as string | null) ?? null,
+      title_id:       (raw.equipped_title_id       as string | null) ?? null,
+      card_design_id: (raw.equipped_card_design_id as string | null) ?? null,
+      screen_anim_id: (raw.equipped_screen_anim_id as string | null) ?? null,
+    },
   }
 }

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '../../hooks/useAuth'
-import { getUserBadges } from '../../services/badges'
+import { getUserBadges } from '../../services/inventory'
 import { updateFeaturedBadges } from '../../services/profile'
 import { ACHIEVEMENT_MAP } from '../../constants/achievements'
 import { TIER_GLOW_COLOR } from '../../constants/achievementColors'
@@ -63,12 +63,12 @@ const TIER_DOT_COLOR: Record<AchievementTier, string> = {
 
 function enrichBadge(badge: OwnedBadge): EnrichedBadge | null {
   if (badge.source === 'achievement') {
-    const ach = ACHIEVEMENT_MAP[badge.badge_id as AchievementId]
+    const ach = ACHIEVEMENT_MAP[badge.item_id as AchievementId]
     if (!ach) return null
     return { ...badge, name: ach.name, description: ach.description, icon: ach.icon, tier: ach.tier }
   }
-  // Pour les futures sources (shop, season, rank) : données à enrichir depuis une table badges
-  return { ...badge, name: badge.badge_id, description: '', icon: '✦', tier: 'common' }
+  // Pour les futures sources (shop, season, rank) : données à enrichir depuis une table items
+  return { ...badge, name: badge.item_id, description: '', icon: '✦', tier: 'common' }
 }
 
 function formatDate(iso: string): string {
@@ -115,7 +115,7 @@ function BadgeCard({ badge, isPinned, canPin, onTogglePin }: {
       {/* Pin button — top-right */}
       <motion.button
         whileTap={{ scale: 0.85 }}
-        onClick={() => onTogglePin(badge.badge_id)}
+        onClick={() => onTogglePin(badge.item_id)}
         disabled={!isPinned && !canPin}
         title={isPinned ? 'Retirer du leaderboard' : canPin ? 'Afficher dans le leaderboard' : 'Maximum 3 badges'}
         className={[
@@ -132,7 +132,7 @@ function BadgeCard({ badge, isPinned, canPin, onTogglePin }: {
 
       {/* Badge hexagone */}
       <div className="relative mt-4 shrink-0">
-        <MiniBadge achievementId={badge.badge_id} size={52} unlocked />
+        <MiniBadge achievementId={badge.item_id} size={52} unlocked />
         <div className="absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full border border-game-bg bg-emerald-500/20 text-[7px] font-black text-emerald-400">
           ✓
         </div>
@@ -167,7 +167,7 @@ function PinnedSection({ pinnedIds, badges, onTogglePin }: {
   badges: EnrichedBadge[]
   onTogglePin: (id: string) => void
 }) {
-  const badgeMap = Object.fromEntries(badges.map(b => [b.badge_id, b]))
+  const badgeMap = Object.fromEntries(badges.map(b => [b.item_id, b]))
 
   return (
     <div className="flex flex-col gap-2 border-b border-game-border px-4 py-3">
@@ -197,7 +197,7 @@ function PinnedSection({ pinnedIds, badges, onTogglePin }: {
           return (
             <div key={id} className="relative">
               <div className="flex h-16 w-14 items-center justify-center rounded-xl border border-neon-violet/20 bg-neon-violet/5">
-                <MiniBadge achievementId={badge.badge_id} size={38} unlocked />
+                <MiniBadge achievementId={badge.item_id} size={38} unlocked />
               </div>
               <button
                 onClick={() => onTogglePin(id)}
@@ -209,6 +209,73 @@ function PinnedSection({ pinnedIds, badges, onTogglePin }: {
           )
         })}
       </div>
+    </div>
+  )
+}
+
+// ─── Dropdown mobile ──────────────────────────────────────────────────────────
+
+function MobileDropdown<T extends string>({ label, value, options, open, setOpen, onChange, dropRef, badges }: {
+  label: string
+  value: T
+  options: { key: T; label: string }[]
+  open: boolean
+  setOpen: (v: boolean) => void
+  onChange: (v: T) => void
+  dropRef: React.RefObject<HTMLDivElement | null>
+  badges: EnrichedBadge[]
+}) {
+  const activeLabel = options.find(f => f.key === value)?.label
+  return (
+    <div ref={dropRef} className="relative sm:hidden">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className={[
+          'flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[10px] font-semibold transition-colors',
+          value !== 'all'
+            ? 'border-neon-violet/30 bg-neon-violet/10 text-neon-violet'
+            : 'border-white/10 bg-white/5 text-white/50 hover:bg-white/10 hover:text-white/70',
+        ].join(' ')}
+      >
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+          <line x1="4" y1="6" x2="20" y2="6"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="11" y1="18" x2="13" y2="18"/>
+        </svg>
+        {label}{value !== 'all' && ` · ${activeLabel}`}
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"
+          className={`transition-transform duration-150 ${open ? 'rotate-180' : ''}`}
+        >
+          <polyline points="6 9 12 15 18 9"/>
+        </svg>
+      </button>
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }}
+            transition={{ duration: 0.15 }}
+            className="absolute left-0 top-9 z-50 min-w-[160px] overflow-hidden rounded-xl py-1.5"
+            style={{ background: 'rgba(19,19,31,0.97)', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 8px 32px rgba(0,0,0,0.6)', backdropFilter: 'blur(20px)' }}
+          >
+            {options.filter(f => {
+              if (f.key === 'all') return true
+              if (label === 'Rareté') return badges.some(b => b.tier === f.key as AchievementTier)
+              return badges.some(b => b.source === f.key as BadgeSource)
+            }).map(f => {
+              const count = label === 'Rareté'
+                ? (f.key === 'all' ? badges.length : badges.filter(b => b.tier === f.key as AchievementTier).length)
+                : (f.key === 'all' ? badges.length : badges.filter(b => b.source === f.key as BadgeSource).length)
+              return (
+                <button key={f.key} type="button" onClick={() => { onChange(f.key); setOpen(false) }}
+                  className={['flex w-full items-center justify-between px-4 py-2.5 text-left text-sm transition-colors', value === f.key ? 'bg-neon-violet/10 font-semibold text-neon-violet' : 'font-medium text-white/70 hover:bg-white/5 hover:text-white'].join(' ')}
+                >
+                  <span>{f.label}</span>
+                  <span className={`tabular-nums text-[11px] ${value === f.key ? 'text-neon-violet/70' : 'text-white/25'}`}>{count}</span>
+                </button>
+              )
+            })}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }
@@ -349,72 +416,6 @@ export default function CollectionPage({ hideBack = false, onBack }: Props) {
     </div>
   )
 
-  // ── Dropdowns mobile ─────────────────────────────────────────────────────────
-
-  function MobileDropdown<T extends string>({ label, value, options, open, setOpen, onChange, dropRef }: {
-    label: string
-    value: T
-    options: { key: T; label: string }[]
-    open: boolean
-    setOpen: (v: boolean) => void
-    onChange: (v: T) => void
-    dropRef: React.RefObject<HTMLDivElement | null>
-  }) {
-    const activeLabel = options.find(f => f.key === value)?.label
-    return (
-      <div ref={dropRef} className="relative sm:hidden">
-        <button
-          type="button"
-          onClick={() => setOpen(!open)}
-          className={[
-            'flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[10px] font-semibold transition-colors',
-            value !== 'all'
-              ? 'border-neon-violet/30 bg-neon-violet/10 text-neon-violet'
-              : 'border-white/10 bg-white/5 text-white/50 hover:bg-white/10 hover:text-white/70',
-          ].join(' ')}
-        >
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-            <line x1="4" y1="6" x2="20" y2="6"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="11" y1="18" x2="13" y2="18"/>
-          </svg>
-          {label}{value !== 'all' && ` · ${activeLabel}`}
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"
-            className={`transition-transform duration-150 ${open ? 'rotate-180' : ''}`}
-          >
-            <polyline points="6 9 12 15 18 9"/>
-          </svg>
-        </button>
-        <AnimatePresence>
-          {open && (
-            <motion.div
-              initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }}
-              transition={{ duration: 0.15 }}
-              className="absolute left-0 top-9 z-50 min-w-[160px] overflow-hidden rounded-xl py-1.5"
-              style={{ background: 'rgba(19,19,31,0.97)', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 8px 32px rgba(0,0,0,0.6)', backdropFilter: 'blur(20px)' }}
-            >
-              {options.filter(f => {
-                if (f.key === 'all') return true
-                if (label === 'Rareté') return badges.some(b => b.tier === f.key as AchievementTier)
-                return badges.some(b => b.source === f.key as BadgeSource)
-              }).map(f => {
-                const count = label === 'Rareté'
-                  ? (f.key === 'all' ? badges.length : badges.filter(b => b.tier === f.key as AchievementTier).length)
-                  : (f.key === 'all' ? badges.length : badges.filter(b => b.source === f.key as BadgeSource).length)
-                return (
-                  <button key={f.key} type="button" onClick={() => { onChange(f.key); setOpen(false) }}
-                    className={['flex w-full items-center justify-between px-4 py-2.5 text-left text-sm transition-colors', value === f.key ? 'bg-neon-violet/10 font-semibold text-neon-violet' : 'font-medium text-white/70 hover:bg-white/5 hover:text-white'].join(' ')}
-                  >
-                    <span>{f.label}</span>
-                    <span className={`tabular-nums text-[11px] ${value === f.key ? 'text-neon-violet/70' : 'text-white/25'}`}>{count}</span>
-                  </button>
-                )
-              })}
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
-    )
-  }
-
   // ── Render ───────────────────────────────────────────────────────────────────
 
   return (
@@ -489,6 +490,7 @@ export default function CollectionPage({ hideBack = false, onBack }: Props) {
                 setOpen={setRarityOpen}
                 onChange={setRarityFilter}
                 dropRef={rarityRef}
+                badges={badges}
               />
               <MobileDropdown
                 label="Provenance"
@@ -498,6 +500,7 @@ export default function CollectionPage({ hideBack = false, onBack }: Props) {
                 setOpen={setSourceOpen}
                 onChange={setSourceFilter}
                 dropRef={sourceRef}
+                badges={badges}
               />
             </div>
 
@@ -535,9 +538,9 @@ export default function CollectionPage({ hideBack = false, onBack }: Props) {
                   <AnimatePresence mode="popLayout">
                     {filtered.map(badge => (
                       <BadgeCard
-                        key={badge.badge_id}
+                        key={badge.item_id}
                         badge={badge}
-                        isPinned={featuredBadges.includes(badge.badge_id)}
+                        isPinned={featuredBadges.includes(badge.item_id)}
                         canPin={featuredBadges.length < 3}
                         onTogglePin={handleTogglePin}
                       />

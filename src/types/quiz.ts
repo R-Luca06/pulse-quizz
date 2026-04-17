@@ -63,14 +63,33 @@ export interface RankingData {
   userScore: number
 }
 
-// ─── Badges ───────────────────────────────────────────────────────────────────
+// ─── Inventaire & cosmétiques ─────────────────────────────────────────────────
 
 export type BadgeSource = 'achievement' | 'shop' | 'season' | 'rank'
 
-export interface OwnedBadge {
-  badge_id:    string       // = achievement_id pour source 'achievement'
+export type ItemType =
+  | 'badge'
+  | 'emblem'
+  | 'background'
+  | 'title'
+  | 'card_design'
+  | 'screen_animation'
+
+export interface InventoryItem {
+  item_type:   ItemType
+  item_id:     string
   source:      BadgeSource
   obtained_at: string       // ISO timestamp
+}
+
+export type OwnedBadge = InventoryItem & { item_type: 'badge' }
+
+export interface EquippedCosmetics {
+  emblem_id:      string | null
+  background_id:  string | null
+  title_id:       string | null
+  card_design_id: string | null
+  screen_anim_id: string | null
 }
 
 // ─── Achievements ─────────────────────────────────────────────────────────────

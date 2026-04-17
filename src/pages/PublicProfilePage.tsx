@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import MiniBadge from '../components/shared/MiniBadge'
@@ -11,6 +11,11 @@ import { useAuth } from '../hooks/useAuth'
 import { updateFeaturedBadges, updateUsername, updateDescription } from '../services/profile'
 import { sendFriendRequest, removeFriendship, getFriendshipStatus, type FriendshipStatus } from '../services/social'
 import { useToast } from '../contexts/ToastContext'
+import EmblemSlot from '../components/cosmetics/EmblemSlot'
+import TitleSlot from '../components/cosmetics/TitleSlot'
+import CardDesignSlot from '../components/cosmetics/CardDesignSlot'
+import BackgroundSlot from '../components/cosmetics/BackgroundSlot'
+import ScreenAnimationSlot from '../components/cosmetics/ScreenAnimationSlot'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -18,16 +23,6 @@ const ALL_BADGE_IDS = Object.keys(ACHIEVEMENT_MAP) as AchievementId[]
 
 const TIER_LABEL: Record<AchievementTier, string> = {
   common: 'Commun', rare: 'Rare', epic: 'Épique', legendary: 'Légendaire',
-}
-
-function computeTitle(rank: number | null): string {
-  if (!rank) return 'Joueur'
-  if (rank === 1) return 'Champion Mondial'
-  if (rank <= 3) return 'Top 3 Mondial'
-  if (rank <= 10) return 'Élite Mondiale'
-  if (rank <= 50) return 'Maître du Quiz'
-  if (rank <= 100) return 'Expert'
-  return 'Compétiteur'
 }
 
 function computeRankLabel(rank: number | null, total: number): string | null {
@@ -39,44 +34,16 @@ function computeRankLabel(rank: number | null, total: number): string | null {
   return null
 }
 
-// ─── Wall sub-components ──────────────────────────────────────────────────────
-
-function Blason({ rank }: { rank: number | null }) {
-  const isTop10 = !!rank && rank <= 10
-  const isTop50 = !!rank && rank <= 50
-  const color   = !rank ? 'rgba(255,255,255,0.18)' : isTop10 ? '#f59e0b' : isTop50 ? '#94a3b8' : '#6b7280'
-
+function PencilIcon() {
   return (
-    <motion.div
-      initial={{ opacity: 0, y: -14, scale: 0.85 }}
-      animate={{ opacity: 1, y: 0,   scale: 1 }}
-      transition={{ delay: 0.25, duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-      style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center' }}
-    >
-      {rank && <div style={{ position: 'absolute', inset: -10, background: `radial-gradient(circle, ${color}28 0%, transparent 70%)`, filter: 'blur(8px)', pointerEvents: 'none' }} />}
-      <svg width="64" height="74" viewBox="-32 -37 64 74" fill="none">
-        <path d="M -24,-33 L 24,-33 L 24,4 C 24,16 9,30 0,36 C -9,30 -24,16 -24,4 Z" fill="rgba(14,10,28,0.95)" stroke={color} strokeWidth="1.5" strokeDasharray={rank ? undefined : '4 3'} />
-        <path d="M -19,-28 L 19,-28 L 19,2 C 19,12 7,24 0,29 C -7,24 -19,12 -19,2 Z" fill="none" stroke={color + '55'} strokeWidth="0.8" />
-        <circle cx="-24" cy="-33" r="2.5" fill={color + '80'} />
-        <circle cx="24" cy="-33" r="2.5" fill={color + '80'} />
-        {rank
-          ? <>
-              <text x="0" y="-4" textAnchor="middle" dominantBaseline="middle" fill={color} fontSize="13" fontWeight="900" letterSpacing="-0.5">#{rank}</text>
-              <text x="0" y="12" textAnchor="middle" dominantBaseline="middle" fill={color + 'aa'} fontSize="6" fontWeight="700" letterSpacing="1">RANG</text>
-            </>
-          : <>
-              <text x="0" y="-4" textAnchor="middle" dominantBaseline="middle" fill={color} fontSize="18" fontWeight="900">?</text>
-              <text x="0" y="12" textAnchor="middle" dominantBaseline="middle" fill={color + 'aa'} fontSize="5.5" fontWeight="700" letterSpacing="0.8">À CLASSER</text>
-            </>
-        }
-      </svg>
-      <div style={{ display: 'flex', gap: 3, marginTop: -2 }}>
-        {[0,1,2].map(i => <div key={i} style={{ width: 3, height: 3, borderRadius: '50%', background: `${color}60`, border: `1px solid ${color}80` }} />)}
-      </div>
-      <div style={{ width: 1.5, height: 8, background: `${color}40` }} />
-    </motion.div>
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+    </svg>
   )
 }
+
+// ─── Wall sub-components ──────────────────────────────────────────────────────
 
 function Banner({ id, index, onClick }: { id: AchievementId | null; index: number; onClick?: () => void }) {
   if (!id || !ACHIEVEMENT_MAP[id]) return <EmptyBanner index={index} onClick={onClick} />
@@ -156,7 +123,7 @@ function EmptyBanner({ index, onClick }: { index: number; onClick?: () => void }
   )
 }
 
-function Nameplate({ username, title }: { username: string; title: string }) {
+function Nameplate({ username, title }: { username: string; title: ReactNode }) {
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.55, duration: 0.65 }}
       style={{ position: 'relative', display: 'inline-flex', flexDirection: 'column', alignItems: 'center' }}
@@ -481,7 +448,6 @@ function WallPage({ profile, onClose, hideNav }: { profile: PublicProfile; onClo
     !!user && !!authProfile && authProfile.username.toLowerCase() === profile.username.toLowerCase()
   )
 
-  const title     = computeTitle(profile.rank)
   const rankLabel = computeRankLabel(profile.rank, profile.total_players)
 
   // ── Friendship state ──
@@ -612,13 +578,6 @@ function WallPage({ profile, onClose, hideNav }: { profile: PublicProfile; onClo
     { label: 'Streak max',     value: profile.best_streak > 0 ? `×${profile.best_streak}` : '—', accent: '#facc15' },
     { label: 'Rang global',    value: profile.rank ? `#${profile.rank}` : '—', accent: '#60a5fa' },
   ]
-
-  const PencilIcon = () => (
-    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-    </svg>
-  )
 
   return (
     <div className={hideNav ? 'flex flex-col' : 'flex h-full flex-col bg-game-bg'}>
@@ -872,25 +831,16 @@ function WallPage({ profile, onClose, hideNav }: { profile: PublicProfile; onClo
         )}
       </motion.div>
 
-      <div className="flex flex-1 flex-col gap-4 overflow-y-auto pb-8 pt-4" style={{ WebkitOverflowScrolling: 'touch' } as React.CSSProperties}>
+      <div className="relative flex flex-1 flex-col gap-4 overflow-y-auto pb-8 pt-4" style={{ WebkitOverflowScrolling: 'touch' } as React.CSSProperties}>
+
+        <BackgroundSlot equippedId={profile.equipped.background_id} />
 
         {/* ── La Salle ───────────────────────────────────────────────────── */}
-        <div className="px-4">
-          <motion.div
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.18, duration: 0.5 }}
-            className="relative overflow-hidden rounded-2xl"
-            style={{ background: 'radial-gradient(ellipse at 50% -10%, #241545 0%, #120d28 45%, #080614 100%)', border: '1px solid rgba(255,255,255,0.06)' }}
-          >
-            <div style={{ position: 'absolute', top: -30, left: '50%', transform: 'translateX(-50%)', width: 200, height: 100, background: 'radial-gradient(ellipse, rgba(196,181,253,0.07) 0%, transparent 70%)', pointerEvents: 'none' }} />
-
-            {/* Corniche */}
-            <motion.div initial={{ scaleX: 0 }} animate={{ scaleX: 1 }} transition={{ delay: 0.3, duration: 0.6, ease: 'easeOut' }}
-              style={{ position: 'absolute', inset: '44px 0 auto', height: 6, background: 'linear-gradient(180deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.03) 100%)', borderTop: '1px solid rgba(255,255,255,0.12)', borderBottom: '1px solid rgba(255,255,255,0.04)', transformOrigin: 'left' }}
-            />
-
+        <div className="relative z-10 px-4">
+          <CardDesignSlot equippedId={profile.equipped.card_design_id}>
             {/* Contenu mural */}
             <div style={{ padding: '18px 12px 0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
-              <Blason rank={profile.rank} />
+              <EmblemSlot equippedId={profile.equipped.emblem_id} rank={profile.rank} />
               <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'center', gap: 8, width: '100%' }}>
                 {pinnedBadges.map((id, i) => (
                   <Banner
@@ -899,7 +849,10 @@ function WallPage({ profile, onClose, hideNav }: { profile: PublicProfile; onClo
                   />
                 ))}
               </div>
-              <Nameplate username={profile.username} title={title} />
+              <Nameplate
+                username={profile.username}
+                title={<TitleSlot equippedId={profile.equipped.title_id} rank={profile.rank} />}
+              />
               <div style={{ height: 10 }} />
             </div>
 
@@ -914,15 +867,17 @@ function WallPage({ profile, onClose, hideNav }: { profile: PublicProfile; onClo
                 ))}
               </svg>
             </div>
-          </motion.div>
+          </CardDesignSlot>
         </div>
 
         {/* ── Stats ──────────────────────────────────────────────────────── */}
-        <div className="grid grid-cols-2 gap-3 px-4 sm:grid-cols-4">
+        <div className="relative z-10 grid grid-cols-2 gap-3 px-4 sm:grid-cols-4">
           {stats.map((s, i) => (
             <StatCard key={s.label} label={s.label} value={s.value} accent={s.accent} delay={1.0 + i * 0.07} />
           ))}
         </div>
+
+        <ScreenAnimationSlot equippedId={profile.equipped.screen_anim_id} />
 
       </div>
 

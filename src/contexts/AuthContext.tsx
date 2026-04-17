@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useRef, useState, type ReactNode 
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '../services/supabase'
 import { checkAndUnlockAchievements, type AchievementContext } from '../services/achievements'
-import type { AchievementWithStatus, PulsesBreakdown, XpBreakdown } from '../types/quiz'
+import type { AchievementWithStatus, EquippedCosmetics, PulsesBreakdown, XpBreakdown } from '../types/quiz'
 import { identifyUser, resetIdentity, trackUserSignedUp, trackUserSignedIn } from '../services/analytics'
 import { getLevelFromXp } from '../constants/levels'
 import { getWallet } from '../services/pulses'
@@ -11,7 +11,44 @@ interface Profile {
   username: string
   featured_badges: string[]
   description: string
+  equipped: EquippedCosmetics
 }
+
+const DEFAULT_EQUIPPED: EquippedCosmetics = {
+  emblem_id:      null,
+  background_id:  null,
+  title_id:       null,
+  card_design_id: null,
+  screen_anim_id: null,
+}
+
+interface ProfileRow {
+  username:                  string
+  featured_badges:           string[] | null
+  description:               string | null
+  equipped_emblem_id:        string | null
+  equipped_background_id:    string | null
+  equipped_title_id:         string | null
+  equipped_card_design_id:   string | null
+  equipped_screen_anim_id:   string | null
+}
+
+function mapProfileRow(data: ProfileRow): Profile {
+  return {
+    username:        data.username,
+    featured_badges: data.featured_badges ?? [],
+    description:     data.description ?? '',
+    equipped: {
+      emblem_id:      data.equipped_emblem_id      ?? null,
+      background_id:  data.equipped_background_id  ?? null,
+      title_id:       data.equipped_title_id       ?? null,
+      card_design_id: data.equipped_card_design_id ?? null,
+      screen_anim_id: data.equipped_screen_anim_id ?? null,
+    },
+  }
+}
+
+const PROFILE_SELECT = 'username, featured_badges, description, equipped_emblem_id, equipped_background_id, equipped_title_id, equipped_card_design_id, equipped_screen_anim_id'
 
 export interface RewardNotification {
   gameXp: XpBreakdown | null
@@ -92,14 +129,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     let cancelled = false
     Promise.all([
-      supabase.from('profiles').select('username, featured_badges, description').eq('id', user.id).maybeSingle(),
+      supabase.from('profiles').select(PROFILE_SELECT).eq('id', user.id).maybeSingle(),
       supabase.from('user_global_stats').select('total_xp').eq('user_id', user.id).maybeSingle(),
       getWallet(user.id).catch(() => ({ balance: 0, lifetime_earned: 0, updated_at: null })),
     ]).then(([profileRes, xpRes, wallet]) => {
       if (!cancelled) {
         if (profileRes.data) {
-          setProfile({ username: profileRes.data.username, featured_badges: profileRes.data.featured_badges ?? [], description: profileRes.data.description ?? '' })
-          identifyUser(user.id, { username: profileRes.data.username, email: user.email ?? undefined })
+          setProfile(mapProfileRow(profileRes.data as ProfileRow))
+          identifyUser(user.id, { username: (profileRes.data as ProfileRow).username, email: user.email ?? undefined })
         }
         const xp = (xpRes.data as { total_xp: number } | null)?.total_xp ?? 0
         setTotalXp(xp)
@@ -189,7 +226,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await supabase.auth.signOut()
       throw profileError
     }
-    setProfile({ username, featured_badges: [], description: '' })
+    setProfile({ username, featured_badges: [], description: '', equipped: { ...DEFAULT_EQUIPPED } })
     trackUserSignedUp({ username })
 
     // Vérification des achievements post-inscription (profile existe maintenant)
@@ -216,10 +253,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!user) return
     const { data } = await supabase
       .from('profiles')
-      .select('username, featured_badges, description')
+      .select(PROFILE_SELECT)
       .eq('id', user.id)
       .maybeSingle()
-    if (data) setProfile({ username: data.username, featured_badges: data.featured_badges ?? [], description: data.description ?? '' })
+    if (data) setProfile(mapProfileRow(data as ProfileRow))
   }
 
   async function refreshWallet(): Promise<void> {

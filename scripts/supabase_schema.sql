@@ -24,7 +24,7 @@
 --   4.  user_stats                  — stats par catégorie / mode / difficulté
 --   5.  user_global_stats           — totaux agrégés (games, XP, comp score)
 --   6.  user_achievements           — achievements débloqués
---   7.  user_badges                 — possession unifiée de badges (toutes sources)
+--   7.  user_inventory              — possession unifiée d'items cosmétiques (tous types, toutes sources)
 --   8.  friendships                 — relations d'amitié
 --   9.  notifications               — notifications in-app (20 max / user)
 --   10. daily_themes                — thème pré-curé par date
@@ -48,7 +48,7 @@
 --   - delete_user                   — suppression complète du compte
 --
 -- Triggers :
---   - sync_achievement_to_badge     — user_achievements → user_badges
+--   - sync_achievement_to_inventory — user_achievements → user_inventory (item_type='badge')
 --   - sync_username_to_leaderboard  — profiles → leaderboard (changement de pseudo)
 --   - trim_notifications            — garde les 20 dernières par utilisateur
 --   - update_friendships_updated_at — maintient friendships.updated_at
@@ -65,16 +65,29 @@
 -- lors d'un changement de pseudo via profile.ts.
 
 CREATE TABLE IF NOT EXISTS profiles (
-  id                  uuid        PRIMARY KEY REFERENCES auth.users (id) ON DELETE CASCADE,
-  username            text        NOT NULL,
-  featured_badges     text[]      NOT NULL DEFAULT '{}',  -- jusqu'à 3 badge_id épinglés
-  description         text        NOT NULL DEFAULT '',    -- bio libre (max 120 char côté client)
-  username_changed    boolean     NOT NULL DEFAULT false,
-  avatar_changed      boolean     NOT NULL DEFAULT false,
-  description_changed boolean     NOT NULL DEFAULT false,
-  notification_prefs  jsonb       NOT NULL DEFAULT '{"achievement_unlocked":true,"rank_change":true}',
-  created_at          timestamptz NOT NULL DEFAULT now()
+  id                         uuid        PRIMARY KEY REFERENCES auth.users (id) ON DELETE CASCADE,
+  username                   text        NOT NULL,
+  featured_badges            text[]      NOT NULL DEFAULT '{}',  -- jusqu'à 3 badge_id épinglés
+  description                text        NOT NULL DEFAULT '',    -- bio libre (max 120 char côté client)
+  username_changed           boolean     NOT NULL DEFAULT false,
+  avatar_changed             boolean     NOT NULL DEFAULT false,
+  description_changed        boolean     NOT NULL DEFAULT false,
+  notification_prefs         jsonb       NOT NULL DEFAULT '{"achievement_unlocked":true,"rank_change":true}',
+  -- Items cosmétiques équipés (NULL = rendu par défaut, résolu côté client)
+  equipped_emblem_id         text        DEFAULT NULL,
+  equipped_background_id     text        DEFAULT NULL,
+  equipped_title_id          text        DEFAULT NULL,
+  equipped_card_design_id    text        DEFAULT NULL,
+  equipped_screen_anim_id    text        DEFAULT NULL,
+  created_at                 timestamptz NOT NULL DEFAULT now()
 );
+
+-- Migration idempotente pour bases existantes (ajout des colonnes equipped_*)
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS equipped_emblem_id       text DEFAULT NULL;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS equipped_background_id   text DEFAULT NULL;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS equipped_title_id        text DEFAULT NULL;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS equipped_card_design_id  text DEFAULT NULL;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS equipped_screen_anim_id  text DEFAULT NULL;
 
 -- Unicité insensible à la casse : index fonctionnel sur lower(username).
 -- 'Alice' et 'alice' = même username.
@@ -238,31 +251,55 @@ CREATE POLICY "user_achievements_insert_own" ON user_achievements FOR INSERT WIT
 
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- 7. user_badges
+-- 7. user_inventory
 -- ─────────────────────────────────────────────────────────────────────────────
--- Possession unifiée de badges, toutes sources confondues.
--- Alimentée automatiquement pour la source 'achievement' par le trigger
--- sync_achievement_to_badge. Les sources 'shop'/'season'/'rank' seront
--- alimentées par leurs flux dédiés.
+-- Possession unifiée des items cosmétiques : badges, emblèmes, fonds, titres,
+-- designs de carte, animations d'écran — toutes sources confondues.
+-- Alimentée automatiquement pour (item_type='badge', source='achievement') par
+-- le trigger sync_achievement_to_inventory. Les autres types/sources seront
+-- alimentés par leurs flux dédiés (boutique, saison, classement).
 
-CREATE TABLE IF NOT EXISTS user_badges (
-  user_id     uuid        NOT NULL REFERENCES auth.users (id) ON DELETE CASCADE,
-  badge_id    text        NOT NULL,
+CREATE TABLE IF NOT EXISTS user_inventory (
+  id          uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id     uuid        NOT NULL REFERENCES profiles (id) ON DELETE CASCADE,
+  item_type   text        NOT NULL CHECK (item_type IN (
+                'badge', 'emblem', 'background', 'title', 'card_design', 'screen_animation'
+              )),
+  item_id     text        NOT NULL,
   source      text        NOT NULL CHECK (source IN ('achievement', 'shop', 'season', 'rank')),
   obtained_at timestamptz NOT NULL DEFAULT now(),
-  PRIMARY KEY (user_id, badge_id)
+  UNIQUE (user_id, item_type, item_id)
 );
 
-ALTER TABLE user_badges ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "user_badges_select_own"
-  ON user_badges FOR SELECT
+CREATE INDEX IF NOT EXISTS idx_user_inventory_user_type
+  ON user_inventory (user_id, item_type);
+
+ALTER TABLE user_inventory ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "user_inventory_select_own"
+  ON user_inventory FOR SELECT
   USING (auth.uid() = user_id);
 
 -- L'insertion directe est permise (WITH CHECK own), mais en pratique elle passe
 -- par le trigger SECURITY DEFINER ou des flux service-role (shop/season).
-CREATE POLICY "user_badges_insert_service"
-  ON user_badges FOR INSERT
+CREATE POLICY "user_inventory_insert_service"
+  ON user_inventory FOR INSERT
   WITH CHECK (auth.uid() = user_id);
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Migration user_badges → user_inventory
+-- ─────────────────────────────────────────────────────────────────────────────
+-- À exécuter une seule fois sur les bases existantes. Copie les badges possédés
+-- dans la nouvelle table, puis supprime l'ancienne. Envelopper dans BEGIN/COMMIT
+-- lors de l'exécution réelle. Idempotent : skip si user_badges n'existe pas.
+--
+--   BEGIN;
+--   INSERT INTO user_inventory (user_id, item_type, item_id, source, obtained_at)
+--   SELECT user_id, 'badge', badge_id, source, obtained_at
+--   FROM   user_badges
+--   ON CONFLICT (user_id, item_type, item_id) DO NOTHING;
+--   DROP TABLE user_badges;
+--   COMMIT;
 
 
 -- ─────────────────────────────────────────────────────────────────────────────
@@ -1035,22 +1072,30 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 DECLARE
-  v_user_id   uuid;
-  v_username  text;
-  v_desc      text;
-  v_featured  text[];
-  v_games     integer := 0;
-  v_correct   integer := 0;
-  v_streak    integer := 0;
-  v_total_xp  integer := 0;
-  v_best_comp integer := 0;
-  v_rank      bigint  := NULL;
-  v_total     bigint  := 0;
-  v_ach       jsonb   := '[]'::jsonb;
-  v_ach_dates jsonb   := '[]'::jsonb;
+  v_user_id       uuid;
+  v_username      text;
+  v_desc          text;
+  v_featured      text[];
+  v_emblem        text;
+  v_background    text;
+  v_title         text;
+  v_card_design   text;
+  v_screen_anim   text;
+  v_games         integer := 0;
+  v_correct       integer := 0;
+  v_streak        integer := 0;
+  v_total_xp      integer := 0;
+  v_best_comp     integer := 0;
+  v_rank          bigint  := NULL;
+  v_total         bigint  := 0;
+  v_ach           jsonb   := '[]'::jsonb;
+  v_ach_dates     jsonb   := '[]'::jsonb;
 BEGIN
-  SELECT id, username, description, featured_badges
-  INTO v_user_id, v_username, v_desc, v_featured
+  SELECT id, username, description, featured_badges,
+         equipped_emblem_id, equipped_background_id, equipped_title_id,
+         equipped_card_design_id, equipped_screen_anim_id
+  INTO v_user_id, v_username, v_desc, v_featured,
+       v_emblem, v_background, v_title, v_card_design, v_screen_anim
   FROM profiles WHERE lower(username) = lower(p_username);
 
   IF NOT FOUND THEN RETURN NULL; END IF;
@@ -1082,20 +1127,25 @@ BEGIN
   FROM user_achievements WHERE user_id = v_user_id;
 
   RETURN jsonb_build_object(
-    'username',          v_username,
-    'avatar_emoji',      '',
-    'avatar_color',      '',
-    'description',       COALESCE(v_desc, ''),
-    'featured_badges',   COALESCE(to_jsonb(v_featured), '[]'::jsonb),
-    'games_played',      v_games,
-    'total_correct',     v_correct,
-    'best_streak',       v_streak,
-    'total_xp',          v_total_xp,
-    'best_comp_score',   v_best_comp,
-    'rank',              v_rank,
-    'total_players',     v_total,
-    'achievements',      COALESCE(v_ach,       '[]'::jsonb),
-    'achievement_dates', COALESCE(v_ach_dates, '[]'::jsonb)
+    'username',                 v_username,
+    'avatar_emoji',             '',
+    'avatar_color',             '',
+    'description',              COALESCE(v_desc, ''),
+    'featured_badges',          COALESCE(to_jsonb(v_featured), '[]'::jsonb),
+    'games_played',             v_games,
+    'total_correct',            v_correct,
+    'best_streak',              v_streak,
+    'total_xp',                 v_total_xp,
+    'best_comp_score',          v_best_comp,
+    'rank',                     v_rank,
+    'total_players',            v_total,
+    'achievements',             COALESCE(v_ach,       '[]'::jsonb),
+    'achievement_dates',        COALESCE(v_ach_dates, '[]'::jsonb),
+    'equipped_emblem_id',       v_emblem,
+    'equipped_background_id',   v_background,
+    'equipped_title_id',        v_title,
+    'equipped_card_design_id',  v_card_design,
+    'equipped_screen_anim_id',  v_screen_anim
   );
 END;
 $$;
@@ -1130,7 +1180,7 @@ BEGIN
   DELETE FROM friendships              WHERE requester_id = uid OR addressee_id = uid;
   DELETE FROM daily_challenge_entries  WHERE user_id = uid;
   DELETE FROM daily_streaks            WHERE user_id = uid;
-  DELETE FROM user_badges              WHERE user_id = uid;
+  DELETE FROM user_inventory           WHERE user_id = uid;
   DELETE FROM user_achievements        WHERE user_id = uid;
   DELETE FROM user_stats               WHERE user_id = uid;
   DELETE FROM user_global_stats        WHERE user_id = uid;
@@ -1151,24 +1201,26 @@ GRANT EXECUTE ON FUNCTION delete_user() TO authenticated;
 
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- sync_achievement_to_badge : user_achievements → user_badges (source 'achievement')
+-- sync_achievement_to_inventory : user_achievements → user_inventory
+-- (item_type='badge', source='achievement')
 -- ─────────────────────────────────────────────────────────────────────────────
 
-CREATE OR REPLACE FUNCTION sync_achievement_to_badge()
+CREATE OR REPLACE FUNCTION sync_achievement_to_inventory()
 RETURNS TRIGGER
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
 AS $$
 BEGIN
-  INSERT INTO user_badges (user_id, badge_id, source, obtained_at)
+  INSERT INTO user_inventory (user_id, item_type, item_id, source, obtained_at)
   VALUES (
     NEW.user_id,
+    'badge',
     NEW.achievement_id,
     'achievement',
     COALESCE(NEW.unlocked_at, now())
   )
-  ON CONFLICT (user_id, badge_id) DO NOTHING;
+  ON CONFLICT (user_id, item_type, item_id) DO NOTHING;
   RETURN NEW;
 END;
 $$;
@@ -1176,13 +1228,13 @@ $$;
 DROP TRIGGER IF EXISTS on_achievement_unlock ON user_achievements;
 CREATE TRIGGER on_achievement_unlock
   AFTER INSERT ON user_achievements
-  FOR EACH ROW EXECUTE FUNCTION sync_achievement_to_badge();
+  FOR EACH ROW EXECUTE FUNCTION sync_achievement_to_inventory();
 
 -- Backfill one-shot pour les bases existantes
-INSERT INTO user_badges (user_id, badge_id, source, obtained_at)
-SELECT user_id, achievement_id, 'achievement', COALESCE(unlocked_at, now())
+INSERT INTO user_inventory (user_id, item_type, item_id, source, obtained_at)
+SELECT user_id, 'badge', achievement_id, 'achievement', COALESCE(unlocked_at, now())
 FROM user_achievements
-ON CONFLICT (user_id, badge_id) DO NOTHING;
+ON CONFLICT (user_id, item_type, item_id) DO NOTHING;
 
 
 -- ─────────────────────────────────────────────────────────────────────────────
