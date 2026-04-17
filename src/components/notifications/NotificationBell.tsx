@@ -120,7 +120,6 @@ function NotifRow({ n, onRead }: { n: AppNotification; onRead: (id: string) => v
 // ─── Panel ────────────────────────────────────────────────────────────────────
 
 interface PanelProps {
-  userId: string
   notifications: AppNotification[]
   loading: boolean
   onRead: (id: string) => void
@@ -128,7 +127,7 @@ interface PanelProps {
   onClose: () => void
 }
 
-function NotifPanelContent({ userId: _userId, notifications, loading, onRead, onReadAll, onClose }: PanelProps) {
+function NotifPanelContent({ notifications, loading, onRead, onReadAll, onClose }: PanelProps) {
   const unreadCount = notifications.filter(n => !n.read).length
 
   return (
@@ -297,7 +296,6 @@ export default function NotificationBell({ userId }: Props) {
         {open && (
           <div className="absolute right-0 top-11 z-50">
             <NotifPanelContent
-              userId={userId}
               notifications={notifications}
               loading={loading}
               onRead={handleRead}

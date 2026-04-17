@@ -201,7 +201,7 @@ export async function getFriends(userId: string): Promise<FriendProfile[]> {
       friendshipId: row.id,
       userId: friendId,
       username: p?.username ?? '?',
-      featuredBadges: (p as any)?.featured_badges ?? [],
+      featuredBadges: (p as { featured_badges?: string[] } | undefined)?.featured_badges ?? [],
     }
   })
 }
@@ -234,7 +234,7 @@ export async function getPendingRequests(userId: string): Promise<PendingRequest
       friendshipId: row.id,
       userId: otherId,
       username: p?.username ?? '?',
-      featuredBadges: (p as any)?.featured_badges ?? [],
+      featuredBadges: (p as { featured_badges?: string[] } | undefined)?.featured_badges ?? [],
       direction: isRequester ? 'sent' : 'received',
       createdAt: row.created_at,
     } as PendingRequest

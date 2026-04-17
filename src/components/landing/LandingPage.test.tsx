@@ -72,7 +72,7 @@ describe('LandingPage — bascule vitrine ↔ connectée (Story 6.5)', () => {
     expect(screen.queryByTestId('connected-landing')).not.toBeInTheDocument()
   })
 
-  it('rend GuestLanding quand user est null après chargement', () => {
+  it('rend GuestLanding quand user est null après chargement', async () => {
     mockUseAuth.mockReturnValue({
       user: null,
       profile: null,
@@ -80,11 +80,12 @@ describe('LandingPage — bascule vitrine ↔ connectée (Story 6.5)', () => {
       signOut: vi.fn(),
     })
     renderLanding()
-    expect(screen.getByTestId('guest-landing')).toBeInTheDocument()
+    // GuestLanding et ConnectedLanding sont lazy() : on attend la résolution
+    expect(await screen.findByTestId('guest-landing')).toBeInTheDocument()
     expect(screen.queryByTestId('connected-landing')).not.toBeInTheDocument()
   })
 
-  it('rend ConnectedLanding quand user est non-null', () => {
+  it('rend ConnectedLanding quand user est non-null', async () => {
     mockUseAuth.mockReturnValue({
       user: { id: 'u1' },
       profile: { username: 'luca' },
@@ -92,7 +93,7 @@ describe('LandingPage — bascule vitrine ↔ connectée (Story 6.5)', () => {
       signOut: vi.fn(),
     })
     renderLanding()
-    expect(screen.getByTestId('connected-landing')).toBeInTheDocument()
+    expect(await screen.findByTestId('connected-landing')).toBeInTheDocument()
     expect(screen.queryByTestId('guest-landing')).not.toBeInTheDocument()
   })
 

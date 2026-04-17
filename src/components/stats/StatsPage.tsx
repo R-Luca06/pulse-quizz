@@ -162,7 +162,7 @@ export default function StatsPage({ onBack, defaultTab = 'leaderboard', initialD
     } finally {
       setDailyLoading(false)
     }
-  }, [user]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [user])
 
   useEffect(() => {
     if (activeTab !== 'daily') return

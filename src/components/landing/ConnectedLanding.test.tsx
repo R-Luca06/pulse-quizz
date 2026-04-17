@@ -48,11 +48,11 @@ function renderConnected(overrides: Partial<React.ComponentProps<typeof Connecte
 describe('Landing branches (Story 5.2)', () => {
   it('ConnectedLanding rend le header et les cards latérales', () => {
     renderConnected()
-    // Nav Achievements présente dans le header
-    expect(screen.getByRole('button', { name: /achievements/i })).toBeInTheDocument()
-    // Cards latérales présentes
-    expect(screen.getByText('Hall of Gloire')).toBeInTheDocument()
-    expect(screen.getByText('Mes Stats')).toBeInTheDocument()
+    // Header : bouton Navigation (dropdown) présent
+    expect(screen.getByRole('button', { name: /^navigation$/i })).toBeInTheDocument()
+    // Cards latérales présentes (rendues 2× : layout mobile + layout desktop dans PodiumScene)
+    expect(screen.getAllByText('Hall of Gloire').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Mes Stats').length).toBeGreaterThan(0)
   })
 
   it('GuestLanding rend le hero avec un h1 unique et des CTAs auth', () => {
@@ -143,9 +143,9 @@ describe('GuestLanding CTA auth (Story 6.2)', () => {
     renderGuest({ onOpenSettings })
     // Mention explicite du mode normal sous le bouton Play
     expect(screen.getByText(/mode normal/i)).toBeInTheDocument()
-    // Les boutons Jouer (header + hero) partagent l'aria-label — on en a au moins 2
+    // Le bouton Jouer existe dans le hero (le header guest n'a plus de bouton Jouer)
     const playBtns = screen.getAllByRole('button', { name: /jouer maintenant en mode invité/i })
-    expect(playBtns.length).toBeGreaterThanOrEqual(2)
+    expect(playBtns.length).toBeGreaterThanOrEqual(1)
     fireEvent.click(playBtns[playBtns.length - 1])
     expect(onOpenSettings).toHaveBeenCalledTimes(1)
   })
@@ -165,10 +165,17 @@ describe('GuestLanding CTA auth (Story 6.2)', () => {
 })
 
 describe('ConnectedHeader via ConnectedLanding (Story 5.4)', () => {
-  it('affiche les 3 entrées nav texte (pas de bouton Profil dédié)', () => {
+  // Le header expose un bouton "Navigation" (icône grille) qui ouvre un dropdown
+  // contenant Classement / Statistiques / Achievements / Collections.
+  function openNavDropdown() {
+    fireEvent.click(screen.getByRole('button', { name: /^navigation$/i }))
+  }
+
+  it('le dropdown Navigation expose Classement, Statistiques, Achievements (pas de bouton Profil dédié)', () => {
     renderConnected()
+    openNavDropdown()
     expect(screen.getByRole('button', { name: /classement/i })).toHaveTextContent('Classement')
-    expect(screen.getByRole('button', { name: /statistiques/i })).toHaveTextContent('Stats')
+    expect(screen.getByRole('button', { name: /statistiques/i })).toHaveTextContent('Statistiques')
     expect(screen.getByRole('button', { name: /achievements/i })).toHaveTextContent('Achievements')
     expect(screen.queryByRole('button', { name: /^voir le profil$/i })).not.toBeInTheDocument()
   })
@@ -176,30 +183,33 @@ describe('ConnectedHeader via ConnectedLanding (Story 5.4)', () => {
   it('clic sur Classement appelle onShowStats("leaderboard")', () => {
     const onShowStats = vi.fn()
     renderConnected({ onShowStats })
+    openNavDropdown()
     fireEvent.click(screen.getByRole('button', { name: /classement/i }))
     expect(onShowStats).toHaveBeenCalledWith('leaderboard')
   })
 
-  it('clic sur Stats appelle onShowStats("stats")', () => {
-    const onShowStats = vi.fn()
-    renderConnected({ onShowStats })
+  it('clic sur Statistiques appelle onShowProfile("stats")', () => {
+    const onShowProfile = vi.fn()
+    renderConnected({ onShowProfile })
+    openNavDropdown()
     fireEvent.click(screen.getByRole('button', { name: /statistiques/i }))
-    expect(onShowStats).toHaveBeenCalledWith('stats')
+    expect(onShowProfile).toHaveBeenCalledWith('stats')
   })
 
-  it('clic sur Achievements appelle onShowAchievements', () => {
-    const onShowAchievements = vi.fn()
-    renderConnected({ onShowAchievements })
+  it('clic sur Achievements appelle onShowProfile("achievements")', () => {
+    const onShowProfile = vi.fn()
+    renderConnected({ onShowProfile })
+    openNavDropdown()
     fireEvent.click(screen.getByRole('button', { name: /achievements/i }))
-    expect(onShowAchievements).toHaveBeenCalledTimes(1)
+    expect(onShowProfile).toHaveBeenCalledWith('achievements')
   })
 
   it('@username est cliquable et appelle onShowProfile', () => {
     const onShowProfile = vi.fn()
     renderConnected({ onShowProfile, username: 'luca' })
-    const usernameBtn = screen.getByRole('button', { name: /ouvrir le profil de luca/i })
-    expect(usernameBtn).toHaveTextContent('@luca')
-    fireEvent.click(usernameBtn)
+    const usernameBtn = screen.getByText('@luca').closest('button')
+    expect(usernameBtn).not.toBeNull()
+    fireEvent.click(usernameBtn!)
     expect(onShowProfile).toHaveBeenCalledTimes(1)
   })
 
@@ -229,16 +239,17 @@ describe('Podium scene (Story 8.1)', () => {
 describe('Cards & CTA (Story 8.2)', () => {
   it('ConnectedLanding rend la LeaderboardCard sur desktop', async () => {
     renderConnected()
-    expect(screen.getByText('Hall of Gloire')).toBeInTheDocument()
+    // Card rendue 2× (mobile + desktop dans PodiumScene)
+    expect(screen.getAllByText('Hall of Gloire').length).toBeGreaterThan(0)
     // Attend que l'effet async se termine (getCompTopScores retourne [])
     await waitFor(() =>
-      expect(screen.getByText('Pas encore de scores')).toBeInTheDocument(),
+      expect(screen.getAllByText('Pas encore de scores').length).toBeGreaterThan(0),
     )
   })
 
   it('ConnectedLanding rend la PlayerStatsCard sur desktop', () => {
     renderConnected()
-    expect(screen.getByText('Mes Stats')).toBeInTheDocument()
+    expect(screen.getAllByText('Mes Stats').length).toBeGreaterThan(0)
   })
 
   // Note: le bouton JOUER est dans GameDock, monté par ConnectedBranch/LandingPage,
