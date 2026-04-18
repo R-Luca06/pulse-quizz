@@ -4,6 +4,7 @@ import { motion } from 'framer-motion'
 import MiniBadge from '../components/shared/MiniBadge'
 import { BADGE_TIER, TIER_GLOW_COLOR } from '../constants/achievementColors'
 import { ACHIEVEMENT_MAP } from '../constants/achievements'
+import { getBadgeMeta } from '../constants/cosmetics/registry'
 import type { AchievementId, AchievementTier, ItemType } from '../types/quiz'
 import { getPublicProfile, type PublicProfile } from '../services/publicProfile'
 import { getLevelFromXp } from '../constants/levels'
@@ -46,10 +47,10 @@ function PencilIcon() {
 
 // ─── Wall sub-components ──────────────────────────────────────────────────────
 
-function Banner({ id, index, onClick }: { id: AchievementId | null; index: number; onClick?: () => void }) {
-  if (!id || !ACHIEVEMENT_MAP[id]) return <EmptyBanner index={index} onClick={onClick} />
-  const achievement = ACHIEVEMENT_MAP[id]
-  const tier = BADGE_TIER[id]
+function Banner({ id, index, onClick }: { id: string | null; index: number; onClick?: () => void }) {
+  const meta = id ? getBadgeMeta(id) : null
+  if (!id || !meta) return <EmptyBanner index={index} onClick={onClick} />
+  const tier = meta.tier
   const glow = TIER_GLOW_COLOR[tier]
   const inner = (
     <>
@@ -75,7 +76,7 @@ function Banner({ id, index, onClick }: { id: AchievementId | null; index: numbe
         )}
         <span style={{ fontSize: 7.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.13em', color: glow + 'bb' }}>{TIER_LABEL[tier]}</span>
         <MiniBadge achievementId={id} size={44} unlocked />
-        <span style={{ fontSize: 10.5, fontWeight: 700, color: 'rgba(255,255,255,0.88)', textAlign: 'center', lineHeight: 1.35 }}>{achievement.name}</span>
+        <span style={{ fontSize: 10.5, fontWeight: 700, color: 'rgba(255,255,255,0.88)', textAlign: 'center', lineHeight: 1.35 }}>{meta.name}</span>
       </div>
     </>
   )
@@ -431,10 +432,10 @@ function WallPage({ profile, onClose, hideNav }: { profile: PublicProfile; onClo
   const liveFeatured = isOwnProfile ? (authProfile?.featured_badges ?? []) : profile.featured_badges
   const liveEquipped = isOwnProfile && authProfile ? authProfile.equipped : profile.equipped
 
-  const pinnedBadges: (AchievementId | null)[] = [
-    (liveFeatured[0] as AchievementId | undefined) ?? null,
-    (liveFeatured[1] as AchievementId | undefined) ?? null,
-    (liveFeatured[2] as AchievementId | undefined) ?? null,
+  const pinnedBadges: (string | null)[] = [
+    liveFeatured[0] ?? null,
+    liveFeatured[1] ?? null,
+    liveFeatured[2] ?? null,
   ]
 
   function firstFreeBadgeSlot(): 0 | 1 | 2 {

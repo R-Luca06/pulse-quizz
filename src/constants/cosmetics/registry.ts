@@ -1,4 +1,6 @@
 import type { AchievementTier, CosmeticType } from '../../types/quiz'
+import { ACHIEVEMENT_MAP }                       from '../achievements'
+import { SHOP_BADGE_REGISTRY }                   from '../shopBadges'
 import { EMBLEM_REGISTRY,       DEFAULT_EMBLEM_ID }       from './emblems'
 import { TITLE_REGISTRY,        DEFAULT_TITLE_ID }        from './titles'
 import { CARD_DESIGN_REGISTRY,  DEFAULT_CARD_DESIGN_ID }  from './cardDesigns'
@@ -75,4 +77,19 @@ export function listCosmetics(type: CosmeticType): CosmeticMeta[] {
     description: entry.description ?? '',
     isDefault:   entry.id === defId,
   }))
+}
+
+export interface BadgeMeta {
+  id:   string
+  name: string
+  icon: string
+  tier: AchievementTier
+}
+
+export function getBadgeMeta(id: string): BadgeMeta | null {
+  const ach = ACHIEVEMENT_MAP[id as keyof typeof ACHIEVEMENT_MAP]
+  if (ach) return { id: ach.id, name: ach.name, icon: ach.icon, tier: ach.tier }
+  const shop = SHOP_BADGE_REGISTRY[id]
+  if (shop) return { id: shop.id, name: shop.name, icon: shop.icon, tier: shop.tier }
+  return null
 }

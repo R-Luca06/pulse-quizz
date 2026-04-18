@@ -26,6 +26,7 @@ interface Props {
   onViewProfile: (username: string) => void
   onShowDaily?: () => void
   onShowInventory?: () => void
+  onShowShop?: () => void
 }
 
 export default function LandingPage({
@@ -42,6 +43,7 @@ export default function LandingPage({
   onViewProfile,
   onShowDaily,
   onShowInventory,
+  onShowShop,
 }: Props) {
   const { user, profile, loading, signOut } = useAuth()
   const toast = useToast()
@@ -94,6 +96,7 @@ export default function LandingPage({
             onViewProfile={onViewProfile}
             onShowDaily={onShowDaily}
             onShowInventory={onShowInventory}
+            onShowShop={onShowShop}
           />
         </motion.div>
       ) : (
@@ -212,6 +215,7 @@ interface ConnectedBranchProps {
   onViewProfile: (username: string) => void
   onShowDaily?: () => void
   onShowInventory?: () => void
+  onShowShop?: () => void
 }
 
 function ConnectedBranch({
@@ -231,6 +235,7 @@ function ConnectedBranch({
   onViewProfile,
   onShowDaily,
   onShowInventory,
+  onShowShop,
 }: ConnectedBranchProps) {
   function handleLaunch() {
     setOpenSettings(false)
@@ -253,6 +258,7 @@ function ConnectedBranch({
           onShowSocial={onShowSocial}
           onShowDaily={onShowDaily}
           onShowInventory={onShowInventory}
+          onShowShop={onShowShop}
         />
       </Suspense>
 

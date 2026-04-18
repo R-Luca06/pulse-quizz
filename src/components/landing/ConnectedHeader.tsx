@@ -20,6 +20,7 @@ interface ConnectedHeaderProps {
   onShowSocial?: () => void
   onShowDaily?: () => void
   onShowInventory?: () => void
+  onShowShop?: () => void
 }
 
 const dropdownItemClass =
@@ -62,6 +63,7 @@ export default function ConnectedHeader({
   onViewProfile,
   onShowSocial,
   onShowDaily,
+  onShowShop,
 }: ConnectedHeaderProps) {
   const { user, totalXp, pulsesBalance } = useAuth()
   const xpData = getLevelProgress(totalXp)
@@ -176,6 +178,10 @@ export default function ConnectedHeader({
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
                 Inventaire
               </button>
+              <button type="button" onClick={() => { onShowShop?.(); closeAll() }} className={dropdownItemClass}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+                Boutique
+              </button>
             </div>
           )}
         </div>
@@ -257,6 +263,10 @@ export default function ConnectedHeader({
               <button type="button" onClick={() => { onShowProfile('inventory'); closeAll() }} className={dropdownItemClass}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
                 Inventaire
+              </button>
+              <button type="button" onClick={() => { onShowShop?.(); closeAll() }} className={dropdownItemClass}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+                Boutique
               </button>
             </div>
           )}

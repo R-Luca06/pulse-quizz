@@ -2,15 +2,14 @@ import { useMemo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '../../hooks/useAuth'
 import { useToast } from '../../contexts/ToastContext'
-import { COSMETIC_TYPE_LABEL, DEFAULT_ID_BY_TYPE, getCosmetic } from '../../constants/cosmetics/registry'
-import { ACHIEVEMENT_MAP } from '../../constants/achievements'
-import { BADGE_TIER, TIER_GLOW_COLOR } from '../../constants/achievementColors'
+import { COSMETIC_TYPE_LABEL, DEFAULT_ID_BY_TYPE, getCosmetic, getBadgeMeta } from '../../constants/cosmetics/registry'
+import { TIER_GLOW_COLOR } from '../../constants/achievementColors'
 import MiniBadge from '../shared/MiniBadge'
 import ItemPicker from './ItemPicker'
 import { CosmeticPreview } from './previews'
 import { equipCosmetic } from '../../services/inventory'
 import { updateFeaturedBadges } from '../../services/profile'
-import type { AchievementId, AchievementTier, BadgeSource, CosmeticType, EquippedCosmetics, InventoryItem, ItemType } from '../../types/quiz'
+import type { AchievementTier, BadgeSource, CosmeticType, EquippedCosmetics, InventoryItem, ItemType } from '../../types/quiz'
 
 // ─── Types & constantes ──────────────────────────────────────────────────────
 
@@ -101,7 +100,7 @@ export default function InventoryPage({ hideBack = false, onBack }: Props) {
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>('all')
   const [picker,       setPicker]       = useState<{ type: ItemType; slotIndex?: 0 | 1 | 2 } | null>(null)
   const [busyId,       setBusyId]       = useState<string | null>(null)
-  const [badgeReplace, setBadgeReplace] = useState<{ newBadgeId: AchievementId } | null>(null)
+  const [badgeReplace, setBadgeReplace] = useState<{ newBadgeId: string } | null>(null)
 
   // ── Direct equip/pin (sans ouvrir le picker) ──────────────────────────────
   async function handleQuickEquip(it: UnifiedItem) {
@@ -110,8 +109,8 @@ export default function InventoryPage({ hideBack = false, onBack }: Props) {
     setBusyId(itemKey)
     try {
       if (it.type === 'badge') {
-        const featured = (profile?.featured_badges ?? []) as AchievementId[]
-        const idx = featured.indexOf(it.id as AchievementId)
+        const featured = profile?.featured_badges ?? []
+        const idx = featured.indexOf(it.id)
         if (idx >= 0) {
           // Déjà épinglé → désépingler
           const next = featured.filter((_, i) => i !== idx)
@@ -120,13 +119,13 @@ export default function InventoryPage({ hideBack = false, onBack }: Props) {
           toast.success('Badge retiré')
         } else if (featured.length < 3) {
           // Slot libre → épingler direct
-          const next = [...featured, it.id as AchievementId]
+          const next = [...featured, it.id]
           setLocalFeaturedBadges(next)
           await updateFeaturedBadges(user.id, next)
           toast.success('Badge épinglé')
         } else {
           // 3 badges déjà pinés → demander quel slot remplacer
-          setBadgeReplace({ newBadgeId: it.id as AchievementId })
+          setBadgeReplace({ newBadgeId: it.id })
         }
       } else {
         const cosmeticType = it.type as CosmeticType
@@ -154,7 +153,7 @@ export default function InventoryPage({ hideBack = false, onBack }: Props) {
 
   async function handleBadgeReplace(slotIndex: 0 | 1 | 2) {
     if (!user || !badgeReplace || !profile) return
-    const next = [...profile.featured_badges] as AchievementId[]
+    const next = [...profile.featured_badges]
     next[slotIndex] = badgeReplace.newBadgeId
     setBusyId(`badge-${badgeReplace.newBadgeId}`)
     setLocalFeaturedBadges(next)
@@ -179,13 +178,13 @@ export default function InventoryPage({ hideBack = false, onBack }: Props) {
     // 1) Items possédés (badges + cosmétiques débloqués)
     for (const it of owned) {
       if (it.item_type === 'badge') {
-        const meta = ACHIEVEMENT_MAP[it.item_id as AchievementId]
+        const meta = getBadgeMeta(it.item_id)
         if (!meta) continue
         out.push({
           type:        'badge',
           id:          it.item_id,
           name:        meta.name,
-          tier:        BADGE_TIER[it.item_id as AchievementId],
+          tier:        meta.tier,
           source:      it.source,
           obtained_at: it.obtained_at,
           isDefault:   false,
@@ -438,7 +437,7 @@ export default function InventoryPage({ hideBack = false, onBack }: Props) {
         {badgeReplace && profile && (
           <BadgeReplaceModal
             newBadgeId={badgeReplace.newBadgeId}
-            currentBadges={profile.featured_badges as AchievementId[]}
+            currentBadges={profile.featured_badges}
             onSelect={handleBadgeReplace}
             onClose={() => setBadgeReplace(null)}
           />
@@ -453,13 +452,13 @@ export default function InventoryPage({ hideBack = false, onBack }: Props) {
 function BadgeReplaceModal({
   newBadgeId, currentBadges, onSelect, onClose,
 }: {
-  newBadgeId:    AchievementId
-  currentBadges: AchievementId[]
+  newBadgeId:    string
+  currentBadges: string[]
   onSelect:      (slotIndex: 0 | 1 | 2) => void
   onClose:       () => void
 }) {
-  const newMeta = ACHIEVEMENT_MAP[newBadgeId]
-  const newTier = BADGE_TIER[newBadgeId]
+  const newMeta = getBadgeMeta(newBadgeId)
+  const newTier = newMeta?.tier ?? 'common'
   return (
     <motion.div
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
@@ -505,10 +504,10 @@ function BadgeReplaceModal({
           <p className="mb-3 text-[10px] font-semibold uppercase tracking-widest text-white/30">Choisis le badge à remplacer</p>
           <div className="grid grid-cols-3 gap-2.5">
             {([0, 1, 2] as const).map(i => {
-              const badgeId = currentBadges[i] as AchievementId | undefined
+              const badgeId = currentBadges[i]
               if (!badgeId) return <div key={i} className="rounded-xl border border-dashed border-white/10" />
-              const meta = ACHIEVEMENT_MAP[badgeId]
-              const tier = BADGE_TIER[badgeId]
+              const meta = getBadgeMeta(badgeId)
+              const tier = meta?.tier ?? 'common'
               const glow = TIER_GLOW_COLOR[tier]
               return (
                 <button
@@ -564,7 +563,7 @@ function Loadout({
           <BadgeSlotTile
             key={i}
             index={i}
-            badgeId={(featuredBadges[i] as AchievementId | undefined) ?? null}
+            badgeId={featuredBadges[i] ?? null}
             onClick={() => onPick({ type: 'badge', slotIndex: i })}
           />
         ))}
@@ -611,8 +610,8 @@ function CosmeticSlot({ type, equippedId, onClick }: { type: CosmeticType; equip
   )
 }
 
-function BadgeSlotTile({ index, badgeId, onClick }: { index: 0 | 1 | 2; badgeId: AchievementId | null; onClick: () => void }) {
-  const meta = badgeId ? ACHIEVEMENT_MAP[badgeId] : null
+function BadgeSlotTile({ index, badgeId, onClick }: { index: 0 | 1 | 2; badgeId: string | null; onClick: () => void }) {
+  const meta = badgeId ? getBadgeMeta(badgeId) : null
   return (
     <motion.button
       type="button"
@@ -692,7 +691,7 @@ function ItemCard({ item, equipped, busy, onClick }: { item: UnifiedItem; equipp
       {/* Preview */}
       <div className="mt-4 flex h-16 items-center justify-center">
         {item.type === 'badge'
-          ? <MiniBadge achievementId={item.id as AchievementId} size={48} unlocked />
+          ? <MiniBadge achievementId={item.id} size={48} unlocked />
           : <CosmeticPreview type={item.type} id={item.id} size="md" />
         }
       </div>

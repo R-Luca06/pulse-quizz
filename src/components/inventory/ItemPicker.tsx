@@ -4,12 +4,13 @@ import { useAuth } from '../../hooks/useAuth'
 import { useToast } from '../../contexts/ToastContext'
 import { equipCosmetic } from '../../services/inventory'
 import { updateFeaturedBadges } from '../../services/profile'
-import { listCosmetics, COSMETIC_TYPE_LABEL, DEFAULT_ID_BY_TYPE } from '../../constants/cosmetics/registry'
+import { listCosmetics, COSMETIC_TYPE_LABEL, DEFAULT_ID_BY_TYPE, getBadgeMeta } from '../../constants/cosmetics/registry'
 import { ACHIEVEMENT_MAP } from '../../constants/achievements'
-import { BADGE_TIER, TIER_GLOW_COLOR } from '../../constants/achievementColors'
+import { SHOP_BADGE_REGISTRY } from '../../constants/shopBadges'
+import { TIER_GLOW_COLOR } from '../../constants/achievementColors'
 import MiniBadge from '../shared/MiniBadge'
 import { CosmeticPreview } from './previews'
-import type { AchievementId, AchievementTier, CosmeticType, EquippedCosmetics, ItemType } from '../../types/quiz'
+import type { AchievementTier, CosmeticType, EquippedCosmetics, ItemType } from '../../types/quiz'
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
 
@@ -335,8 +336,8 @@ function BadgePickerInner({ slotIndex, onClose }: { slotIndex: 0 | 1 | 2; onClos
   const toast = useToast()
 
   const featured     = profile?.featured_badges ?? []
-  const currentSlot  = (featured[slotIndex] as AchievementId | undefined) ?? null
-  const [selectedId, setSelectedId] = useState<AchievementId | null>(currentSlot)
+  const currentSlot  = featured[slotIndex] ?? null
+  const [selectedId, setSelectedId] = useState<string | null>(currentSlot)
   const [saving, setSaving] = useState(false)
 
   const ownedBadgeIds = useMemo(() => {
@@ -349,35 +350,40 @@ function BadgePickerInner({ slotIndex, onClose }: { slotIndex: 0 | 1 | 2; onClos
 
   const tiles = useMemo(() => {
     const TIER_ORDER: Record<AchievementTier, number> = { legendary: 0, epic: 1, rare: 2, common: 3 }
-    const allIds = Object.keys(ACHIEVEMENT_MAP) as AchievementId[]
+    const achievementIds = Object.keys(ACHIEVEMENT_MAP)
+    const shopIds        = Object.keys(SHOP_BADGE_REGISTRY)
+    const allIds = [...achievementIds, ...shopIds]
     return allIds
       .map(id => {
-        const meta = ACHIEVEMENT_MAP[id]
+        const meta = getBadgeMeta(id)
+        if (!meta) return null
         return {
           id,
           name:  meta.name,
-          tier:  BADGE_TIER[id],
+          tier:  meta.tier,
           owned: ownedBadgeIds.has(id),
         }
       })
+      .filter((t): t is { id: string; name: string; tier: AchievementTier; owned: boolean } => t !== null)
       .sort((a, b) => {
         if (a.owned !== b.owned) return a.owned ? -1 : 1
         return TIER_ORDER[a.tier] - TIER_ORDER[b.tier]
       })
   }, [ownedBadgeIds])
 
-  const selected = selectedId ? { id: selectedId, meta: ACHIEVEMENT_MAP[selectedId] } : null
-  const selectedTier = selected ? BADGE_TIER[selected.id] : 'common'
+  const selectedMeta = selectedId ? getBadgeMeta(selectedId) : null
+  const selected = selectedId && selectedMeta ? { id: selectedId, meta: selectedMeta } : null
+  const selectedTier = selectedMeta?.tier ?? 'common'
   const pinnedElsewhere = selectedId ? featured.includes(selectedId) && featured[slotIndex] !== selectedId : false
   const isCurrentlyPinnedHere = selectedId !== null && currentSlot === selectedId
   const canEquip = !!selected && ownedBadgeIds.has(selected.id) && !pinnedElsewhere && !isCurrentlyPinnedHere
   const tierGlow = TIER_GLOW_COLOR[selectedTier]
   const obtainedAt = selectedId ? (ownedItems ?? []).find(it => it.item_type === 'badge' && it.item_id === selectedId)?.obtained_at ?? null : null
 
-  async function applyUpdate(next: (AchievementId | null)[]) {
+  async function applyUpdate(next: (string | null)[]) {
     if (!user || saving) return
-    const prev = featured as AchievementId[]
-    const nextIds = next.filter((b): b is AchievementId => b !== null)
+    const prev = featured
+    const nextIds = next.filter((b): b is string => b !== null)
     setSaving(true)
     setLocalFeaturedBadges(nextIds)
     try {
@@ -393,13 +399,13 @@ function BadgePickerInner({ slotIndex, onClose }: { slotIndex: 0 | 1 | 2; onClos
 
   async function handlePin() {
     if (!selectedId || !canEquip) return
-    const next = [featured[0] ?? null, featured[1] ?? null, featured[2] ?? null] as (AchievementId | null)[]
+    const next: (string | null)[] = [featured[0] ?? null, featured[1] ?? null, featured[2] ?? null]
     next[slotIndex] = selectedId
     await applyUpdate(next)
   }
 
   async function handleUnpin() {
-    const next = [featured[0] ?? null, featured[1] ?? null, featured[2] ?? null] as (AchievementId | null)[]
+    const next: (string | null)[] = [featured[0] ?? null, featured[1] ?? null, featured[2] ?? null]
     next[slotIndex] = null
     await applyUpdate(next)
   }

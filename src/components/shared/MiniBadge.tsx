@@ -1,6 +1,5 @@
-import type { AchievementId } from '../../types/quiz'
-import { ACHIEVEMENT_MAP } from '../../constants/achievements'
-import { BADGE_TIER, TIER_STROKE } from '../../constants/achievementColors'
+import { TIER_STROKE } from '../../constants/achievementColors'
+import { getBadgeMeta } from '../../constants/cosmetics/registry'
 
 interface Props {
   achievementId: string
@@ -24,11 +23,11 @@ const HEX_PATH = 'M32 2 L62 20 L62 52 L32 70 L2 52 L2 20 Z'
  *   legendary — contour or + 2 running lights + glow pulsant (badge-gold)
  */
 export default function MiniBadge({ achievementId, size = 16, unlocked = true }: Props) {
-  const achievement = ACHIEVEMENT_MAP[achievementId as AchievementId]
-  if (!achievement) return null
+  const meta = getBadgeMeta(achievementId)
+  if (!meta) return null
 
   const h      = Math.round(size * 1.125)
-  const tier   = BADGE_TIER[achievementId as AchievementId]
+  const tier   = meta.tier
   const stroke = unlocked ? TIER_STROKE[tier] : 'rgba(255,255,255,0.10)'
 
   // Glow pulsant via filter:drop-shadow sur le container (tailwind animate-badge-*)
@@ -43,7 +42,7 @@ export default function MiniBadge({ achievementId, size = 16, unlocked = true }:
     <div
       className={`relative shrink-0 flex items-center justify-center ${glowClass}`}
       style={{ width: size, height: h }}
-      title={achievement.name}
+      title={meta.name}
     >
       {/* ── Glass background — clip-path hexagone ──────────────────────────── */}
       {/* Gradient subtil qui simule un verre dépoli sur fond sombre */}
@@ -100,7 +99,7 @@ export default function MiniBadge({ achievementId, size = 16, unlocked = true }:
         className={['relative z-10 select-none leading-none', !unlocked ? 'opacity-25 grayscale' : ''].join(' ')}
         style={{ fontSize: Math.round(size * 0.45) }}
       >
-        {achievement.icon}
+        {meta.icon}
       </span>
     </div>
   )

@@ -18,6 +18,7 @@ interface Props {
   onShowSocial?: () => void
   onShowDaily?: () => void
   onShowInventory?: () => void
+  onShowShop?: () => void
 }
 
 export default function ConnectedLanding({
@@ -33,6 +34,7 @@ export default function ConnectedLanding({
   onShowSocial,
   onShowDaily,
   onShowInventory,
+  onShowShop,
 }: Props) {
   return (
     <>
@@ -46,6 +48,7 @@ export default function ConnectedLanding({
         onShowSocial={onShowSocial}
         onShowDaily={onShowDaily}
         onShowInventory={onShowInventory}
+        onShowShop={onShowShop}
       />
 
       <div className="absolute inset-0 z-0">

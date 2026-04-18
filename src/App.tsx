@@ -28,9 +28,10 @@ const SocialPage = lazy(() => import('./components/social/SocialPage'))
 const DailyChallengePage = lazy(() => import('./components/daily/DailyChallengePage'))
 const DailyChallengeModal = lazy(() => import('./components/daily/DailyChallengeModal'))
 const InventoryPage = lazy(() => import('./components/inventory/InventoryPage'))
+const ShopPage = lazy(() => import('./components/shop/ShopPage'))
 const DailyRecapOverlay = lazy(() => import('./components/daily/DailyRecapOverlay'))
 
-export type AppScreen = 'landing' | 'quiz' | 'ranking' | 'result' | 'stats' | 'profile' | 'achievements' | 'social' | 'daily' | 'inventory'
+export type AppScreen = 'landing' | 'quiz' | 'ranking' | 'result' | 'stats' | 'profile' | 'achievements' | 'social' | 'daily' | 'inventory' | 'shop'
 
 // Écrans pendant lesquels l'overlay d'achievement doit être mis en attente
 const GAME_SCREENS: AppScreen[] = ['quiz', 'ranking']
@@ -78,7 +79,7 @@ export default function App() {
 
   // Analytics — screen views
   useEffect(() => {
-    const trackable: AppScreen[] = ['landing', 'result', 'ranking', 'stats', 'profile', 'achievements', 'social', 'daily']
+    const trackable: AppScreen[] = ['landing', 'result', 'ranking', 'stats', 'profile', 'achievements', 'social', 'daily', 'inventory', 'shop']
     if (trackable.includes(screen)) trackScreenViewed(screen)
   }, [screen])
 
@@ -312,6 +313,8 @@ export default function App() {
 
   function handleShowInventory() { setScreen('inventory') }
 
+  function handleShowShop() { setScreen('shop') }
+
   return (
     <>
       <div className="min-h-screen bg-game-bg font-game">
@@ -337,6 +340,7 @@ export default function App() {
                 onViewProfile={setViewingUsername}
                 onShowDaily={handleShowDaily}
                 onShowInventory={handleShowInventory}
+                onShowShop={handleShowShop}
               />
             </motion.div>
           )}
@@ -507,6 +511,20 @@ export default function App() {
             >
               <Suspense fallback={<div className="absolute inset-0 bg-game-bg" />}>
                 <InventoryPage onBack={() => setScreen('landing')} />
+              </Suspense>
+            </motion.div>
+          )}
+
+          {screen === 'shop' && (
+            <motion.div
+              key="shop"
+              initial={{ opacity: 0, y: 40 }}
+              animate={{ opacity: 1, y: 0, transition: { duration: 0.5, delay: 0.1, ease: 'easeOut' } }}
+              exit={{ opacity: 0, transition: { duration: 0.25 } }}
+              className="absolute inset-0 z-10"
+            >
+              <Suspense fallback={<div className="absolute inset-0 bg-game-bg" />}>
+                <ShopPage onBack={() => setScreen('landing')} onGoToInventory={() => setScreen('inventory')} />
               </Suspense>
             </motion.div>
           )}

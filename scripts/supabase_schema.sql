@@ -32,6 +32,8 @@
 --   12. daily_streaks               — séries journalières par utilisateur
 --   13. user_wallet                 — solde Pulses ◈
 --   14. wallet_transactions         — ledger immuable des gains de Pulses
+--   15. shop_items                  — catalogue de la Boutique (lecture publique)
+--   16. shop_purchases              — ledger immuable des achats en Boutique
 --
 -- Fonctions RPC :
 --   - get_random_questions          — sélection aléatoire via pivot UUID
@@ -40,6 +42,7 @@
 --   - increment_global_stats        — upsert atomique de user_global_stats (+ XP)
 --   - add_xp                        — crédit ponctuel d'XP
 --   - add_pulses                    — ledger + wallet upsert atomique
+--   - purchase_item                 — achat atomique Boutique (wallet + inventory)
 --   - submit_daily_entry            — insert + calcul de série (UNIQUE user/date)
 --   - mark_daily_recap_seen         — flag recap_seen=true pour une entrée journalière
 --   - get_daily_leaderboard         — classement journalier paginé
@@ -482,6 +485,64 @@ ALTER TABLE wallet_transactions ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "tx read own" ON wallet_transactions FOR SELECT USING (auth.uid() = user_id);
 
 
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 15. shop_items
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Catalogue de la Boutique. `item_type` + `item_id` référencent les registries
+-- cosmétiques côté client (src/constants/cosmetics/*) — ou un id de badge shop
+-- dédié pour les badges. Lecture ouverte (anon + authenticated) pour que la
+-- landing puisse teaser les items. Écritures : service_role uniquement.
+
+CREATE TABLE IF NOT EXISTS shop_items (
+  id              uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+  item_type       text        NOT NULL CHECK (item_type IN (
+                    'badge', 'emblem', 'background', 'title', 'card_design', 'screen_animation'
+                  )),
+  item_id         text        NOT NULL,
+  name            text        NOT NULL,
+  description     text,
+  tier            text        NOT NULL CHECK (tier IN ('common', 'rare', 'epic', 'legendary')),
+  price           int         NOT NULL CHECK (price > 0),
+  is_new          boolean     NOT NULL DEFAULT false,
+  is_limited      boolean     NOT NULL DEFAULT false,
+  available_from  timestamptz,
+  available_until timestamptz,
+  featured        boolean     NOT NULL DEFAULT false,
+  sort_order      int         NOT NULL DEFAULT 0,
+  created_at      timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (item_type, item_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_shop_items_type            ON shop_items (item_type);
+CREATE INDEX IF NOT EXISTS idx_shop_items_featured        ON shop_items (featured);
+CREATE INDEX IF NOT EXISTS idx_shop_items_available_until ON shop_items (available_until);
+
+ALTER TABLE shop_items ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "shop_items_select_all" ON shop_items FOR SELECT USING (true);
+
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 16. shop_purchases
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Ledger immuable des achats en Boutique (INSERT only). Pendant symétrique de
+-- wallet_transactions (lui-même réservé aux gains positifs). Alimenté
+-- exclusivement par le RPC purchase_item (SECURITY DEFINER).
+
+CREATE TABLE IF NOT EXISTS shop_purchases (
+  id           uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id      uuid        NOT NULL REFERENCES auth.users (id) ON DELETE CASCADE,
+  shop_item_id uuid        NOT NULL REFERENCES shop_items (id),
+  price_paid   int         NOT NULL CHECK (price_paid > 0),
+  created_at   timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_shop_purchases_user_created
+  ON shop_purchases (user_id, created_at DESC);
+
+ALTER TABLE shop_purchases ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "shop_purchases_select_own" ON shop_purchases FOR SELECT USING (auth.uid() = user_id);
+
+
 -- ═══════════════════════════════════════════════════════════════════════════════
 -- Fonctions RPC
 -- ═══════════════════════════════════════════════════════════════════════════════
@@ -788,6 +849,113 @@ $$;
 
 REVOKE ALL ON FUNCTION add_pulses(int, text, text) FROM public, anon;
 GRANT EXECUTE ON FUNCTION add_pulses(int, text, text) TO authenticated;
+
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- purchase_item
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Achat atomique en Boutique :
+--   1. Vérifie auth (sinon 'not_authenticated').
+--   2. Charge shop_items (sinon 'item_not_found').
+--   3. Fenêtre de disponibilité : 'not_yet_available' / 'no_longer_available'.
+--   4. Non déjà possédé dans user_inventory → sinon 'already_owned'.
+--   5. Balance suffisante (check préalable) → sinon 'insufficient_balance'.
+--   6. UPDATE user_wallet atomique (guard `balance >= price`) ; 0 row →
+--      'insufficient_balance' (protection contre la race avec add_pulses).
+--   7. INSERT shop_purchases + user_inventory(source='shop').
+-- Retourne { balance, item_type, item_id } pour update optimiste côté client.
+
+-- Note : on évite deux patterns plpgsql cassés dans l'env Supabase de ce
+-- projet (validateur qui interprète les variables comme des relations) :
+--   • `SELECT c1, c2 INTO v1, v2 FROM t` → remplacé par scalar-subquery
+--     assignments `var := (SELECT col FROM t WHERE …);`
+--   • `UPDATE … RETURNING col INTO var` → remplacé par UPDATE + GET
+--     DIAGNOSTICS n = ROW_COUNT + relecture scalaire du solde.
+
+CREATE OR REPLACE FUNCTION purchase_item(p_shop_item_id uuid)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $func$
+DECLARE
+  caller_uid uuid;
+  cos_type   text;
+  cos_ref    text;
+  cos_price  int;
+  cos_from   timestamptz;
+  cos_until  timestamptz;
+  wallet_bal int;
+  updated_n  int;
+  new_bal    int;
+BEGIN
+  caller_uid := auth.uid();
+  IF caller_uid IS NULL THEN
+    RAISE EXCEPTION 'not_authenticated';
+  END IF;
+
+  cos_type  := (SELECT item_type       FROM shop_items WHERE id = p_shop_item_id);
+  IF cos_type IS NULL THEN
+    RAISE EXCEPTION 'item_not_found';
+  END IF;
+
+  cos_ref   := (SELECT item_id         FROM shop_items WHERE id = p_shop_item_id);
+  cos_price := (SELECT price           FROM shop_items WHERE id = p_shop_item_id);
+  cos_from  := (SELECT available_from  FROM shop_items WHERE id = p_shop_item_id);
+  cos_until := (SELECT available_until FROM shop_items WHERE id = p_shop_item_id);
+
+  IF cos_from IS NOT NULL AND now() < cos_from THEN
+    RAISE EXCEPTION 'not_yet_available';
+  END IF;
+
+  IF cos_until IS NOT NULL AND now() > cos_until THEN
+    RAISE EXCEPTION 'no_longer_available';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM user_inventory
+     WHERE user_id   = caller_uid
+       AND item_type = cos_type
+       AND item_id   = cos_ref
+  ) THEN
+    RAISE EXCEPTION 'already_owned';
+  END IF;
+
+  wallet_bal := (SELECT balance FROM user_wallet WHERE user_id = caller_uid);
+  IF wallet_bal IS NULL OR wallet_bal < cos_price THEN
+    RAISE EXCEPTION 'insufficient_balance';
+  END IF;
+
+  UPDATE user_wallet
+     SET balance    = balance - cos_price,
+         updated_at = now()
+   WHERE user_id = caller_uid
+     AND balance >= cos_price;
+
+  GET DIAGNOSTICS updated_n = ROW_COUNT;
+  IF updated_n = 0 THEN
+    RAISE EXCEPTION 'insufficient_balance';
+  END IF;
+
+  new_bal := (SELECT balance FROM user_wallet WHERE user_id = caller_uid);
+
+  INSERT INTO shop_purchases (user_id, shop_item_id, price_paid)
+    VALUES (caller_uid, p_shop_item_id, cos_price);
+
+  INSERT INTO user_inventory (user_id, item_type, item_id, source)
+    VALUES (caller_uid, cos_type, cos_ref, 'shop')
+    ON CONFLICT (user_id, item_type, item_id) DO NOTHING;
+
+  RETURN jsonb_build_object(
+    'balance',   new_bal,
+    'item_type', cos_type,
+    'item_id',   cos_ref
+  );
+END;
+$func$;
+
+REVOKE ALL ON FUNCTION purchase_item(uuid) FROM public, anon;
+GRANT EXECUTE ON FUNCTION purchase_item(uuid) TO authenticated;
 
 
 -- ─────────────────────────────────────────────────────────────────────────────

@@ -1,0 +1,434 @@
+Phase 1 — Backend (SQL)
+
+Implémente la partie base de données de la boutique Pulse Quizz.
+
+## Contexte déjà en place
+- Table `user_inventory (user_id, item_type, item_id, source, obtained_at)` avec `item_type IN ('badge','emblem','background','title','card_design','screen_animation')` et `source IN ('achievement','shop','season','rank')`. UNIQUE(user_id, item_type, item_id).
+- Table `user_wallet (user_id, balance, lifetime_earned, updated_at)`. `balance int CHECK (balance >= 0)`.
+- Table `wallet_transactions (user_id, amount, source, source_ref, created_at)` — ledger **positif uniquement** (earnings). Ne pas toucher à cette table.
+- RPC `add_pulses(amount, source, source_ref)` existe déjà pour les gains.
+- Fichiers migration : `scripts/migrations/` (dernière = `004_daily_recap_and_podium_legendary.sql`).
+- Schéma canonique : `scripts/supabase_schema.sql` (1311 lignes).
+
+## Ce qu'il faut créer
+
+### 1. Fichier migration : `scripts/migrations/005_shop.sql`
+
+Contenu :
+- Table `shop_items` :
+  - `id uuid PRIMARY KEY DEFAULT gen_random_uuid()`
+  - `item_type text NOT NULL CHECK (item_type IN ('badge','emblem','background','title','card_design','screen_animation'))`
+  - `item_id text NOT NULL` — référence l'id dans le registry cosmétique (ou id badge shop)
+  - `name text NOT NULL`
+  - `description text`
+  - `tier text NOT NULL CHECK (tier IN ('common','rare','epic','legendary'))`
+  - `price int NOT NULL CHECK (price > 0)`
+  - `is_new boolean NOT NULL DEFAULT false`
+  - `is_limited boolean NOT NULL DEFAULT false`
+  - `available_from timestamptz`
+  - `available_until timestamptz`
+  - `featured boolean NOT NULL DEFAULT false` — pour le bloc « Nouveautés »
+  - `sort_order int NOT NULL DEFAULT 0`
+  - `created_at timestamptz NOT NULL DEFAULT now()`
+  - `UNIQUE (item_type, item_id)`
+  - Index sur `(item_type)` et `(featured)` et `(available_until)`
+- RLS : `ENABLE ROW LEVEL SECURITY`, policy SELECT ouverte à tous (`USING (true)`).
+
+- Table `shop_purchases` (ledger des achats, symétrique de wallet_transactions pour les gains) :
+  - `id uuid PRIMARY KEY DEFAULT gen_random_uuid()`
+  - `user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE`
+  - `shop_item_id uuid NOT NULL REFERENCES shop_items(id)`
+  - `price_paid int NOT NULL CHECK (price_paid > 0)`
+  - `created_at timestamptz NOT NULL DEFAULT now()`
+  - Index sur `(user_id, created_at DESC)`
+  - RLS : SELECT own uniquement.
+
+- RPC `purchase_item(p_shop_item_id uuid) RETURNS jsonb` :
+  - `LANGUAGE plpgsql SECURITY DEFINER SET search_path = public`
+  - Vérifie `auth.uid()` non null (sinon `RAISE EXCEPTION 'not_authenticated'`)
+  - Load la ligne shop_items (sinon `'item_not_found'`)
+  - Fenêtre de disponibilité : `now() < available_from` → `'not_yet_available'` ; `now() > available_until` → `'no_longer_available'`
+  - Check non déjà possédé dans `user_inventory` → `'already_owned'`
+  - Check balance suffisante (`SELECT balance FROM user_wallet`) → `'insufficient_balance'` sinon
+  - UPDATE atomique : `UPDATE user_wallet SET balance = balance - price, updated_at = now() WHERE user_id = v_user_id AND balance >= price RETURNING balance INTO v_new_balance` (protège contre race condition) ; si 0 row → `'insufficient_balance'`
+  - INSERT dans `shop_purchases (user_id, shop_item_id, price_paid)`
+  - INSERT dans `user_inventory (user_id, item_type, item_id, source)` avec `source='shop'` ; ON CONFLICT DO NOTHING
+  - RETURN `jsonb_build_object('balance', v_new_balance, 'item_type', v_item.item_type, 'item_id', v_item.item_id)`
+  - `REVOKE ALL FROM public, anon; GRANT EXECUTE TO authenticated;`
+
+- Seed initial — INSERT dans shop_items (au minimum 2 items par type : emblem, title, card_design, background, screen_animation, badge). Les `item_id` doivent correspondre aux ids déjà définis dans les registries TS (voir ci-dessous). Pour les emblems/titles/card_designs/backgrounds/screen_animations : lis d'abord les fichiers `src/constants/cosmetics/*.tsx` et `.ts` pour récupérer les ids disponibles, puis seed 2-3 items par type avec des prix cohérents (common 80-150, rare 280-400, epic 520-780, legendary 1600-2400). Pour les badges shop : crée 2 ids `shop_badge_crown` (legendary) et `shop_badge_diamond` (epic) — ces ids seront référencés en Phase 2.
+- Marque 1-2 items comme `featured=true` et `is_new=true` (pour la section « Nouveautés » de la preview).
+
+### 2. Mettre à jour `scripts/supabase_schema.sql`
+
+Ajouter les nouvelles tables + RPC dans la même structure documentée (commentaires d'en-tête, sections numérotées, REVOKE/GRANT). Placer `shop_items` après la section 14 (`wallet_transactions`) comme section 15, `shop_purchases` comme 16, et la RPC `purchase_item` dans la section RPC après `add_pulses`. Mettre à jour le sommaire en haut du fichier.
+
+## Références preview
+Design des items boutique : `previews/boutique/shop.html` et `previews/boutique/shop-purchase.html`. Les tags `featured`, `is_new`, `is_limited` sont visibles sur les cartes.
+
+## Validation
+- La migration doit être idempotente (`CREATE TABLE IF NOT EXISTS`, `CREATE OR REPLACE FUNCTION`).
+- Grep pour vérifier qu'aucun autre fichier ne réfère à `shop_items` (table nouvelle).
+- Rappel : ne **rien** modifier côté TypeScript dans cette phase.
+
+N'implémente rien d'autre. Stop ici.
+
+Phase 2 — Types, constants, service
+
+Implémente la couche service + types de la boutique Pulse Quizz.
+
+## Contexte
+- Phase 1 complétée : tables `shop_items`, `shop_purchases`, RPC `purchase_item` existent en DB.
+- Types existants dans `src/types/quiz.ts` : `ItemType`, `CosmeticType`, `BadgeSource`, `InventoryItem`.
+- Service inventaire existant : `src/services/inventory.ts` — expose `getUserInventory(userId, itemType?)` et `equipCosmetic(userId, type, itemId)`.
+- Service pulses : `src/services/pulses.ts` — expose `getWallet`, `addPulses`, etc.
+- Registry cosmétique : `src/constants/cosmetics/registry.ts` — expose `getCosmetic(type, id): CosmeticMeta`, `listCosmetics(type)`, `COSMETIC_TYPE_LABEL`.
+- Registry achievements : `src/constants/achievements.ts` — expose `ACHIEVEMENT_MAP` pour badges achievement.
+- Supabase client : `import { supabase } from './supabase'`
+- Erreurs typées : `import { AppError } from './errors'`
+
+## Ce qu'il faut créer
+
+### 1. Types — `src/types/quiz.ts`
+
+Ajouter au bloc « Inventaire & cosmétiques » :
+
+```ts
+// ─── Boutique ─────────────────────────────────────────────────────────────────
+
+export interface ShopItem {
+  id:               string           // uuid shop_items.id
+  item_type:        ItemType
+  item_id:          string
+  name:             string
+  description:      string | null
+  tier:             AchievementTier
+  price:            number
+  is_new:           boolean
+  is_limited:       boolean
+  featured:         boolean
+  available_from:   string | null
+  available_until:  string | null
+  sort_order:       number
+}
+
+export interface PurchaseResult {
+  balance:   number
+  item_type: ItemType
+  item_id:   string
+}
+
+export type PurchaseErrorCode =
+  | 'not_authenticated'
+  | 'item_not_found'
+  | 'not_yet_available'
+  | 'no_longer_available'
+  | 'already_owned'
+  | 'insufficient_balance'
+  | 'unknown'
+```
+
+(Vérifie d'abord que `AchievementTier` est bien exporté depuis ce fichier — sinon importe-le depuis l'endroit approprié.)
+
+### 2. Registry de badges shop — `src/constants/shopBadges.ts` (nouveau)
+
+Les badges vendus en boutique n'existent pas dans `ACHIEVEMENT_MAP`. Créer :
+
+```ts
+import type { AchievementTier } from '../types/quiz'
+
+export interface ShopBadgeMeta {
+  id:    string
+  name:  string
+  icon:  string          // emoji
+  tier:  AchievementTier
+}
+
+export const SHOP_BADGE_REGISTRY: Record<string, ShopBadgeMeta> = {
+  shop_badge_crown:   { id: 'shop_badge_crown',   name: 'Couronne dorée', icon: '👑', tier: 'legendary' },
+  shop_badge_diamond: { id: 'shop_badge_diamond', name: 'Éclat diamant',  icon: '💎', tier: 'epic' },
+  // autres badges shop à venir
+}
+
+export function getShopBadge(id: string): ShopBadgeMeta | null {
+  return SHOP_BADGE_REGISTRY[id] ?? null
+}
+```
+
+### 3. Unifier le lookup badge (achievement + shop) — `src/constants/cosmetics/registry.ts`
+
+Ajouter une fonction utilitaire qui retourne la meta d'un badge quel que soit sa provenance :
+
+```ts
+import { ACHIEVEMENT_MAP } from '../achievements'
+import { SHOP_BADGE_REGISTRY } from '../shopBadges'
+
+export interface BadgeMeta {
+  id:   string
+  name: string
+  icon: string
+  tier: AchievementTier
+}
+
+export function getBadgeMeta(id: string): BadgeMeta | null {
+  const ach = ACHIEVEMENT_MAP[id as keyof typeof ACHIEVEMENT_MAP]
+  if (ach) return { id: ach.id, name: ach.name, icon: ach.icon, tier: ach.tier }
+  const shop = SHOP_BADGE_REGISTRY[id]
+  if (shop) return { id: shop.id, name: shop.name, icon: shop.icon, tier: shop.tier }
+  return null
+}
+```
+
+(Adapte si `ACHIEVEMENT_MAP` a une shape différente — lis d'abord `src/constants/achievements.ts`.)
+
+### 4. Service — `src/services/shop.ts` (nouveau)
+
+```ts
+import { supabase } from './supabase'
+import { AppError } from './errors'
+import type { ShopItem, PurchaseResult, PurchaseErrorCode, ItemType, AchievementTier } from '../types/quiz'
+
+// ─── Fetch ────────────────────────────────────────────────────────────────────
+
+export async function fetchShopItems(itemType?: ItemType): Promise<ShopItem[]> {
+  let query = supabase
+    .from('shop_items')
+    .select('id, item_type, item_id, name, description, tier, price, is_new, is_limited, featured, available_from, available_until, sort_order')
+    .order('featured', { ascending: false })
+    .order('sort_order', { ascending: true })
+    .order('price', { ascending: true })
+
+  if (itemType) query = query.eq('item_type', itemType)
+
+  const { data, error } = await query
+  if (error) throw new AppError('db_error', error.message)
+
+  return (data ?? []).map(row => ({
+    id:              row.id,
+    item_type:       row.item_type as ItemType,
+    item_id:         row.item_id,
+    name:            row.name,
+    description:     row.description,
+    tier:            row.tier as AchievementTier,
+    price:           row.price,
+    is_new:          row.is_new,
+    is_limited:      row.is_limited,
+    featured:        row.featured,
+    available_from:  row.available_from,
+    available_until: row.available_until,
+    sort_order:      row.sort_order,
+  }))
+}
+
+// ─── Achat ────────────────────────────────────────────────────────────────────
+
+export async function purchaseItem(shopItemId: string): Promise<PurchaseResult> {
+  const { data, error } = await supabase.rpc('purchase_item', { p_shop_item_id: shopItemId })
+  if (error) {
+    const code = parsePurchaseError(error.message)
+    throw new AppError(code, error.message)
+  }
+  return data as PurchaseResult
+}
+
+function parsePurchaseError(message: string): PurchaseErrorCode {
+  if (message.includes('not_authenticated'))     return 'not_authenticated'
+  if (message.includes('item_not_found'))        return 'item_not_found'
+  if (message.includes('not_yet_available'))     return 'not_yet_available'
+  if (message.includes('no_longer_available'))   return 'no_longer_available'
+  if (message.includes('already_owned'))         return 'already_owned'
+  if (message.includes('insufficient_balance'))  return 'insufficient_balance'
+  return 'unknown'
+}
+```
+
+(Vérifie d'abord le constructeur de `AppError` dans `src/services/errors.ts` pour savoir s'il accepte `PurchaseErrorCode` comme code — sinon élargis le type des codes dans errors.ts.)
+
+## Validation
+```bash
+npx tsc --noEmit
+```
+Doit passer sans erreur.
+
+N'implémente **aucune UI** dans cette phase. Stop ici.
+
+Phase 3 — Page boutique (UI principale)
+
+Implémente la page Boutique (grid, filtres, hero, nouveautés) de Pulse Quizz.
+
+## Contexte
+- Phase 1 & 2 complétées. `fetchShopItems()` et `purchaseItem(id)` existent dans `src/services/shop.ts`. Types `ShopItem` / `PurchaseResult` dans `src/types/quiz.ts`.
+- State machine dans `src/App.tsx` : `AppScreen = 'landing' | 'quiz' | 'ranking' | 'result' | 'stats' | 'profile' | 'achievements' | 'social' | 'daily' | 'inventory'`.
+- Écran Inventaire de référence : `src/components/inventory/InventoryPage.tsx` — reproduire les mêmes patterns (topbar, sidebar filters, type-tabs, grid).
+- Preview fidèle à implémenter : **`previews/boutique/shop.html`** — s'en servir comme source de vérité design (couleurs, spacing, animations, états).
+- Preview composants cosmétiques : `src/components/inventory/previews.tsx` exporte `CosmeticPreview` — réutiliser pour afficher les items blason/titre/carte/fond/animation.
+- Mini badge hex : `src/components/shared/MiniBadge.tsx`.
+- Wallet balance : `useAuth()` expose `pulsesBalance` (via `AuthContext`).
+- Auth : `import { useAuth } from '../../hooks/useAuth'`
+- Navigation landing → écrans : regarder comment `InventoryPage` est ouvert depuis la landing/header pour reproduire le même point d'entrée.
+
+## Ce qu'il faut créer
+
+### 1. Nouvel écran dans `src/App.tsx`
+
+- Étendre `AppScreen` avec `'shop'`.
+- `import ShopPage = lazy(() => import('./components/shop/ShopPage'))`.
+- Ajouter le rendu de `<ShopPage />` dans l'AnimatePresence (même pattern que `InventoryPage`).
+- Ajouter `trackScreenViewed('shop')` à l'entrée.
+
+### 2. Point d'entrée navigation
+
+Identifier comment l'utilisateur accède à Inventaire depuis la landing connectée (probablement un bouton/menu dans `ConnectedHeader.tsx`) et ajouter un point d'entrée **Boutique** à côté/dans le même menu. Icône : svg boutique (cf. preview shop.html `.hero-icon`). Label : « Boutique ».
+
+### 3. Composants Boutique — nouveau dossier `src/components/shop/`
+
+Créer :
+- `ShopPage.tsx` — container principal (topbar « Boutique » seul, hero + wallet, featured, body avec sidebar + type-tabs + grid). État local : filtre rarity (`'all' | AchievementTier`), filtre état (`'all' | 'affordable' | 'unaffordable' | 'owned'`), filtre type (`'all' | ItemType`), tri (`'featured' | 'price_asc' | 'price_desc' | 'tier'`). Charge `fetchShopItems()` + `getUserInventory(userId)` (pour connaître le statut « possédé ») en parallèle au mount. Passe `onOpenItem(shopItem)` à chaque carte (stub — ouvrira la modale en Phase 4).
+
+- `ShopHero.tsx` — bloc hero avec icône boutique à gauche, titre + subtitle (`{total} objets disponibles · {nbNew} nouveautés cette semaine`), encart wallet à droite (icône ◈, label « Solde Pulses », montant).
+
+- `FeaturedSection.tsx` — rangée 3 colonnes des items `featured=true`. Cartes plus grandes avec description, tag « Nouveau » ou « ✦ Édition limitée » selon flags, preview large (reutilise `CosmeticPreview` en variante `size='lg'` ou écris une variante `FeaturedPreview`), prix + bouton « Voir » qui appelle `onOpenItem`.
+
+- `ShopFilters.tsx` — sidebar gauche (176px) : sections « Rareté », « État » (Tous / Abordable / À économiser / Possédé), « Tri ». Reproduit fidèlement le style de `InventoryPage` (boutons actifs violets `rgba(139,92,246,0.1)`, compteur à droite).
+
+- `ShopTypeTabs.tsx` — ligne d'onglets arrondis en haut du content. Items : Tous, Badges, Blasons, Titres, Cartes, Fonds, Animations, Avatars (désactivé avec label « Bientôt »). Chaque tab affiche le count.
+
+- `ShopGrid.tsx` — grid `repeat(auto-fill, minmax(148px, 1fr))`. Map `items.filter(...).sort(...)` → `<ShopItemCard>`.
+
+- `ShopItemCard.tsx` — carte unitaire. Props : `item: ShopItem`, `owned: boolean`, `balance: number`, `onClick(item)`. Affiche :
+  - Pill rareté top-left (dot couleur tier + label « LÉGENDAIRE » etc., opacity 0.55).
+  - Icône type top-right (blason/titre/carte/fond/animation/badge).
+  - Badge coin `Nouveau` / `✦ Limité` si `is_new` / `is_limited`.
+  - Preview centrée 60px (utiliser `CosmeticPreview` pour cosmetics, `MiniBadge` pour badges via `getBadgeMeta(item.item_id)`).
+  - Nom centré en blanc 11px bold.
+  - Prix « ◈ 2 400 » format français avec séparateur espace insécable.
+  - CTA full-width bas :
+    - Si `owned` → « Possédé » vert, non cliquable.
+    - Sinon si `balance < price` → « Pas assez » gris + icône cercle barré, non cliquable.
+    - Sinon → « Acheter » doré (bg `rgba(234,179,8,0.1)`, border `rgba(234,179,8,0.35)`).
+  - États visuels : `.owned` → border verte et bg gradient légère vert ; `.unaffordable` → opacity 0.55 + preview désaturé.
+  - Hover cards : `transform: translateY(-1px)` + border `rgba(234,179,8,0.3)`.
+
+Tous les composants utilisent Framer Motion pour les transitions d'entrée (entry stagger sur la grid). Respecter la palette exacte de la preview (`--legendary #f59e0b`, `--epic #a78bfa`, `--rare #60a5fa`, `--common rgba(255,255,255,0.30)`) + gold shop (`rgba(234,179,8,*)`).
+
+### 4. Stub de la modale (placeholder)
+
+Pour cette phase, `onOpenItem` peut juste faire un `console.log(item)` — la modale complète sera implémentée en Phase 4.
+
+## Validation
+```bash
+npx tsc --noEmit
+npm run lint
+npm run dev
+```
+Ouvrir la boutique depuis le header/menu, vérifier :
+- Hero affiche le bon solde Pulses.
+- Les 3 items featured apparaissent dans la section Nouveautés.
+- Clic sur un type-tab filtre correctement.
+- Sidebar filtres (rareté/état/tri) fonctionne.
+- Items possédés affichent bien « Possédé » vert.
+- Items trop chers affichent « Pas assez » grisé.
+- Aucun bouton n'appelle encore la RPC (pas de modale).
+- Design pixel-fidèle à `previews/boutique/shop.html`.
+
+N'implémente **pas** la modale d'achat ni le flux de purchase — c'est Phase 4. Stop ici.
+
+Phase 4 — Modale d'achat + intégration
+
+Implémente la modale d'achat + intégration complète du flux boutique Pulse Quizz.
+
+## Contexte
+- Phase 1, 2, 3 complétées. La page Boutique existe (`src/components/shop/ShopPage.tsx`) avec son grid d'items. Le clic sur un item appelle actuellement `onOpenItem(item)` en no-op.
+- Service : `purchaseItem(shopItemId)` dans `src/services/shop.ts` retourne `{ balance, item_type, item_id }` ou throw `AppError` avec code `PurchaseErrorCode`.
+- AuthContext : expose `bumpPulses(delta)` (optimiste), `refreshStats()`, `showRewardGain({...})`.
+- Preview design à suivre : **`previews/boutique/shop-purchase.html`** — deux états côte à côte (détail + succès).
+- Toast : `useToast()` depuis `src/contexts/ToastContext.tsx`.
+- Service equip : `equipCosmetic(userId, type, itemId)` dans `src/services/inventory.ts`.
+- Modale référence : `src/components/achievements/AchievementUnlockOverlay.tsx` (backdrop flou + motion spring).
+
+## Ce qu'il faut créer
+
+### 1. `src/components/shop/ShopItemModal.tsx` (nouveau)
+
+Props :
+```ts
+interface ShopItemModalProps {
+  item:    ShopItem | null
+  owned:   boolean
+  balance: number
+  onClose: () => void
+  onPurchased: (result: PurchaseResult) => void  // parent met à jour le state
+}
+```
+
+Deux états internes :
+- `'detail'` : vue initiale (preview grand, rareté, description, récap prix + solde après, boutons Annuler / Confirmer).
+- `'success'` : après RPC réussie (icône check vert, item card avec preview, tag source Boutique, nouveau solde avec `old → new`, boutons « Voir inventaire » / « Équiper maintenant »).
+- `'loading'` : pendant la RPC (spinner sur bouton Confirmer).
+
+Flux confirmer :
+1. `setState('loading')`
+2. `await purchaseItem(item.id)` → en cas de succès : `bumpPulses(-item.price)` puis setState('success'), appelle `onPurchased(result)`.
+3. En cas d'erreur : toast d'erreur mappé :
+   - `already_owned` → « Tu possèdes déjà cet objet »
+   - `insufficient_balance` → « Solde insuffisant »
+   - `no_longer_available` → « Cet objet n'est plus disponible »
+   - `not_yet_available` → « Cet objet n'est pas encore disponible »
+   - autre → « Une erreur est survenue »
+   Puis setState('detail').
+
+État succès :
+- Bouton « Équiper maintenant » : si `item_type !== 'badge'`, appelle `equipCosmetic(userId, item_type, item_id)` puis `onClose()` + toast succès. Si `item_type === 'badge'`, le bouton devient « Voir inventaire » qui redirige vers l'inventaire (via un callback `onGoToInventory` à passer depuis ShopPage).
+
+Animation : backdrop fade, modale scale-in spring (reprendre les transitions de `AchievementUnlockOverlay`). Effet sparkle subtil dans la preview-area (cf. preview `.sparkles::before/::after` avec `@keyframes twinkle`).
+
+### 2. Wire dans `ShopPage.tsx`
+
+- State local : `const [selectedItem, setSelectedItem] = useState<ShopItem | null>(null)`
+- `onOpenItem` → `setSelectedItem(item)`
+- Rendu : `<ShopItemModal item={selectedItem} owned={...} balance={pulsesBalance} onClose={() => setSelectedItem(null)} onPurchased={handlePurchased} />`
+- `handlePurchased(result)` : met à jour localement la liste des items possédés (`setOwnedIds(prev => new Set([...prev, \`${result.item_type}:${result.item_id}\`]))`) pour que le CTA passe immédiatement en « Possédé » sans refetch.
+
+### 3. Optimistic balance update
+
+`bumpPulses(-item.price)` dans la modale immédiatement après succès RPC — le hero se met à jour instantanément. Appeler `refreshStats()` en fire-and-forget après pour garantir la cohérence.
+
+### 4. Analytics
+
+Ajouter dans `src/services/analytics.ts` :
+```ts
+export function trackShopItemViewed(item: ShopItem): void { /* PostHog capture */ }
+export function trackShopItemPurchased(item: ShopItem, newBalance: number): void { /* PostHog capture */ }
+```
+Appeler `trackShopItemViewed` à l'ouverture de la modale et `trackShopItemPurchased` au succès.
+
+### 5. Preview rendering dans la modale
+
+Pour la preview large (120px+), écrire un composant `LargeItemPreview` dans `src/components/shop/LargeItemPreview.tsx` qui prend `(item_type, item_id)` et retourne :
+- `badge` → hex large avec icon via `getBadgeMeta()`.
+- Cosmetics → variante grande de `CosmeticPreview` (reprendre le SVG existant en scale x2).
+
+### 6. Gestion d'erreur réseau
+
+Si la RPC timeout ou échoue avec erreur réseau (pas un code métier), toast générique et retour à 'detail'. Ne jamais laisser le user dans 'loading'.
+
+## Validation
+```bash
+npx tsc --noEmit
+npm run lint
+npm run dev
+```
+
+Scénarios à tester manuellement :
+- **Nominal** : clic sur un item abordable → modale détail → confirmer → succès → solde mis à jour dans le hero → CTA item passe à « Possédé ».
+- **Équiper direct** : depuis succès, clic « Équiper maintenant » → modale ferme + toast « Équipé ».
+- **Solde insuffisant** : items unaffordable → modale s'ouvre quand même (read-only) mais CTA Confirmer disabled + mention « Solde insuffisant ».
+- **Double-clic / already_owned** : simuler en jouant 2 achats rapprochés → toast « Déjà possédé ».
+- **Design pixel-fidèle** : comparer côte à côte avec `previews/boutique/shop-purchase.html`.
+- **Accessibilité clavier** : Escape ferme la modale, focus trap pendant ouvert.
+
+## Nettoyage final
+
+Vérifier qu'aucun `console.log` stub de la Phase 3 ne traîne. Vérifier que `AppScreen` inclut `'shop'` et que la navigation depuis/vers la boutique est cohérente (bouton Retour → landing).
+
+Stop ici. Tout doit être fonctionnel après cette phase.

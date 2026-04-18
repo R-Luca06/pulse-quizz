@@ -1,0 +1,1169 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pulse Quizz — Preview Boutique</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+
+  :root {
+    --game-bg:      #0A0A0F;
+    --game-card:    #13131F;
+    --game-border:  #1E1E2E;
+    --neon-violet:  #8B5CF6;
+    --neon-blue:    #3B82F6;
+    --neon-cyan:    #06B6D4;
+    --neon-pink:    #EC4899;
+    --neon-gold:    #EAB308;
+    --legendary:    #f59e0b;
+    --epic:         #a78bfa;
+    --rare:         #60a5fa;
+    --common:       rgba(255,255,255,0.30);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Inter', system-ui, sans-serif;
+    background: #050508;
+    color: rgba(255,255,255,0.88);
+    min-height: 100vh;
+    padding: 24px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── Framing commentaire ─────────────────────────────────────────── */
+  .preview-label {
+    max-width: 1100px;
+    margin: 0 auto 16px;
+    padding: 10px 14px;
+    background: rgba(139,92,246,0.08);
+    border: 1px solid rgba(139,92,246,0.25);
+    border-radius: 10px;
+    color: rgba(196,181,253,0.8);
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .preview-label b { color: rgba(255,255,255,0.85); }
+
+  /* ── Container ────────────────────────────────────────────────────── */
+  .page {
+    max-width: 1100px;
+    margin: 0 auto;
+    background: var(--game-bg);
+    border-radius: 14px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    min-height: 960px;
+    border: 1px solid var(--game-border);
+    box-shadow: 0 32px 80px rgba(0,0,0,0.5);
+  }
+
+  /* ── Topbar (reprend ProfilePage) ─────────────────────────────────── */
+  .topbar {
+    display: flex; align-items: center;
+    border-bottom: 1px solid var(--game-border);
+    padding: 10px 16px;
+  }
+  .topbar .back {
+    display: flex; align-items: center; gap: 6px;
+    padding: 6px 12px;
+    border-radius: 8px;
+    color: rgba(255,255,255,0.5);
+    font-size: 13px;
+    width: 80px;
+  }
+  .topbar .back:hover { background: rgba(255,255,255,0.05); color: #fff; cursor: pointer; }
+  .topbar .title {
+    flex: 1; text-align: center; font-size: 13px;
+    color: rgba(255,255,255,0.4);
+  }
+  .topbar .title b { color: rgba(255,255,255,0.65); font-weight: 400; }
+  .topbar .spacer { width: 80px; }
+
+  /* ── Hero ─────────────────────────────────────────────────────────── */
+  .hero {
+    position: relative;
+    padding: 22px 24px;
+    background: linear-gradient(135deg, rgba(234,179,8,0.06), rgba(19,19,31,0.3), transparent);
+    overflow: hidden;
+    border-bottom: 1px solid var(--game-border);
+  }
+  .hero::before {
+    content: ''; position: absolute;
+    right: -60px; top: -60px;
+    width: 192px; height: 192px;
+    border-radius: 50%;
+    background: rgba(234,179,8,0.06);
+    filter: blur(48px);
+  }
+  .hero-row {
+    position: relative;
+    display: flex; align-items: center; gap: 16px;
+  }
+  .hero-icon {
+    display: flex; align-items: center; justify-content: center;
+    height: 64px; width: 64px;
+    border-radius: 50%;
+    background: rgba(234,179,8,0.10);
+    border: 1px solid rgba(234,179,8,0.22);
+    color: rgba(234,179,8,0.75);
+  }
+  .hero-text { flex: 1; }
+  .hero-text p.title { font-size: 18px; font-weight: 700; color: #fff; }
+  .hero-text p.sub { margin-top: 2px; font-size: 12px; color: rgba(255,255,255,0.35); }
+
+  /* Wallet balance */
+  .wallet {
+    display: flex; align-items: center; gap: 14px;
+    padding: 10px 16px;
+    background: rgba(234,179,8,0.05);
+    border: 1px solid rgba(234,179,8,0.20);
+    border-radius: 14px;
+  }
+  .wallet .diamond {
+    display: flex; align-items: center; justify-content: center;
+    width: 34px; height: 34px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 40% 30%, rgba(251,191,36,0.4), rgba(234,179,8,0.15));
+    border: 1px solid rgba(234,179,8,0.4);
+    color: #fbbf24;
+    font-size: 16px;
+    box-shadow: 0 0 16px rgba(234,179,8,0.25);
+  }
+  .wallet .amount { font-size: 20px; font-weight: 800; color: #fde68a; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
+  .wallet .label-small {
+    font-size: 9px; font-weight: 700;
+    letter-spacing: 0.16em; text-transform: uppercase;
+    color: rgba(234,179,8,0.65);
+    display: block;
+    margin-bottom: 1px;
+  }
+
+  /* ── Featured ─────────────────────────────────────────────────────── */
+  .featured {
+    padding: 18px 20px 20px;
+    background: rgba(10,10,15,0.4);
+    border-bottom: 1px solid var(--game-border);
+  }
+  .featured-head {
+    display: flex; align-items: center; gap: 8px;
+    margin-bottom: 14px;
+  }
+  .featured-head .label {
+    font-size: 9px; font-weight: 700;
+    letter-spacing: 0.16em; text-transform: uppercase;
+    color: rgba(234,179,8,0.65);
+  }
+  .featured-head .helper {
+    font-size: 10px; color: rgba(255,255,255,0.28);
+    margin-left: 4px;
+  }
+  .featured-head .spacer { flex: 1; }
+  .featured-head .view-all {
+    font-size: 10px; color: rgba(196,181,253,0.7);
+    cursor: pointer;
+  }
+  .featured-head .view-all:hover { color: var(--neon-violet); }
+
+  .featured-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+  }
+
+  .featured-card {
+    position: relative;
+    display: flex; flex-direction: column;
+    border-radius: 14px;
+    padding: 14px;
+    min-height: 180px;
+    overflow: hidden;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .featured-card:hover { transform: translateY(-2px); }
+  .featured-card.legendary {
+    background: linear-gradient(180deg, rgba(245,158,11,0.14), rgba(19,19,31,0.6));
+    border: 1px solid rgba(245,158,11,0.35);
+    box-shadow: 0 0 20px rgba(245,158,11,0.1) inset;
+  }
+  .featured-card.epic {
+    background: linear-gradient(180deg, rgba(167,139,250,0.12), rgba(19,19,31,0.6));
+    border: 1px solid rgba(167,139,250,0.3);
+    box-shadow: 0 0 20px rgba(167,139,250,0.08) inset;
+  }
+  .featured-card .fc-tag {
+    position: absolute; top: 10px; left: 10px;
+    font-size: 8px; font-weight: 800;
+    letter-spacing: 0.12em; text-transform: uppercase;
+    padding: 3px 8px;
+    border-radius: 999px;
+    background: rgba(234,179,8,0.15);
+    border: 1px solid rgba(234,179,8,0.35);
+    color: #fde68a;
+    z-index: 2;
+  }
+  .featured-card .fc-tag.limited { background: rgba(236,72,153,0.15); border-color: rgba(236,72,153,0.35); color: #fbcfe8; }
+  .featured-card .fc-tier {
+    position: absolute; top: 10px; right: 10px;
+    font-size: 8px; font-weight: 600;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    color: rgba(255,255,255,0.55);
+    z-index: 2;
+  }
+  .featured-card .fc-preview {
+    flex: 1;
+    display: flex; align-items: center; justify-content: center;
+    margin: 14px 0 10px;
+  }
+  .featured-card .fc-name {
+    font-size: 13px; font-weight: 800; color: #fff;
+    margin-bottom: 2px;
+  }
+  .featured-card .fc-sub {
+    font-size: 10px; color: rgba(255,255,255,0.45);
+    margin-bottom: 10px;
+    line-height: 1.35;
+  }
+  .featured-card .fc-footer {
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .featured-card .fc-price {
+    display: flex; align-items: center; gap: 4px;
+    font-size: 13px; font-weight: 800; color: #fde68a;
+    font-variant-numeric: tabular-nums;
+  }
+  .featured-card .fc-price .d {
+    font-size: 12px; color: rgba(234,179,8,0.85);
+  }
+  .featured-card .fc-buy {
+    font-size: 10px; font-weight: 700;
+    padding: 6px 12px;
+    border-radius: 8px;
+    background: rgba(234,179,8,0.15);
+    border: 1px solid rgba(234,179,8,0.35);
+    color: #fde68a;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .featured-card .fc-buy:hover {
+    background: rgba(234,179,8,0.25);
+    border-color: rgba(234,179,8,0.55);
+  }
+
+  /* ── Mini previews par type (copié de inventaire) ─────────────────── */
+  .mini-emblem svg { display: block; }
+  .mini-nameplate {
+    padding: 4px 12px;
+    background: linear-gradient(180deg, rgba(255,255,255,0.065), rgba(255,255,255,0.03));
+    border: 1px solid rgba(255,255,255,0.13);
+    border-radius: 2px;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.6);
+  }
+  .mini-nameplate.gold {
+    background: linear-gradient(180deg, rgba(234,179,8,0.22), rgba(234,179,8,0.06));
+    border-color: rgba(234,179,8,0.45);
+    color: #fde68a;
+  }
+  .mini-nameplate.neon {
+    background: linear-gradient(180deg, rgba(139,92,246,0.22), rgba(59,130,246,0.1));
+    border-color: rgba(139,92,246,0.45);
+    color: #c4b5fd;
+    text-shadow: 0 0 8px rgba(139,92,246,0.6);
+  }
+  .mini-card {
+    width: 52px; height: 42px;
+    border-radius: 6px;
+    background: linear-gradient(135deg, rgba(139,92,246,0.18), rgba(59,130,246,0.12));
+    border: 1px solid rgba(139,92,246,0.35);
+    position: relative;
+    overflow: hidden;
+  }
+  .mini-card.holo { background: linear-gradient(135deg, rgba(236,72,153,0.22), rgba(6,182,212,0.22), rgba(234,179,8,0.2)); border-color: rgba(236,72,153,0.4); }
+  .mini-card.frost { background: linear-gradient(135deg, rgba(103,232,249,0.18), rgba(59,130,246,0.12)); border-color: rgba(103,232,249,0.4); }
+  .mini-card.arcane { background: radial-gradient(circle at 30% 30%, rgba(167,139,250,0.3), rgba(10,10,15,0.9)); border-color: rgba(167,139,250,0.45); }
+  .mini-card.ember { background: radial-gradient(circle at 30% 30%, rgba(251,146,60,0.3), rgba(10,10,15,0.9)); border-color: rgba(251,146,60,0.45); }
+  .mini-card::after {
+    content: ''; position: absolute;
+    inset: 2px; border-radius: 4px;
+    border: 1px dashed rgba(255,255,255,0.12);
+  }
+  .mini-bg {
+    width: 56px; height: 42px;
+    border-radius: 6px;
+    position: relative;
+    overflow: hidden;
+    border: 1px solid var(--game-border);
+  }
+  .mini-bg.aurora {
+    background: radial-gradient(circle at 20% 30%, rgba(139,92,246,0.55), transparent 60%),
+                radial-gradient(circle at 80% 70%, rgba(59,130,246,0.45), transparent 60%),
+                #0a0a15;
+  }
+  .mini-bg.constellation {
+    background: radial-gradient(circle at 25% 30%, #fff 1px, transparent 2px),
+                radial-gradient(circle at 70% 60%, #fff 1px, transparent 2px),
+                radial-gradient(circle at 45% 80%, #fff 1px, transparent 2px),
+                radial-gradient(circle at 85% 25%, #fff 1px, transparent 2px),
+                #0a0a15;
+  }
+  .mini-bg.grid {
+    background:
+      linear-gradient(rgba(139,92,246,0.35) 1px, transparent 1px) 0 0 / 10px 10px,
+      linear-gradient(90deg, rgba(139,92,246,0.35) 1px, transparent 1px) 0 0 / 10px 10px,
+      #060610;
+  }
+  .mini-bg.nebula {
+    background:
+      radial-gradient(circle at 40% 50%, rgba(234,179,8,0.55), transparent 55%),
+      radial-gradient(circle at 70% 30%, rgba(251,146,60,0.35), transparent 60%),
+      #140d05;
+  }
+  .mini-bg.ember {
+    background:
+      radial-gradient(circle at 50% 80%, rgba(239,68,68,0.5), transparent 55%),
+      radial-gradient(circle at 30% 60%, rgba(251,146,60,0.35), transparent 60%),
+      #140808;
+  }
+  .mini-anim {
+    width: 56px; height: 42px;
+    border-radius: 6px;
+    position: relative;
+    overflow: hidden;
+    background: rgba(10,10,15,0.9);
+    border: 1px solid var(--game-border);
+  }
+  .mini-anim .particle {
+    position: absolute;
+    width: 3px; height: 3px;
+    border-radius: 50%;
+    animation: fall 2.4s linear infinite;
+  }
+  .mini-anim.pulses .particle {
+    background: radial-gradient(circle, #67e8f9, rgba(103,232,249,0.4));
+    box-shadow: 0 0 4px #67e8f9;
+  }
+  .mini-anim.gold .particle {
+    background: radial-gradient(circle, #fde68a, rgba(251,191,36,0.4));
+    box-shadow: 0 0 4px #fbbf24;
+  }
+  .mini-anim.violet .particle {
+    background: radial-gradient(circle, #c4b5fd, rgba(139,92,246,0.4));
+    box-shadow: 0 0 4px #8b5cf6;
+  }
+  .mini-anim.pink .particle {
+    background: radial-gradient(circle, #fbcfe8, rgba(236,72,153,0.4));
+    box-shadow: 0 0 4px #ec4899;
+  }
+  .mini-anim .particle:nth-child(1) { left: 10%; animation-delay: 0s; }
+  .mini-anim .particle:nth-child(2) { left: 30%; animation-delay: .6s; }
+  .mini-anim .particle:nth-child(3) { left: 50%; animation-delay: 1.2s; }
+  .mini-anim .particle:nth-child(4) { left: 70%; animation-delay: 0.3s; }
+  .mini-anim .particle:nth-child(5) { left: 88%; animation-delay: 1.5s; }
+  @keyframes fall {
+    from { top: -6px; opacity: 0; }
+    10%  { opacity: 1; }
+    90%  { opacity: 1; }
+    to   { top: 100%; opacity: 0; }
+  }
+
+  /* Hex badges */
+  .mini-badge {
+    width: 44px; height: 50px;
+    clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+  }
+  .mini-badge.legendary { background: linear-gradient(180deg, rgba(245,158,11,0.3), rgba(245,158,11,0.08)); box-shadow: 0 0 10px rgba(245,158,11,0.35); }
+  .mini-badge.epic      { background: linear-gradient(180deg, rgba(167,139,250,0.3), rgba(167,139,250,0.08)); box-shadow: 0 0 10px rgba(167,139,250,0.35); }
+  .mini-badge.rare      { background: linear-gradient(180deg, rgba(96,165,250,0.3), rgba(96,165,250,0.08)); box-shadow: 0 0 8px rgba(96,165,250,0.3); }
+  .mini-badge.common    { background: linear-gradient(180deg, rgba(255,255,255,0.15), rgba(255,255,255,0.04)); }
+
+  .badge-hex-preview {
+    width: 48px; height: 54px;
+    clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px;
+    position: relative;
+  }
+  .badge-hex-preview.legendary { background: linear-gradient(180deg, rgba(245,158,11,0.55), rgba(245,158,11,0.1)); filter: drop-shadow(0 0 6px rgba(245,158,11,0.45)); }
+  .badge-hex-preview.epic      { background: linear-gradient(180deg, rgba(167,139,250,0.55), rgba(167,139,250,0.1)); filter: drop-shadow(0 0 6px rgba(167,139,250,0.4)); }
+  .badge-hex-preview.rare      { background: linear-gradient(180deg, rgba(96,165,250,0.5), rgba(96,165,250,0.08)); filter: drop-shadow(0 0 5px rgba(96,165,250,0.3)); }
+  .badge-hex-preview.common    { background: linear-gradient(180deg, rgba(255,255,255,0.2), rgba(255,255,255,0.05)); }
+
+  /* ── Featured big preview variants ────────────────────────────────── */
+  .fc-preview .big-card {
+    width: 86px; height: 70px;
+    border-radius: 8px;
+    position: relative;
+    overflow: hidden;
+  }
+  .fc-preview .big-card::after {
+    content: ''; position: absolute;
+    inset: 3px; border-radius: 6px;
+    border: 1px dashed rgba(255,255,255,0.15);
+  }
+  .fc-preview .big-card.arcane {
+    background: radial-gradient(circle at 30% 30%, rgba(167,139,250,0.4), rgba(10,10,15,0.9));
+    border: 1px solid rgba(167,139,250,0.5);
+  }
+  .fc-preview .big-card.holo {
+    background: linear-gradient(135deg, rgba(236,72,153,0.28), rgba(6,182,212,0.28), rgba(234,179,8,0.24));
+    border: 1px solid rgba(236,72,153,0.45);
+  }
+  .fc-preview .big-bg {
+    width: 92px; height: 72px;
+    border-radius: 8px;
+    border: 1px solid var(--game-border);
+    overflow: hidden;
+  }
+
+  /* ── Body (sidebar + grid) ────────────────────────────────────────── */
+  .body { display: flex; flex: 1; overflow: hidden; }
+  .sidebar {
+    width: 176px; flex-shrink: 0;
+    border-right: 1px solid var(--game-border);
+    padding: 12px;
+    display: flex; flex-direction: column; gap: 2px;
+  }
+  .sidebar h4 {
+    padding: 0 8px; margin: 4px 0;
+    font-size: 10px; font-weight: 700;
+    letter-spacing: 0.16em; text-transform: uppercase;
+    color: rgba(255,255,255,0.2);
+  }
+  .sidebar button {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 10px;
+    border-radius: 8px;
+    font-size: 12px; font-weight: 500;
+    color: rgba(255,255,255,0.35);
+    cursor: pointer;
+    transition: all 0.1s;
+    background: transparent;
+    border: none;
+  }
+  .sidebar button:hover { background: rgba(255,255,255,0.05); color: rgba(255,255,255,0.6); }
+  .sidebar button.active {
+    background: rgba(139,92,246,0.1);
+    color: var(--neon-violet);
+  }
+  .sidebar button .count {
+    font-size: 10px; font-variant-numeric: tabular-nums;
+    color: rgba(255,255,255,0.2);
+  }
+  .sidebar button.active .count { color: rgba(139,92,246,0.7); }
+  .sidebar .sep { height: 1px; background: var(--game-border); margin: 8px; opacity: 0.7; }
+
+  .content { flex: 1; overflow-y: auto; display: flex; flex-direction: column; }
+
+  /* Tabs type d'item */
+  .type-tabs {
+    display: flex; align-items: center; gap: 4px;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--game-border);
+    overflow-x: auto;
+  }
+  .type-tabs button {
+    display: flex; align-items: center; gap: 6px;
+    padding: 6px 12px;
+    border-radius: 999px;
+    font-size: 11px; font-weight: 600;
+    color: rgba(255,255,255,0.4);
+    background: rgba(255,255,255,0.03);
+    border: 1px solid transparent;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.15s;
+  }
+  .type-tabs button:hover:not(.disabled) { background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.7); }
+  .type-tabs button.active {
+    background: rgba(139,92,246,0.12);
+    border-color: rgba(139,92,246,0.35);
+    color: var(--neon-violet);
+  }
+  .type-tabs button .count {
+    font-size: 10px;
+    background: rgba(255,255,255,0.06);
+    padding: 1px 6px;
+    border-radius: 999px;
+    font-variant-numeric: tabular-nums;
+    color: rgba(255,255,255,0.45);
+  }
+  .type-tabs button.active .count { background: rgba(139,92,246,0.2); color: rgba(196,181,253,0.9); }
+  .type-tabs button.disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+  .type-tabs button.disabled .count {
+    background: rgba(255,255,255,0.04);
+    color: rgba(255,255,255,0.28);
+    font-size: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  /* Grid */
+  .grid {
+    padding: 16px;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
+    gap: 12px;
+  }
+  .item-card {
+    position: relative;
+    display: flex; flex-direction: column; align-items: center;
+    gap: 6px;
+    padding: 10px 10px 10px;
+    min-height: 208px;
+    border-radius: 12px;
+    background: var(--game-card);
+    border: 1px solid var(--game-border);
+    transition: all 0.15s;
+  }
+  .item-card:hover {
+    border-color: rgba(234,179,8,0.3);
+    transform: translateY(-1px);
+  }
+  .item-card.owned {
+    border-color: rgba(34,197,94,0.4);
+    background: linear-gradient(180deg, rgba(34,197,94,0.04), var(--game-card));
+  }
+  .item-card.unaffordable {
+    opacity: 0.55;
+  }
+  .item-card.unaffordable .item-preview { filter: saturate(0.6); }
+
+  .item-tier-pill {
+    position: absolute; top: 8px; left: 8px;
+    display: flex; align-items: center; gap: 4px;
+    opacity: 0.55;
+    z-index: 2;
+  }
+  .item-tier-pill .dot { width: 5px; height: 5px; border-radius: 50%; }
+  .item-tier-pill.legendary .dot { background: var(--legendary); }
+  .item-tier-pill.epic .dot      { background: var(--epic); }
+  .item-tier-pill.rare .dot      { background: var(--rare); }
+  .item-tier-pill.common .dot    { background: var(--common); }
+  .item-tier-pill span {
+    font-size: 8px; font-weight: 500;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    color: rgba(255,255,255,0.55);
+  }
+
+  .item-type-icon {
+    position: absolute; top: 8px; right: 8px;
+    width: 18px; height: 18px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 6px;
+    background: rgba(255,255,255,0.04);
+    color: rgba(255,255,255,0.35);
+    z-index: 2;
+  }
+
+  .item-badge-corner {
+    position: absolute; top: 32px; right: 8px;
+    font-size: 7px; font-weight: 800;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    padding: 2px 6px;
+    border-radius: 999px;
+    z-index: 2;
+  }
+  .item-badge-corner.new {
+    background: rgba(139,92,246,0.14);
+    border: 1px solid rgba(139,92,246,0.4);
+    color: #c4b5fd;
+  }
+  .item-badge-corner.limited {
+    background: rgba(236,72,153,0.14);
+    border: 1px solid rgba(236,72,153,0.4);
+    color: #fbcfe8;
+  }
+
+  .item-preview {
+    margin-top: 18px;
+    display: flex; align-items: center; justify-content: center;
+    height: 60px;
+  }
+  .item-name {
+    font-size: 11px; font-weight: 700;
+    color: #fff;
+    text-align: center;
+    line-height: 1.2;
+    margin-top: 2px;
+  }
+
+  .item-price {
+    display: flex; align-items: center; justify-content: center; gap: 4px;
+    font-size: 12px; font-weight: 800;
+    color: #fde68a;
+    font-variant-numeric: tabular-nums;
+    margin-top: 2px;
+  }
+  .item-price .d {
+    font-size: 11px;
+    color: rgba(234,179,8,0.8);
+  }
+  .item-card.owned .item-price { opacity: 0.45; text-decoration: line-through; }
+
+  .item-cta-wrap {
+    margin-top: auto;
+    width: 100%;
+    display: flex; justify-content: center;
+  }
+  .item-cta {
+    width: 100%;
+    display: flex; align-items: center; justify-content: center; gap: 4px;
+    padding: 7px 10px;
+    border-radius: 8px;
+    border: 1px solid rgba(234,179,8,0.35);
+    background: rgba(234,179,8,0.1);
+    font-size: 10px; font-weight: 700;
+    color: #fde68a;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .item-cta:hover {
+    background: rgba(234,179,8,0.2);
+    border-color: rgba(234,179,8,0.55);
+  }
+  .item-cta.owned {
+    background: rgba(34,197,94,0.08);
+    border-color: rgba(34,197,94,0.3);
+    color: rgba(34,197,94,0.9);
+    cursor: default;
+  }
+  .item-cta.unaffordable {
+    background: rgba(255,255,255,0.03);
+    border-color: rgba(255,255,255,0.1);
+    color: rgba(255,255,255,0.35);
+    cursor: not-allowed;
+  }
+
+  /* ── Bottom note ──────────────────────────────────────────────────── */
+  .note {
+    max-width: 1100px; margin: 40px auto 8px;
+    color: rgba(196,181,253,0.7);
+    font-size: 12px;
+    padding: 0 14px;
+  }
+  .note a { color: #c4b5fd; }
+</style>
+</head>
+<body>
+
+<div class="preview-label">
+  <b>Preview 1 / 2 — Boutique, vue principale.</b>
+  Point d'entrée : <b>Paramètres → Boutique</b> (ou nav de la landing). On reprend la structure de l'<b>Inventaire</b> (topbar, sidebar filtre, type-tabs, grid) et on ajoute : (1) <b>solde Pulses</b> dans le hero, (2) bloc <b>Nouveautés</b> (3 vedettes), (3) chaque item affiche son <b>prix</b> et un CTA <b>Acheter</b> / <b>Possédé</b> / <b>Pas assez</b>. Le flux d'achat : <a href="./shop-purchase.html">shop-purchase.html</a>.
+</div>
+
+<div class="page">
+
+  <!-- Topbar -->
+  <div class="topbar">
+    <div class="back">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg>
+      Retour
+    </div>
+    <div class="title"><b>Boutique</b></div>
+    <div class="spacer"></div>
+  </div>
+
+  <!-- Hero -->
+  <div class="hero">
+    <div class="hero-row">
+      <div class="hero-icon">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/>
+          <line x1="3" y1="6" x2="21" y2="6"/>
+          <path d="M16 10a4 4 0 0 1-8 0"/>
+        </svg>
+      </div>
+      <div class="hero-text">
+        <p class="title">Boutique</p>
+        <p class="sub">38 objets disponibles · 4 nouveautés cette semaine</p>
+      </div>
+      <div class="wallet">
+        <div class="diamond">◈</div>
+        <div>
+          <span class="label-small">Solde Pulses</span>
+          <div class="amount">1 420</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Featured -->
+  <div class="featured">
+    <div class="featured-head">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style="color: rgba(234,179,8,0.7);">
+        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+      </svg>
+      <span class="label">Nouveautés</span>
+      <span class="helper">Objets mis en avant cette semaine</span>
+      <div class="spacer"></div>
+      <span class="view-all">Voir tout →</span>
+    </div>
+
+    <div class="featured-row">
+
+      <!-- Featured 1 — Legendary emblem -->
+      <div class="featured-card legendary">
+        <div class="fc-tag">✦ Édition limitée</div>
+        <div class="fc-tier">Légendaire</div>
+        <div class="fc-preview">
+          <svg width="64" height="76" viewBox="-32 -37 64 74">
+            <path d="M -24,-33 L 24,-33 L 24,4 C 24,16 9,30 0,36 C -9,30 -24,16 -24,4 Z"
+                  fill="rgba(14,10,28,0.95)" stroke="#fbbf24" stroke-width="1.5"/>
+            <path d="M 0,-18 C -7,-9 -11,1 -8,9 C -5,16 5,16 8,9 C 11,1 7,-9 0,-18 Z" fill="#fbbf24" fill-opacity="0.85"/>
+            <path d="M 0,-8 C -3,-3 -4,3 -2,7 C 0,9 3,8 3,3 C 3,-1 1,-5 0,-8 Z" fill="#fde68a"/>
+          </svg>
+        </div>
+        <div class="fc-name">Blason Flamme d'or</div>
+        <div class="fc-sub">Un blason de feu forgé pour les légendes. Disponible uniquement cette semaine.</div>
+        <div class="fc-footer">
+          <div class="fc-price"><span class="d">◈</span>2 400</div>
+          <div class="fc-buy">Voir</div>
+        </div>
+      </div>
+
+      <!-- Featured 2 — Epic card design -->
+      <div class="featured-card epic">
+        <div class="fc-tag">Nouveau</div>
+        <div class="fc-tier">Épique</div>
+        <div class="fc-preview">
+          <div class="big-card arcane"></div>
+        </div>
+        <div class="fc-name">Carte Arcane</div>
+        <div class="fc-sub">Un design de carte profil envoûtant aux accents violets mystiques.</div>
+        <div class="fc-footer">
+          <div class="fc-price"><span class="d">◈</span>780</div>
+          <div class="fc-buy">Voir</div>
+        </div>
+      </div>
+
+      <!-- Featured 3 — Epic background -->
+      <div class="featured-card epic">
+        <div class="fc-tag limited">✦ Saison</div>
+        <div class="fc-tier">Épique</div>
+        <div class="fc-preview">
+          <div class="big-bg mini-bg nebula" style="width:92px;height:72px;"></div>
+        </div>
+        <div class="fc-name">Fond Nebula</div>
+        <div class="fc-sub">Fond de profil cosmique doré pour briller sur le classement.</div>
+        <div class="fc-footer">
+          <div class="fc-price"><span class="d">◈</span>650</div>
+          <div class="fc-buy">Voir</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Body (sidebar + content) -->
+  <div class="body">
+
+    <!-- Sidebar -->
+    <div class="sidebar">
+      <h4>Rareté</h4>
+      <button class="active"><span>Tous</span><span class="count">38</span></button>
+      <button><span>Légendaire</span><span class="count">4</span></button>
+      <button><span>Épique</span><span class="count">13</span></button>
+      <button><span>Rare</span><span class="count">15</span></button>
+      <button><span>Commun</span><span class="count">6</span></button>
+
+      <div class="sep"></div>
+
+      <h4>État</h4>
+      <button class="active"><span>Tous</span><span class="count">38</span></button>
+      <button><span>Abordable</span><span class="count">22</span></button>
+      <button><span>À économiser</span><span class="count">9</span></button>
+      <button><span>Possédé</span><span class="count">7</span></button>
+
+      <div class="sep"></div>
+
+      <h4>Tri</h4>
+      <button class="active"><span>Nouveautés</span></button>
+      <button><span>Prix ↑</span></button>
+      <button><span>Prix ↓</span></button>
+      <button><span>Rareté</span></button>
+    </div>
+
+    <!-- Content -->
+    <div class="content">
+
+      <!-- Type tabs -->
+      <div class="type-tabs">
+        <button class="active">
+          Tous <span class="count">38</span>
+        </button>
+        <button>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          Badges <span class="count">10</span>
+        </button>
+        <button>
+          <svg width="12" height="14" viewBox="0 0 24 28" fill="currentColor"><path d="M12 2 4 5v8c0 5 3.5 10 8 12 4.5-2 8-7 8-12V5l-8-3z"/></svg>
+          Blasons <span class="count">6</span>
+        </button>
+        <button>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h10M4 17h16"/></svg>
+          Titres <span class="count">8</span>
+        </button>
+        <button>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/></svg>
+          Cartes <span class="count">5</span>
+        </button>
+        <button>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5" fill="currentColor"/><path d="m21 15-5-5L5 21"/></svg>
+          Fonds <span class="count">5</span>
+        </button>
+        <button>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+          Animations <span class="count">4</span>
+        </button>
+        <button class="disabled" title="Bientôt disponible">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 22c0-4.4 3.6-8 8-8s8 3.6 8 8"/></svg>
+          Avatars <span class="count">Bientôt</span>
+        </button>
+      </div>
+
+      <!-- Grid -->
+      <div class="grid">
+
+        <!-- Blason Flamme d'or - Featured -->
+        <div class="item-card">
+          <div class="item-tier-pill legendary"><span class="dot"></span><span>Légendaire</span></div>
+          <div class="item-type-icon" title="Blason">
+            <svg width="10" height="12" viewBox="0 0 24 28" fill="currentColor"><path d="M12 2 4 5v8c0 5 3.5 10 8 12 4.5-2 8-7 8-12V5l-8-3z"/></svg>
+          </div>
+          <div class="item-badge-corner limited">✦ Limité</div>
+          <div class="item-preview">
+            <svg width="44" height="52" viewBox="-32 -37 64 74">
+              <path d="M -24,-33 L 24,-33 L 24,4 C 24,16 9,30 0,36 C -9,30 -24,16 -24,4 Z"
+                    fill="rgba(14,10,28,0.95)" stroke="#fbbf24" stroke-width="1.5"/>
+              <path d="M 0,-18 C -7,-9 -11,1 -8,9 C -5,16 5,16 8,9 C 11,1 7,-9 0,-18 Z" fill="#fbbf24" fill-opacity="0.85"/>
+              <path d="M 0,-8 C -3,-3 -4,3 -2,7 C 0,9 3,8 3,3 C 3,-1 1,-5 0,-8 Z" fill="#fde68a"/>
+            </svg>
+          </div>
+          <div class="item-name">Flamme d'or</div>
+          <div class="item-price"><span class="d">◈</span>2 400</div>
+          <div class="item-cta-wrap"><div class="item-cta">Acheter</div></div>
+        </div>
+
+        <!-- Blason Rose cyberpunk - New -->
+        <div class="item-card">
+          <div class="item-tier-pill epic"><span class="dot"></span><span>Épique</span></div>
+          <div class="item-type-icon" title="Blason">
+            <svg width="10" height="12" viewBox="0 0 24 28" fill="currentColor"><path d="M12 2 4 5v8c0 5 3.5 10 8 12 4.5-2 8-7 8-12V5l-8-3z"/></svg>
+          </div>
+          <div class="item-badge-corner new">Nouveau</div>
+          <div class="item-preview">
+            <svg width="44" height="52" viewBox="-32 -37 64 74">
+              <path d="M -24,-33 L 24,-33 L 24,4 C 24,16 9,30 0,36 C -9,30 -24,16 -24,4 Z"
+                    fill="rgba(14,10,28,0.95)" stroke="#ec4899" stroke-width="1.5"/>
+              <g transform="translate(0 -4)">
+                <path d="M 0,0 L 6,-4 L 0,-12 L -6,-4 Z" fill="#ec489933" stroke="#ec4899" stroke-width="0.8"/>
+                <path d="M 0,0 L 6,-4 L 0,-12 L -6,-4 Z" fill="#ec489933" stroke="#ec4899" stroke-width="0.8" transform="rotate(60)"/>
+                <path d="M 0,0 L 6,-4 L 0,-12 L -6,-4 Z" fill="#ec489933" stroke="#ec4899" stroke-width="0.8" transform="rotate(120)"/>
+                <path d="M 0,0 L 6,-4 L 0,-12 L -6,-4 Z" fill="#ec489933" stroke="#ec4899" stroke-width="0.8" transform="rotate(180)"/>
+                <path d="M 0,0 L 6,-4 L 0,-12 L -6,-4 Z" fill="#ec489933" stroke="#ec4899" stroke-width="0.8" transform="rotate(240)"/>
+                <path d="M 0,0 L 6,-4 L 0,-12 L -6,-4 Z" fill="#ec489933" stroke="#ec4899" stroke-width="0.8" transform="rotate(300)"/>
+                <circle r="3.5" fill="#fbcfe8" stroke="#ec4899" stroke-width="0.8"/>
+              </g>
+            </svg>
+          </div>
+          <div class="item-name">Rose cyberpunk</div>
+          <div class="item-price"><span class="d">◈</span>780</div>
+          <div class="item-cta-wrap"><div class="item-cta">Acheter</div></div>
+        </div>
+
+        <!-- Blason Bouclier runique -->
+        <div class="item-card">
+          <div class="item-tier-pill rare"><span class="dot"></span><span>Rare</span></div>
+          <div class="item-type-icon" title="Blason">
+            <svg width="10" height="12" viewBox="0 0 24 28" fill="currentColor"><path d="M12 2 4 5v8c0 5 3.5 10 8 12 4.5-2 8-7 8-12V5l-8-3z"/></svg>
+          </div>
+          <div class="item-preview">
+            <svg width="44" height="52" viewBox="-32 -37 64 74">
+              <path d="M -24,-33 L 24,-33 L 24,4 C 24,16 9,30 0,36 C -9,30 -24,16 -24,4 Z"
+                    fill="rgba(14,10,28,0.95)" stroke="#60a5fa" stroke-width="1.5"/>
+              <g transform="translate(0 -2)" stroke="#60a5fa" stroke-width="1" fill="none">
+                <path d="M -10,-12 L 0,-20 L 10,-12 M 0,-20 L 0,14" />
+                <circle r="3" fill="#60a5fa" fill-opacity="0.4"/>
+              </g>
+            </svg>
+          </div>
+          <div class="item-name">Bouclier runique</div>
+          <div class="item-price"><span class="d">◈</span>320</div>
+          <div class="item-cta-wrap"><div class="item-cta">Acheter</div></div>
+        </div>
+
+        <!-- Titre Sage - possédé -->
+        <div class="item-card owned">
+          <div class="item-tier-pill common"><span class="dot"></span><span>Commun</span></div>
+          <div class="item-type-icon" title="Titre">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h10M4 17h16"/></svg>
+          </div>
+          <div class="item-preview">
+            <div class="mini-nameplate" style="font-size:9px;padding:4px 10px;">SAGE</div>
+          </div>
+          <div class="item-name">Sage</div>
+          <div class="item-price"><span class="d">◈</span>80</div>
+          <div class="item-cta-wrap"><div class="item-cta owned">
+            <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+            Possédé
+          </div></div>
+        </div>
+
+        <!-- Titre Foudre Mentale -->
+        <div class="item-card">
+          <div class="item-tier-pill epic"><span class="dot"></span><span>Épique</span></div>
+          <div class="item-type-icon" title="Titre">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h10M4 17h16"/></svg>
+          </div>
+          <div class="item-badge-corner new">Nouveau</div>
+          <div class="item-preview">
+            <div class="mini-nameplate neon" style="font-size:9px;padding:4px 10px;">FOUDRE MENTALE</div>
+          </div>
+          <div class="item-name">Foudre Mentale</div>
+          <div class="item-price"><span class="d">◈</span>520</div>
+          <div class="item-cta-wrap"><div class="item-cta">Acheter</div></div>
+        </div>
+
+        <!-- Titre Roi du jour -->
+        <div class="item-card">
+          <div class="item-tier-pill legendary"><span class="dot"></span><span>Légendaire</span></div>
+          <div class="item-type-icon" title="Titre">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h10M4 17h16"/></svg>
+          </div>
+          <div class="item-preview">
+            <div class="mini-nameplate gold" style="font-size:9px;padding:4px 10px;">ROI DU JOUR</div>
+          </div>
+          <div class="item-name">Roi du jour</div>
+          <div class="item-price"><span class="d">◈</span>1 800</div>
+          <div class="item-cta-wrap"><div class="item-cta">Acheter</div></div>
+        </div>
+
+        <!-- Carte Arcane -->
+        <div class="item-card">
+          <div class="item-tier-pill epic"><span class="dot"></span><span>Épique</span></div>
+          <div class="item-type-icon" title="Carte">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/></svg>
+          </div>
+          <div class="item-badge-corner new">Nouveau</div>
+          <div class="item-preview"><div class="mini-card arcane" style="width:54px;height:44px;"></div></div>
+          <div class="item-name">Carte Arcane</div>
+          <div class="item-price"><span class="d">◈</span>780</div>
+          <div class="item-cta-wrap"><div class="item-cta">Acheter</div></div>
+        </div>
+
+        <!-- Carte Holographique - Possédé -->
+        <div class="item-card owned">
+          <div class="item-tier-pill epic"><span class="dot"></span><span>Épique</span></div>
+          <div class="item-type-icon" title="Carte">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/></svg>
+          </div>
+          <div class="item-preview"><div class="mini-card holo" style="width:54px;height:44px;"></div></div>
+          <div class="item-name">Holographique</div>
+          <div class="item-price"><span class="d">◈</span>650</div>
+          <div class="item-cta-wrap"><div class="item-cta owned">
+            <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+            Possédé
+          </div></div>
+        </div>
+
+        <!-- Carte Givrée -->
+        <div class="item-card">
+          <div class="item-tier-pill rare"><span class="dot"></span><span>Rare</span></div>
+          <div class="item-type-icon" title="Carte">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/></svg>
+          </div>
+          <div class="item-preview"><div class="mini-card frost" style="width:54px;height:44px;"></div></div>
+          <div class="item-name">Givrée</div>
+          <div class="item-price"><span class="d">◈</span>340</div>
+          <div class="item-cta-wrap"><div class="item-cta">Acheter</div></div>
+        </div>
+
+        <!-- Carte Ember -->
+        <div class="item-card">
+          <div class="item-tier-pill rare"><span class="dot"></span><span>Rare</span></div>
+          <div class="item-type-icon" title="Carte">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/></svg>
+          </div>
+          <div class="item-preview"><div class="mini-card ember" style="width:54px;height:44px;"></div></div>
+          <div class="item-name">Ember</div>
+          <div class="item-price"><span class="d">◈</span>340</div>
+          <div class="item-cta-wrap"><div class="item-cta">Acheter</div></div>
+        </div>
+
+        <!-- Fond Aurore violette -->
+        <div class="item-card">
+          <div class="item-tier-pill epic"><span class="dot"></span><span>Épique</span></div>
+          <div class="item-type-icon" title="Fond">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5" fill="currentColor"/><path d="m21 15-5-5L5 21"/></svg>
+          </div>
+          <div class="item-preview"><div class="mini-bg aurora" style="width:58px;height:44px;"></div></div>
+          <div class="item-name">Aurore violette</div>
+          <div class="item-price"><span class="d">◈</span>620</div>
+          <div class="item-cta-wrap"><div class="item-cta">Acheter</div></div>
+        </div>
+
+        <!-- Fond Nebula - New -->
+        <div class="item-card">
+          <div class="item-tier-pill epic"><span class="dot"></span><span>Épique</span></div>
+          <div class="item-type-icon" title="Fond">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5" fill="currentColor"/><path d="m21 15-5-5L5 21"/></svg>
+          </div>
+          <div class="item-badge-corner new">Nouveau</div>
+          <div class="item-preview"><div class="mini-bg nebula" style="width:58px;height:44px;"></div></div>
+          <div class="item-name">Nebula</div>
+          <div class="item-price"><span class="d">◈</span>650</div>
+          <div class="item-cta-wrap"><div class="item-cta">Acheter</div></div>
+        </div>
+
+        <!-- Fond Constellation -->
+        <div class="item-card">
+          <div class="item-tier-pill rare"><span class="dot"></span><span>Rare</span></div>
+          <div class="item-type-icon" title="Fond">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+          </div>
+          <div class="item-preview"><div class="mini-bg constellation" style="width:58px;height:44px;"></div></div>
+          <div class="item-name">Constellation</div>
+          <div class="item-price"><span class="d">◈</span>320</div>
+          <div class="item-cta-wrap"><div class="item-cta">Acheter</div></div>
+        </div>
+
+        <!-- Fond Grid -->
+        <div class="item-card">
+          <div class="item-tier-pill common"><span class="dot"></span><span>Commun</span></div>
+          <div class="item-type-icon" title="Fond">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+          </div>
+          <div class="item-preview"><div class="mini-bg grid" style="width:58px;height:44px;"></div></div>
+          <div class="item-name">Grille neon</div>
+          <div class="item-price"><span class="d">◈</span>140</div>
+          <div class="item-cta-wrap"><div class="item-cta">Acheter</div></div>
+        </div>
+
+        <!-- Fond Ember -->
+        <div class="item-card">
+          <div class="item-tier-pill rare"><span class="dot"></span><span>Rare</span></div>
+          <div class="item-type-icon" title="Fond">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+          </div>
+          <div class="item-preview"><div class="mini-bg ember" style="width:58px;height:44px;"></div></div>
+          <div class="item-name">Braise</div>
+          <div class="item-price"><span class="d">◈</span>280</div>
+          <div class="item-cta-wrap"><div class="item-cta">Acheter</div></div>
+        </div>
+
+        <!-- Anim Pluie de Pulses - Legendary - UNAFFORDABLE -->
+        <div class="item-card unaffordable">
+          <div class="item-tier-pill legendary"><span class="dot"></span><span>Légendaire</span></div>
+          <div class="item-type-icon" title="Animation">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83"/></svg>
+          </div>
+          <div class="item-preview">
+            <div class="mini-anim pulses" style="width:58px;height:44px;">
+              <span class="particle"></span><span class="particle"></span><span class="particle"></span><span class="particle"></span><span class="particle"></span>
+            </div>
+          </div>
+          <div class="item-name">Pluie de Pulses</div>
+          <div class="item-price"><span class="d">◈</span>2 200</div>
+          <div class="item-cta-wrap"><div class="item-cta unaffordable">
+            <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+            Pas assez
+          </div></div>
+        </div>
+
+        <!-- Anim Particules violet - owned -->
+        <div class="item-card owned">
+          <div class="item-tier-pill epic"><span class="dot"></span><span>Épique</span></div>
+          <div class="item-type-icon" title="Animation">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4M12 18v4"/></svg>
+          </div>
+          <div class="item-preview">
+            <div class="mini-anim violet" style="width:58px;height:44px;">
+              <span class="particle"></span><span class="particle"></span><span class="particle"></span><span class="particle"></span><span class="particle"></span>
+            </div>
+          </div>
+          <div class="item-name">Particules violet</div>
+          <div class="item-price"><span class="d">◈</span>560</div>
+          <div class="item-cta-wrap"><div class="item-cta owned">
+            <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+            Possédé
+          </div></div>
+        </div>
+
+        <!-- Anim Particules gold -->
+        <div class="item-card">
+          <div class="item-tier-pill epic"><span class="dot"></span><span>Épique</span></div>
+          <div class="item-type-icon" title="Animation">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4M12 18v4"/></svg>
+          </div>
+          <div class="item-preview">
+            <div class="mini-anim gold" style="width:58px;height:44px;">
+              <span class="particle"></span><span class="particle"></span><span class="particle"></span><span class="particle"></span><span class="particle"></span>
+            </div>
+          </div>
+          <div class="item-name">Particules dorées</div>
+          <div class="item-price"><span class="d">◈</span>560</div>
+          <div class="item-cta-wrap"><div class="item-cta">Acheter</div></div>
+        </div>
+
+        <!-- Badge Couronne -->
+        <div class="item-card">
+          <div class="item-tier-pill legendary"><span class="dot"></span><span>Légendaire</span></div>
+          <div class="item-type-icon" title="Badge">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          </div>
+          <div class="item-preview"><div class="badge-hex-preview legendary">👑</div></div>
+          <div class="item-name">Couronne dorée</div>
+          <div class="item-price"><span class="d">◈</span>1 600</div>
+          <div class="item-cta-wrap"><div class="item-cta">Acheter</div></div>
+        </div>
+
+        <!-- Badge Diamant -->
+        <div class="item-card">
+          <div class="item-tier-pill epic"><span class="dot"></span><span>Épique</span></div>
+          <div class="item-type-icon" title="Badge">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          </div>
+          <div class="item-preview"><div class="badge-hex-preview epic">💎</div></div>
+          <div class="item-name">Éclat diamant</div>
+          <div class="item-price"><span class="d">◈</span>680</div>
+          <div class="item-cta-wrap"><div class="item-cta">Acheter</div></div>
+        </div>
+
+        <!-- Badge Fusée -->
+        <div class="item-card">
+          <div class="item-tier-pill rare"><span class="dot"></span><span>Rare</span></div>
+          <div class="item-type-icon" title="Badge">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          </div>
+          <div class="item-preview"><div class="badge-hex-preview rare">🚀</div></div>
+          <div class="item-name">Ascension</div>
+          <div class="item-price"><span class="d">◈</span>280</div>
+          <div class="item-cta-wrap"><div class="item-cta">Acheter</div></div>
+        </div>
+
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<div class="note">
+  <b>Flux d'achat & item détail</b> — voir <a href="./shop-purchase.html">shop-purchase.html</a>
+</div>
+
+</body>
+</html>

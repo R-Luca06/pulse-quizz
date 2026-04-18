@@ -1,5 +1,5 @@
 import type posthogJs from 'posthog-js'
-import type { GameMode, Difficulty, Category, Language } from '../types/quiz'
+import type { GameMode, Difficulty, Category, Language, ShopItem } from '../types/quiz'
 
 const KEY = import.meta.env.VITE_POSTHOG_KEY as string | undefined
 
@@ -68,4 +68,25 @@ export function trackUserSignedUp(props: { username: string }): void {
 
 export function trackUserSignedIn(): void {
   ph?.capture('user_signed_in')
+}
+
+export function trackShopItemViewed(item: ShopItem): void {
+  ph?.capture('shop_item_viewed', {
+    shop_item_id: item.id,
+    item_type:    item.item_type,
+    item_id:      item.item_id,
+    tier:         item.tier,
+    price:        item.price,
+  })
+}
+
+export function trackShopItemPurchased(item: ShopItem, newBalance: number): void {
+  ph?.capture('shop_item_purchased', {
+    shop_item_id: item.id,
+    item_type:    item.item_type,
+    item_id:      item.item_id,
+    tier:         item.tier,
+    price:        item.price,
+    new_balance:  newBalance,
+  })
 }

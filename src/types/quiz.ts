@@ -94,6 +94,39 @@ export interface EquippedCosmetics {
   screen_anim_id: string | null
 }
 
+// ─── Boutique ─────────────────────────────────────────────────────────────────
+
+export interface ShopItem {
+  id:              string           // uuid shop_items.id
+  item_type:       ItemType
+  item_id:         string
+  name:            string
+  description:     string | null
+  tier:            AchievementTier
+  price:           number
+  is_new:          boolean
+  is_limited:      boolean
+  featured:        boolean
+  available_from:  string | null
+  available_until: string | null
+  sort_order:      number
+}
+
+export interface PurchaseResult {
+  balance:   number
+  item_type: ItemType
+  item_id:   string
+}
+
+export type PurchaseErrorCode =
+  | 'not_authenticated'
+  | 'item_not_found'
+  | 'not_yet_available'
+  | 'no_longer_available'
+  | 'already_owned'
+  | 'insufficient_balance'
+  | 'unknown'
+
 // ─── Achievements ─────────────────────────────────────────────────────────────
 
 export type AchievementId =

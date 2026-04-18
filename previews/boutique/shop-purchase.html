@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pulse Quizz — Preview Flux d'achat</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+
+  :root {
+    --game-bg:      #0A0A0F;
+    --game-card:    #13131F;
+    --game-border:  #1E1E2E;
+    --neon-violet:  #8B5CF6;
+    --neon-blue:    #3B82F6;
+    --legendary:    #f59e0b;
+    --epic:         #a78bfa;
+    --rare:         #60a5fa;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Inter', system-ui, sans-serif;
+    background: #050508;
+    color: rgba(255,255,255,0.88);
+    min-height: 100vh;
+    padding: 24px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .preview-label {
+    max-width: 1080px;
+    margin: 0 auto 16px;
+    padding: 10px 14px;
+    background: rgba(139,92,246,0.08);
+    border: 1px solid rgba(139,92,246,0.25);
+    border-radius: 10px;
+    color: rgba(196,181,253,0.8);
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .preview-label b { color: rgba(255,255,255,0.85); }
+
+  .stage-wrap {
+    max-width: 1080px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+  }
+
+  .stage {
+    position: relative;
+    background: var(--game-bg);
+    border-radius: 14px;
+    overflow: hidden;
+    height: 720px;
+    border: 1px solid var(--game-border);
+    box-shadow: 0 32px 80px rgba(0,0,0,0.5);
+  }
+  .stage-label {
+    padding: 8px 14px;
+    font-size: 11px; font-weight: 700;
+    letter-spacing: 0.12em; text-transform: uppercase;
+    color: rgba(196,181,253,0.6);
+    text-align: center;
+  }
+
+  /* ── Page blur behind modal ───────────────────────────────────────── */
+  .bg-page {
+    position: absolute; inset: 0;
+    filter: blur(3px) brightness(0.55);
+    background:
+      linear-gradient(180deg, rgba(19,19,31,0.5), rgba(10,10,15,0.9)),
+      radial-gradient(circle at 30% 20%, rgba(234,179,8,0.15), transparent 55%),
+      radial-gradient(circle at 70% 75%, rgba(139,92,246,0.15), transparent 55%);
+  }
+
+  .backdrop {
+    position: absolute; inset: 0;
+    background: rgba(0,0,0,0.72);
+    backdrop-filter: blur(4px);
+  }
+
+  /* ── Modal ────────────────────────────────────────────────────────── */
+  .modal {
+    position: absolute;
+    left: 50%; top: 50%;
+    transform: translate(-50%, -50%);
+    width: calc(100% - 32px);
+    max-width: 460px;
+    background: linear-gradient(180deg, #14141f, #0d0d14);
+    border-radius: 16px;
+    border: 1px solid var(--game-border);
+    box-shadow: 0 20px 60px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.02);
+    overflow: hidden;
+  }
+
+  .modal-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 16px 10px;
+    border-bottom: 1px solid var(--game-border);
+  }
+  .modal-header .title {
+    font-size: 10px; font-weight: 700;
+    letter-spacing: 0.14em; text-transform: uppercase;
+    color: rgba(167,139,250,0.65);
+  }
+  .modal-header .close {
+    width: 24px; height: 24px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 6px;
+    color: rgba(255,255,255,0.4);
+    cursor: pointer;
+  }
+  .modal-header .close:hover { color: #fff; background: rgba(255,255,255,0.06); }
+
+  /* ── Preview area ─────────────────────────────────────────────────── */
+  .preview-area {
+    position: relative;
+    padding: 32px 20px 24px;
+    text-align: center;
+    background: radial-gradient(circle at 50% 40%, rgba(245,158,11,0.12), transparent 60%);
+    border-bottom: 1px solid var(--game-border);
+  }
+  .preview-area .sparkles {
+    position: absolute; inset: 0;
+    pointer-events: none;
+    overflow: hidden;
+  }
+  .preview-area .sparkles::before,
+  .preview-area .sparkles::after {
+    content: ''; position: absolute;
+    border-radius: 50%;
+    background: radial-gradient(circle, #fde68a, transparent 70%);
+    opacity: 0.5;
+  }
+  .preview-area .sparkles::before {
+    width: 4px; height: 4px;
+    top: 20%; left: 18%;
+    animation: twinkle 2.4s ease-in-out infinite;
+  }
+  .preview-area .sparkles::after {
+    width: 3px; height: 3px;
+    top: 35%; right: 22%;
+    animation: twinkle 3.2s ease-in-out 0.6s infinite;
+  }
+  @keyframes twinkle {
+    0%,100% { opacity: 0.2; transform: scale(0.8); }
+    50%     { opacity: 0.9; transform: scale(1.2); }
+  }
+
+  .big-preview {
+    display: flex; align-items: center; justify-content: center;
+    min-height: 120px;
+    position: relative;
+    z-index: 2;
+  }
+  .big-emblem {
+    filter: drop-shadow(0 0 20px rgba(245,158,11,0.35));
+  }
+
+  .rarity-pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    margin: 14px auto 0;
+    padding: 3px 10px;
+    border-radius: 999px;
+    background: rgba(245,158,11,0.14);
+    border: 1px solid rgba(245,158,11,0.35);
+    font-size: 9px; font-weight: 800;
+    letter-spacing: 0.16em; text-transform: uppercase;
+    color: #fde68a;
+  }
+  .rarity-pill .dot { width: 5px; height: 5px; border-radius: 50%; background: var(--legendary); }
+
+  .item-main-name {
+    margin-top: 8px;
+    font-size: 22px; font-weight: 800;
+    color: #fff;
+    letter-spacing: -0.01em;
+  }
+  .item-kind {
+    margin-top: 4px;
+    font-size: 11px; font-weight: 600;
+    color: rgba(255,255,255,0.4);
+  }
+
+  /* ── Description + meta ───────────────────────────────────────────── */
+  .body-section {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--game-border);
+  }
+  .desc {
+    font-size: 12px;
+    color: rgba(255,255,255,0.6);
+    line-height: 1.55;
+  }
+  .meta-row {
+    display: flex; gap: 16px;
+    margin-top: 12px;
+  }
+  .meta-item {
+    flex: 1;
+    padding: 10px 12px;
+    background: rgba(255,255,255,0.02);
+    border: 1px solid var(--game-border);
+    border-radius: 10px;
+  }
+  .meta-item .k {
+    font-size: 8px; font-weight: 700;
+    letter-spacing: 0.14em; text-transform: uppercase;
+    color: rgba(255,255,255,0.35);
+    margin-bottom: 4px;
+  }
+  .meta-item .v {
+    font-size: 12px; font-weight: 700;
+    color: #fff;
+  }
+
+  /* ── Price summary ────────────────────────────────────────────────── */
+  .price-summary {
+    padding: 14px 20px 16px;
+    background: rgba(234,179,8,0.03);
+  }
+  .price-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 6px 0;
+    font-size: 12px;
+    color: rgba(255,255,255,0.55);
+  }
+  .price-row.total {
+    margin-top: 6px;
+    padding-top: 10px;
+    border-top: 1px solid var(--game-border);
+    font-size: 14px;
+    color: #fff;
+    font-weight: 700;
+  }
+  .price-row .amount {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-variant-numeric: tabular-nums;
+  }
+  .price-row .amount .d {
+    color: rgba(234,179,8,0.8);
+    font-weight: 700;
+  }
+  .price-row.total .amount {
+    color: #fde68a;
+    font-size: 16px;
+    font-weight: 800;
+  }
+  .price-row.total .amount .d {
+    color: #fbbf24;
+    font-size: 14px;
+  }
+  .price-row.after .amount { color: rgba(103,232,249,0.85); }
+
+  /* ── Actions ──────────────────────────────────────────────────────── */
+  .actions {
+    display: flex; gap: 10px;
+    padding: 14px 20px 18px;
+  }
+  .btn {
+    flex: 1;
+    padding: 12px 16px;
+    border-radius: 10px;
+    font-size: 12px; font-weight: 700;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    border: 1px solid transparent;
+  }
+  .btn.secondary {
+    flex: 0 0 120px;
+    background: rgba(255,255,255,0.04);
+    border-color: rgba(255,255,255,0.1);
+    color: rgba(255,255,255,0.6);
+  }
+  .btn.secondary:hover {
+    background: rgba(255,255,255,0.08);
+    color: #fff;
+  }
+  .btn.primary {
+    background: linear-gradient(180deg, rgba(234,179,8,0.25), rgba(234,179,8,0.12));
+    border-color: rgba(234,179,8,0.5);
+    color: #fde68a;
+    box-shadow: 0 0 18px rgba(234,179,8,0.2);
+  }
+  .btn.primary:hover {
+    background: linear-gradient(180deg, rgba(234,179,8,0.35), rgba(234,179,8,0.18));
+    border-color: rgba(234,179,8,0.7);
+  }
+
+  /* ── Success state ────────────────────────────────────────────────── */
+  .success-stage .modal {
+    border-color: rgba(34,197,94,0.3);
+    box-shadow: 0 20px 60px rgba(0,0,0,0.6), 0 0 40px rgba(34,197,94,0.12);
+  }
+  .success-badge {
+    display: flex; flex-direction: column; align-items: center;
+    padding: 36px 20px 22px;
+    background: radial-gradient(circle at 50% 40%, rgba(34,197,94,0.15), transparent 60%);
+    border-bottom: 1px solid var(--game-border);
+    position: relative;
+  }
+  .success-icon {
+    width: 60px; height: 60px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 50%;
+    background: linear-gradient(180deg, rgba(34,197,94,0.3), rgba(34,197,94,0.1));
+    border: 2px solid rgba(34,197,94,0.55);
+    color: #4ade80;
+    box-shadow: 0 0 30px rgba(34,197,94,0.25);
+    margin-bottom: 16px;
+  }
+  .success-title {
+    font-size: 18px; font-weight: 800;
+    color: #fff;
+    margin-bottom: 4px;
+  }
+  .success-sub {
+    font-size: 12px;
+    color: rgba(255,255,255,0.5);
+    text-align: center;
+  }
+  .success-sub b { color: #4ade80; font-weight: 700; }
+
+  .acquired-card {
+    margin: 16px 20px;
+    display: flex; gap: 14px;
+    padding: 14px;
+    background: linear-gradient(180deg, rgba(245,158,11,0.08), rgba(19,19,31,0.6));
+    border: 1px solid rgba(245,158,11,0.25);
+    border-radius: 12px;
+  }
+  .acquired-card .ac-preview {
+    width: 64px; height: 72px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .acquired-card .ac-info { flex: 1; }
+  .acquired-card .ac-name { font-size: 14px; font-weight: 800; color: #fff; }
+  .acquired-card .ac-kind { font-size: 10px; color: rgba(255,255,255,0.45); margin-top: 2px; }
+  .acquired-card .ac-tags { display: flex; gap: 6px; margin-top: 8px; }
+  .acquired-card .tag {
+    font-size: 8px; font-weight: 700;
+    letter-spacing: 0.1em; text-transform: uppercase;
+    padding: 3px 8px;
+    border-radius: 999px;
+    background: rgba(245,158,11,0.14);
+    border: 1px solid rgba(245,158,11,0.3);
+    color: #fde68a;
+  }
+  .acquired-card .tag.source {
+    background: rgba(234,179,8,0.1);
+    color: rgba(234,179,8,0.85);
+    border-color: rgba(234,179,8,0.2);
+  }
+
+  .balance-update {
+    margin: 8px 20px 16px;
+    padding: 12px 14px;
+    background: rgba(10,10,15,0.4);
+    border: 1px solid var(--game-border);
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .balance-update .k {
+    font-size: 9px; font-weight: 700;
+    letter-spacing: 0.14em; text-transform: uppercase;
+    color: rgba(255,255,255,0.4);
+  }
+  .balance-update .v {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 14px; font-weight: 800;
+    color: #fde68a;
+    font-variant-numeric: tabular-nums;
+  }
+  .balance-update .v .old {
+    color: rgba(255,255,255,0.3);
+    font-size: 12px;
+    text-decoration: line-through;
+    font-weight: 500;
+  }
+  .balance-update .v .arrow {
+    color: rgba(255,255,255,0.3);
+    font-size: 11px;
+  }
+  .balance-update .v .d {
+    font-size: 13px;
+    color: rgba(234,179,8,0.85);
+  }
+
+  .success-actions {
+    display: flex; gap: 10px;
+    padding: 10px 20px 18px;
+  }
+  .btn.success-primary {
+    background: linear-gradient(180deg, rgba(139,92,246,0.25), rgba(139,92,246,0.12));
+    border-color: rgba(139,92,246,0.5);
+    color: #c4b5fd;
+  }
+  .btn.success-primary:hover {
+    background: linear-gradient(180deg, rgba(139,92,246,0.35), rgba(139,92,246,0.18));
+    border-color: rgba(139,92,246,0.7);
+  }
+
+  /* ── Notes ────────────────────────────────────────────────────────── */
+  .note {
+    max-width: 1080px; margin: 40px auto 8px;
+    color: rgba(196,181,253,0.7);
+    font-size: 12px;
+    padding: 0 14px;
+  }
+  .note a { color: #c4b5fd; }
+</style>
+</head>
+<body>
+
+<div class="preview-label">
+  <b>Preview 2 / 2 — Flux d'achat.</b>
+  Deux états : à gauche la <b>modale de détail</b> qui s'ouvre au clic sur un item, à droite l'<b>état de confirmation</b> après achat réussi. La modale réutilise la structure des <i>AchievementUnlockOverlay</i> / <i>DailyChallengeModal</i> : backdrop flou, carte centrée, header compact. Le flux d'achat passe par la RPC <code>purchase_item</code> (solde débité, entrée ajoutée à l'inventaire, entrée dans <code>wallet_transactions</code>). En cas de succès on peut directement <b>équiper</b> l'objet depuis cette modale.
+</div>
+
+<div class="stage-wrap">
+
+  <!-- ========== STAGE 1 — Detail / confirmation ========== -->
+  <div>
+    <div class="stage-label">État 1 — Modale détail (avant achat)</div>
+    <div class="stage">
+      <div class="bg-page"></div>
+      <div class="backdrop"></div>
+
+      <div class="modal">
+
+        <div class="modal-header">
+          <span class="title">✦ Objet boutique</span>
+          <div class="close">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </div>
+        </div>
+
+        <div class="preview-area">
+          <div class="sparkles"></div>
+          <div class="big-preview">
+            <svg class="big-emblem" width="92" height="110" viewBox="-32 -37 64 74">
+              <path d="M -24,-33 L 24,-33 L 24,4 C 24,16 9,30 0,36 C -9,30 -24,16 -24,4 Z"
+                    fill="rgba(14,10,28,0.95)" stroke="#fbbf24" stroke-width="1.5"/>
+              <path d="M 0,-18 C -7,-9 -11,1 -8,9 C -5,16 5,16 8,9 C 11,1 7,-9 0,-18 Z" fill="#fbbf24" fill-opacity="0.85"/>
+              <path d="M 0,-8 C -3,-3 -4,3 -2,7 C 0,9 3,8 3,3 C 3,-1 1,-5 0,-8 Z" fill="#fde68a"/>
+            </svg>
+          </div>
+          <div class="rarity-pill"><span class="dot"></span>Légendaire</div>
+          <div class="item-main-name">Flamme d'or</div>
+          <div class="item-kind">Blason · Édition limitée</div>
+        </div>
+
+        <div class="body-section">
+          <p class="desc">Un blason forgé dans la lumière d'une flamme éternelle. Équipe-le sur ton profil pour marquer ton rang aux yeux de tous.</p>
+          <div class="meta-row">
+            <div class="meta-item">
+              <div class="k">Catégorie</div>
+              <div class="v">Blason</div>
+            </div>
+            <div class="meta-item">
+              <div class="k">Disponibilité</div>
+              <div class="v">Cette semaine</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="price-summary">
+          <div class="price-row">
+            <span>Prix</span>
+            <span class="amount"><span class="d">◈</span>2 400</span>
+          </div>
+          <div class="price-row after">
+            <span>Ton solde après achat</span>
+            <span class="amount"><span class="d">◈</span>1 020</span>
+          </div>
+          <div class="price-row total">
+            <span>Total à payer</span>
+            <span class="amount"><span class="d">◈</span>2 400</span>
+          </div>
+        </div>
+
+        <div class="actions">
+          <div class="btn secondary">Annuler</div>
+          <div class="btn primary">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+            Confirmer l'achat
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== STAGE 2 — Success ========== -->
+  <div class="success-stage">
+    <div class="stage-label">État 2 — Achat réussi</div>
+    <div class="stage">
+      <div class="bg-page"></div>
+      <div class="backdrop"></div>
+
+      <div class="modal">
+
+        <div class="modal-header">
+          <span class="title" style="color: rgba(34,197,94,0.75);">✓ Achat réussi</span>
+          <div class="close">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </div>
+        </div>
+
+        <div class="success-badge">
+          <div class="success-icon">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="20 6 9 17 4 12"/>
+            </svg>
+          </div>
+          <div class="success-title">C'est à toi !</div>
+          <div class="success-sub">
+            <b>Flamme d'or</b> rejoint ton inventaire.
+          </div>
+        </div>
+
+        <div class="acquired-card">
+          <div class="ac-preview">
+            <svg width="56" height="66" viewBox="-32 -37 64 74">
+              <path d="M -24,-33 L 24,-33 L 24,4 C 24,16 9,30 0,36 C -9,30 -24,16 -24,4 Z"
+                    fill="rgba(14,10,28,0.95)" stroke="#fbbf24" stroke-width="1.5"/>
+              <path d="M 0,-18 C -7,-9 -11,1 -8,9 C -5,16 5,16 8,9 C 11,1 7,-9 0,-18 Z" fill="#fbbf24" fill-opacity="0.85"/>
+              <path d="M 0,-8 C -3,-3 -4,3 -2,7 C 0,9 3,8 3,3 C 3,-1 1,-5 0,-8 Z" fill="#fde68a"/>
+            </svg>
+          </div>
+          <div class="ac-info">
+            <div class="ac-name">Flamme d'or</div>
+            <div class="ac-kind">Blason · Légendaire</div>
+            <div class="ac-tags">
+              <span class="tag">✦ Limité</span>
+              <span class="tag source">Boutique</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="balance-update">
+          <span class="k">Nouveau solde</span>
+          <span class="v">
+            <span class="old">◈&nbsp;3 420</span>
+            <span class="arrow">→</span>
+            <span class="d">◈</span>1 020
+          </span>
+        </div>
+
+        <div class="success-actions">
+          <div class="btn secondary" style="flex: 0 0 130px;">Voir inventaire</div>
+          <div class="btn success-primary">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            Équiper maintenant
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="note">
+  <b>Retour à la boutique</b> — <a href="./shop.html">shop.html</a>
+  &nbsp;·&nbsp;
+  <b>Inventaire existant</b> — <a href="../inventaire/inventaire.html">inventaire.html</a>
+</div>
+
+</body>
+</html>
