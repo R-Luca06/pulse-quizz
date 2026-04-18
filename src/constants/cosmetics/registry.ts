@@ -80,16 +80,17 @@ export function listCosmetics(type: CosmeticType): CosmeticMeta[] {
 }
 
 export interface BadgeMeta {
-  id:   string
-  name: string
-  icon: string
-  tier: AchievementTier
+  id:          string
+  name:        string
+  icon:        string
+  tier:        AchievementTier
+  description: string
 }
 
 export function getBadgeMeta(id: string): BadgeMeta | null {
   const ach = ACHIEVEMENT_MAP[id as keyof typeof ACHIEVEMENT_MAP]
-  if (ach) return { id: ach.id, name: ach.name, icon: ach.icon, tier: ach.tier }
+  if (ach) return { id: ach.id, name: ach.name, icon: ach.icon, tier: ach.tier, description: ach.description }
   const shop = SHOP_BADGE_REGISTRY[id]
-  if (shop) return { id: shop.id, name: shop.name, icon: shop.icon, tier: shop.tier }
+  if (shop) return { id: shop.id, name: shop.name, icon: shop.icon, tier: shop.tier, description: shop.description }
   return null
 }
