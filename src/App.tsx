@@ -30,10 +30,18 @@ const DailyChallengeModal = lazy(() => import('./components/daily/DailyChallenge
 const CollectionPage = lazy(() => import('./components/collection/CollectionPage'))
 const DailyRecapOverlay = lazy(() => import('./components/daily/DailyRecapOverlay'))
 
-export type AppScreen = 'landing' | 'launching' | 'quiz' | 'ranking' | 'result' | 'stats' | 'profile' | 'achievements' | 'social' | 'daily' | 'collection'
+export type AppScreen = 'landing' | 'quiz' | 'ranking' | 'result' | 'stats' | 'profile' | 'achievements' | 'social' | 'daily' | 'collection'
 
 // Écrans pendant lesquels l'overlay d'achievement doit être mis en attente
-const GAME_SCREENS: AppScreen[] = ['quiz', 'launching', 'ranking']
+const GAME_SCREENS: AppScreen[] = ['quiz', 'ranking']
+
+// Prefetch des chunks de partie dès que le main thread est idle — évite le freeze
+// au premier lancement de quiz sur mobile (parse + compile du chunk).
+function prefetchGameChunks() {
+  void import('./components/quiz/QuizContainer')
+  void import('./components/result/ResultScreen')
+  void import('./components/ranking/RankingRevealScreen')
+}
 
 export default function App() {
   const { settings, update, updateTemp, reset } = useSettings()
@@ -68,11 +76,18 @@ export default function App() {
     pendingRewardsRef.current = { ...p, creditOnShow: false }
   }
 
-  // Analytics — screen views (on exclut 'launching' qui est un état transitoire)
+  // Analytics — screen views
   useEffect(() => {
     const trackable: AppScreen[] = ['landing', 'result', 'ranking', 'stats', 'profile', 'achievements', 'social', 'daily']
     if (trackable.includes(screen)) trackScreenViewed(screen)
   }, [screen])
+
+  // Prefetch game chunks on idle — 1ʳᵉ partie sans lag de parse
+  useEffect(() => {
+    const ric = (window as Window & { requestIdleCallback?: (cb: () => void) => number }).requestIdleCallback
+    if (ric) ric(prefetchGameChunks)
+    else setTimeout(prefetchGameChunks, 1500)
+  }, [])
   const overlayOriginRef = useRef<AppScreen>('result')
 
   function handleNewAchievements(unlocked: AchievementWithStatus[], fromGame = false) {
@@ -251,12 +266,10 @@ export default function App() {
     setShowDailyModal(false)
     // updateTemp : n'écrase PAS localStorage, pour préserver les préférences normales
     updateTemp({ mode: 'daily', difficulty: 'mixed', category: 'all' })
-    setScreen('launching')
+    setScreen('quiz')
   }
 
-  function handleStart() { setScreen('launching') }
-
-  function handleExplosion() { setScreen('quiz') }
+  function handleStart() { setScreen('quiz') }
 
   function handleQuit() {
     if (screenRef.current === 'quiz' && settings.mode !== 'daily') {
@@ -304,7 +317,7 @@ export default function App() {
       <div className="min-h-screen bg-game-bg font-game">
         <Suspense fallback={<div className="absolute inset-0 bg-game-bg" />}>
         <AnimatePresence mode="sync">
-          {(screen === 'landing' || screen === 'launching') && (
+          {screen === 'landing' && (
             <motion.div
               key="landing"
               exit={{ opacity: 0, transition: { duration: 0.35 } }}
@@ -314,8 +327,6 @@ export default function App() {
                 settings={settings}
                 onSettingsChange={update}
                 onStart={handleStart}
-                onExplosion={handleExplosion}
-                screen={screen}
                 autoOpenSettings={returnToSettings}
                 onShowStats={(tab) => handleShowStats('landing', tab)}
                 onOpenSignIn={openSignIn}
@@ -545,7 +556,7 @@ export default function App() {
       </Suspense>
 
       <AnimatePresence>
-        {newAchievements.length > 0 && !dailyRecap && screen !== 'quiz' && screen !== 'launching' && screen !== 'ranking' && (
+        {newAchievements.length > 0 && !dailyRecap && screen !== 'quiz' && screen !== 'ranking' && (
           <AchievementUnlockOverlay
             key="achievement-overlay"
             achievements={newAchievements}

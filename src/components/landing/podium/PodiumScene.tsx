@@ -10,7 +10,6 @@ import { CATEGORY_LABELS, DIFFICULTY_LABELS } from '../../../constants/quiz'
 import type { GameSettings } from '../../../hooks/useSettings'
 
 interface Props {
-  isLaunching: boolean
   onShowStats: (tab?: 'stats' | 'leaderboard' | 'daily') => void
   settings: GameSettings
   onPlay: () => void
@@ -91,7 +90,7 @@ function MobileDock({ settings, onPlay, onOpenSettings }: MobileDockProps) {
 
 // ── Main ───────────────────────────────────────────────────────────────────────
 
-export default function PodiumScene({ isLaunching, onShowStats, settings, onPlay, onOpenSettings }: Props) {
+export default function PodiumScene({ onShowStats, settings, onPlay, onOpenSettings }: Props) {
   const reduced = useReducedMotion()
   const { user, profile } = useAuth()
   const [rank, setRank] = useState<number | null>(null)
@@ -144,14 +143,9 @@ export default function PodiumScene({ isLaunching, onShowStats, settings, onPlay
         <div className="flex flex-col">
 
           {/* Zone avatar — portion haute, sous le header + subheader (pt-[5.5rem]) */}
-          <motion.div
+          <div
             className="flex shrink-0 items-center justify-center pt-[5.5rem]"
             style={{ height: 'calc(40vh + 88px)' }}
-            animate={
-              isLaunching
-                ? { opacity: 0, scale: 0.85, transition: { duration: 0.25 } }
-                : { opacity: 1, scale: 1 }
-            }
           >
             <motion.div
               className="relative flex flex-col items-center gap-3"
@@ -179,7 +173,7 @@ export default function PodiumScene({ isLaunching, onShowStats, settings, onPlay
                 )}
               </div>
             </motion.div>
-          </motion.div>
+          </div>
 
           {/* Dock mobile */}
           <div className="shrink-0 py-3">
@@ -229,14 +223,7 @@ export default function PodiumScene({ isLaunching, onShowStats, settings, onPlay
         </div>
 
         {/* Hero : avatar flottant + identité */}
-        <motion.div
-          className="absolute inset-0 z-10 flex flex-col items-center justify-center"
-          animate={
-            isLaunching
-              ? { opacity: 0, scale: 0.85, transition: { duration: 0.25 } }
-              : { opacity: 1, scale: 1 }
-          }
-        >
+        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center">
           <motion.div
             className="relative flex flex-col items-center gap-4"
             style={{ willChange: 'transform' }}
@@ -268,7 +255,7 @@ export default function PodiumScene({ isLaunching, onShowStats, settings, onPlay
               )}
             </div>
           </motion.div>
-        </motion.div>
+        </div>
       </div>
 
     </div>

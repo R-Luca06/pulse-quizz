@@ -42,8 +42,6 @@ function renderLanding() {
       settings={makeSettings()}
       onSettingsChange={vi.fn()}
       onStart={vi.fn()}
-      onExplosion={vi.fn()}
-      screen="landing"
       onShowStats={vi.fn()}
       onOpenSignIn={vi.fn()}
       onOpenSignUp={vi.fn()}
@@ -118,8 +116,6 @@ describe('LandingPage — bascule vitrine ↔ connectée (Story 6.5)', () => {
         settings={makeSettings()}
         onSettingsChange={vi.fn()}
         onStart={vi.fn()}
-        onExplosion={vi.fn()}
-        screen="landing"
         onShowStats={vi.fn()}
         onOpenSignIn={vi.fn()}
         onOpenSignUp={vi.fn()}

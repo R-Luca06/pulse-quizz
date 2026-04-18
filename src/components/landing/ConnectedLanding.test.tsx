@@ -34,7 +34,6 @@ const noop = () => {}
 
 function renderConnected(overrides: Partial<React.ComponentProps<typeof ConnectedLanding>> = {}) {
   const props: React.ComponentProps<typeof ConnectedLanding> = {
-    isLaunching: false,
     onShowStats: noop,
     onShowProfile: noop,
     onShowAchievements: noop,

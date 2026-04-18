@@ -1,24 +1,21 @@
-import { useEffect, useState, lazy, Suspense } from 'react'
-import { motion, useAnimationControls, AnimatePresence } from 'framer-motion'
+import { useState, lazy, Suspense } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import GameDock from './GameDock'
 
 const SettingsModal = lazy(() => import('./SettingsModal'))
 const RulesModal = lazy(() => import('./RulesModal'))
 const ConnectedLanding = lazy(() => import('./ConnectedLanding'))
 const GuestLanding = lazy(() => import('./GuestLanding'))
-import { useAuth } from '../../hooks/useAuth'
-import { useToast } from '../../contexts/ToastContext'
-import type { AppScreen } from '../../App'
-import type { GameSettings } from '../../hooks/useSettings'
 
 export type LaunchPhase = 'idle' | 'converging' | 'shaking' | 'exploding'
+import { useAuth } from '../../hooks/useAuth'
+import { useToast } from '../../contexts/ToastContext'
+import type { GameSettings } from '../../hooks/useSettings'
 
 interface Props {
   settings: GameSettings
   onSettingsChange: (patch: Partial<GameSettings>) => void
   onStart: () => void
-  onExplosion: () => void
-  screen: AppScreen
   autoOpenSettings?: boolean
   onShowStats: (tab?: 'stats' | 'leaderboard' | 'daily') => void
   onOpenSignIn: () => void
@@ -35,8 +32,6 @@ export default function LandingPage({
   settings,
   onSettingsChange,
   onStart,
-  onExplosion,
-  screen,
   autoOpenSettings,
   onShowStats,
   onOpenSignIn,
@@ -83,11 +78,9 @@ export default function LandingPage({
           transition={{ duration: 0.2 }}
         >
           <ConnectedBranch
-            screen={screen}
             settings={settings}
             onSettingsChange={onSettingsChange}
             onStart={onStart}
-            onExplosion={onExplosion}
             openSettings={openSettings}
             setOpenSettings={setOpenSettings}
             showRules={showRules}
@@ -115,7 +108,7 @@ export default function LandingPage({
           <GuestBranch
             settings={settings}
             onSettingsChange={onSettingsChange}
-            onExplosion={onExplosion}
+            onStart={onStart}
             openSettings={openSettings}
             setOpenSettings={setOpenSettings}
             showRules={showRules}
@@ -134,7 +127,7 @@ export default function LandingPage({
 interface GuestBranchProps {
   settings: GameSettings
   onSettingsChange: (patch: Partial<GameSettings>) => void
-  onExplosion: () => void
+  onStart: () => void
   openSettings: boolean
   setOpenSettings: (v: boolean) => void
   showRules: boolean
@@ -146,7 +139,7 @@ interface GuestBranchProps {
 function GuestBranch({
   settings,
   onSettingsChange,
-  onExplosion,
+  onStart,
   openSettings,
   setOpenSettings,
   showRules,
@@ -156,7 +149,7 @@ function GuestBranch({
 }: GuestBranchProps) {
   function handleLaunch() {
     setOpenSettings(false)
-    onExplosion()
+    onStart()
   }
 
   function handleRequireAuth() {
@@ -200,14 +193,12 @@ function GuestBranch({
   )
 }
 
-// ─── Connected branch : layout original avec ArenaBackground + shake ──────────
+// ─── Connected branch : layout avec ConstellationBackground ──────────────────
 
 interface ConnectedBranchProps {
-  screen: AppScreen
   settings: GameSettings
   onSettingsChange: (patch: Partial<GameSettings>) => void
   onStart: () => void
-  onExplosion: () => void
   openSettings: boolean
   setOpenSettings: (v: boolean) => void
   showRules: boolean
@@ -224,11 +215,9 @@ interface ConnectedBranchProps {
 }
 
 function ConnectedBranch({
-  screen,
   settings,
   onSettingsChange,
   onStart,
-  onExplosion,
   openSettings,
   setOpenSettings,
   showRules,
@@ -243,28 +232,6 @@ function ConnectedBranch({
   onShowDaily,
   onShowCollection,
 }: ConnectedBranchProps) {
-  const isLaunching = screen === 'launching'
-  const [launchPhase, setLaunchPhase] = useState<LaunchPhase>('idle')
-  const shakeControls = useAnimationControls()
-
-  useEffect(() => {
-    if (!isLaunching) {
-      queueMicrotask(() => setLaunchPhase('idle'))
-      return
-    }
-    queueMicrotask(() => setLaunchPhase('converging'))
-    const t = setTimeout(async () => {
-      setLaunchPhase('shaking')
-      await shakeControls.start({
-        x: [0, -18, 18, -14, 14, -9, 9, -5, 5, 0],
-        transition: { duration: 0.32, ease: 'linear' },
-      })
-      setLaunchPhase('exploding')
-      onExplosion()
-    }, 380)
-    return () => clearTimeout(t)
-  }, [isLaunching, shakeControls, onExplosion])
-
   function handleLaunch() {
     setOpenSettings(false)
     onStart()
@@ -272,25 +239,14 @@ function ConnectedBranch({
 
   return (
     <div className="relative flex min-h-screen w-full flex-col items-center justify-center overflow-hidden bg-game-bg">
-      {launchPhase === 'exploding' && (
-        <motion.div
-          className="pointer-events-none absolute inset-0 z-20 bg-white"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: [0, 0.3, 0] }}
-          transition={{ duration: 0.45 }}
-        />
-      )}
-
       <Suspense fallback={null}>
         <ConnectedLanding
-          isLaunching={isLaunching}
           onShowStats={onShowStats}
           onShowProfile={onShowProfile}
           onShowAchievements={onShowAchievements}
           onSignOut={onSignOut}
           username={username}
           onViewProfile={onViewProfile}
-          shakeControls={shakeControls}
           settings={settings}
           onPlay={handleLaunch}
           onOpenSettings={() => setOpenSettings(true)}
@@ -301,11 +257,9 @@ function ConnectedBranch({
       </Suspense>
 
       {/* GameDock : desktop uniquement (lg+) — le mobile a son dock dans PodiumScene */}
-      {!isLaunching && (
-        <div className="hidden lg:block">
-          <GameDock settings={settings} onPlay={handleLaunch} onOpenSettings={() => setOpenSettings(true)} />
-        </div>
-      )}
+      <div className="hidden lg:block">
+        <GameDock settings={settings} onPlay={handleLaunch} onOpenSettings={() => setOpenSettings(true)} />
+      </div>
 
       <AnimatePresence>
         {openSettings && (
