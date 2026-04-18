@@ -1,0 +1,780 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pulse Quizz — Roadmap 2026</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+
+  :root {
+    --bg:        #0d0d18;
+    --card:      #13131f;
+    --border:    rgba(255,255,255,0.07);
+    --violet:    #a78bfa;
+    --violet-dim: rgba(167,139,250,0.15);
+    --violet-border: rgba(167,139,250,0.25);
+    --text:      rgba(255,255,255,0.88);
+    --text-dim:  rgba(255,255,255,0.40);
+    --text-muted:rgba(255,255,255,0.22);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Inter', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 48px 24px 80px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── Header ── */
+  .header {
+    text-align: center;
+    margin-bottom: 64px;
+  }
+  .header-eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .18em;
+    text-transform: uppercase;
+    color: var(--violet);
+    margin-bottom: 18px;
+  }
+  .header-eyebrow::before,
+  .header-eyebrow::after {
+    content: '';
+    display: block;
+    width: 32px;
+    height: 1px;
+    background: var(--violet);
+    opacity: .4;
+  }
+  .header h1 {
+    font-size: clamp(32px, 5vw, 56px);
+    font-weight: 900;
+    letter-spacing: -.02em;
+    line-height: 1.1;
+  }
+  .header h1 span { color: var(--violet); }
+  .header-sub {
+    margin-top: 12px;
+    font-size: 15px;
+    color: var(--text-dim);
+    font-weight: 500;
+  }
+
+  /* ── Layout ── */
+  .content { max-width: 900px; margin: 0 auto; }
+
+  /* ── Phase ── */
+  .phase { margin-bottom: 56px; }
+
+  .phase-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+  .phase-num {
+    flex-shrink: 0;
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    background: var(--violet-dim);
+    border: 1px solid var(--violet-border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 900;
+    color: var(--violet);
+    margin-top: 2px;
+  }
+  .phase-meta { flex: 1; }
+  .phase-title {
+    font-size: 20px;
+    font-weight: 800;
+    letter-spacing: -.01em;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .phase-priority {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: auto;
+  }
+  .priority-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+  }
+  .priority-dot.filled  { background: var(--violet); }
+  .priority-dot.empty   { background: rgba(255,255,255,0.12); }
+  .phase-tagline {
+    margin-top: 4px;
+    font-size: 13px;
+    color: var(--text-dim);
+    font-style: italic;
+    font-weight: 500;
+  }
+
+  /* ── Feature cards ── */
+  .features { display: flex; flex-direction: column; gap: 16px; }
+
+  .feature-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 20px 22px;
+    transition: border-color .2s;
+  }
+  .feature-card:hover { border-color: rgba(167,139,250,.2); }
+
+  .feature-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+    gap: 12px;
+  }
+  .feature-name {
+    font-size: 13px;
+    font-weight: 800;
+    letter-spacing: .10em;
+    text-transform: uppercase;
+    color: var(--violet);
+  }
+  .complexity {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+  .complexity-label {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+  .complexity-dots { display: flex; gap: 4px; }
+  .cdot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+  }
+  .cdot.on  { background: var(--violet); }
+  .cdot.off { background: rgba(255,255,255,0.10); }
+
+  .feature-bullets {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    margin-bottom: 14px;
+  }
+  .feature-bullets li {
+    font-size: 13.5px;
+    color: rgba(255,255,255,0.65);
+    padding-left: 14px;
+    position: relative;
+    line-height: 1.55;
+  }
+  .feature-bullets li::before {
+    content: '·';
+    position: absolute;
+    left: 0;
+    color: var(--violet);
+    font-weight: 700;
+  }
+
+  .feature-why {
+    background: rgba(167,139,250,0.06);
+    border: 1px solid rgba(167,139,250,0.12);
+    border-radius: 10px;
+    padding: 10px 14px;
+    font-size: 12px;
+    color: rgba(167,139,250,0.75);
+    line-height: 1.6;
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+  }
+  .feature-why-flag {
+    flex-shrink: 0;
+    margin-top: 1px;
+    font-size: 13px;
+  }
+
+  /* ── Phase divider ── */
+  .phase-divider {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--border) 20%, var(--border) 80%, transparent);
+    margin-bottom: 56px;
+  }
+
+  /* ── Dependencies ── */
+  .section-title {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .18em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 24px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .section-title::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  .deps-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .dep-row {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    font-size: 13px;
+  }
+  .dep-name {
+    font-weight: 700;
+    color: rgba(255,255,255,0.75);
+    min-width: 220px;
+    flex-shrink: 0;
+  }
+  .dep-line {
+    flex: 1;
+    height: 1px;
+    background: repeating-linear-gradient(90deg, rgba(255,255,255,0.12) 0, rgba(255,255,255,0.12) 4px, transparent 4px, transparent 8px);
+    margin: 0 12px;
+    position: relative;
+  }
+  .dep-arrow {
+    color: var(--text-muted);
+    font-size: 11px;
+    margin-right: 8px;
+  }
+  .dep-requires {
+    font-size: 12px;
+    color: var(--text-dim);
+    font-weight: 500;
+    white-space: nowrap;
+  }
+  .dep-none {
+    font-size: 12px;
+    color: rgba(255,255,255,0.18);
+    font-style: italic;
+  }
+  .dep-check {
+    font-size: 12px;
+    color: rgba(52,211,153,0.75);
+    font-weight: 600;
+  }
+
+  /* ── Summary ── */
+  .summary-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .summary-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 16px 20px;
+  }
+  .summary-phase {
+    flex-shrink: 0;
+    width: 72px;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--violet);
+    padding-top: 1px;
+  }
+  .summary-arrow {
+    color: var(--text-muted);
+    flex-shrink: 0;
+    padding-top: 1px;
+  }
+  .summary-text {
+    font-size: 14px;
+    color: rgba(255,255,255,0.65);
+    line-height: 1.55;
+    font-weight: 500;
+  }
+
+  /* ── Footer ── */
+  .footer {
+    text-align: center;
+    margin-top: 72px;
+    font-size: 12px;
+    color: var(--text-muted);
+    font-weight: 500;
+  }
+  .footer strong { color: var(--violet); font-weight: 700; }
+
+  @media (max-width: 600px) {
+    body { padding: 32px 16px 64px; }
+    .phase-title { font-size: 17px; }
+    .dep-name { min-width: 160px; font-size: 12px; }
+    .dep-requires { font-size: 11px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="content">
+
+  <!-- Header -->
+  <div class="header">
+    <div class="header-eyebrow">Roadmap 2026</div>
+    <h1>Pulse <span>Quizz</span></h1>
+    <p class="header-sub">De l'application quiz à la plateforme communautaire</p>
+  </div>
+
+  <!-- ─── Phase 1 ─── -->
+  <div class="phase">
+    <div class="phase-header">
+      <div class="phase-num">1</div>
+      <div class="phase-meta">
+        <div class="phase-title">
+          Fondations
+          <div class="phase-priority">
+            <div class="priority-dot filled"></div>
+            <div class="priority-dot filled"></div>
+            <div class="priority-dot filled"></div>
+            <div class="priority-dot filled"></div>
+          </div>
+        </div>
+        <div class="phase-tagline">Construire les rails avant de faire rouler le train</div>
+      </div>
+    </div>
+
+    <div class="features">
+      <div class="feature-card">
+        <div class="feature-top">
+          <div class="feature-name">Analytics</div>
+          <div class="complexity">
+            <span class="complexity-label">Complexité</span>
+            <div class="complexity-dots">
+              <div class="cdot on"></div><div class="cdot off"></div><div class="cdot off"></div>
+            </div>
+          </div>
+        </div>
+        <ul class="feature-bullets">
+          <li>Intégration PostHog ou Plausible</li>
+          <li>Tracker les funnels landing → jeu → fin, rétention J1 / J7 / J30</li>
+          <li>Modes joués, drop-off points, parcours utilisateur</li>
+        </ul>
+        <div class="feature-why">
+          <span class="feature-why-flag">⚑</span>
+          <span>On ne peut pas prendre de décisions produit sans données. À poser avant d'avoir de vrais utilisateurs.</span>
+        </div>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-top">
+          <div class="feature-name">Système d'XP</div>
+          <div class="complexity">
+            <span class="complexity-label">Complexité</span>
+            <div class="complexity-dots">
+              <div class="cdot on"></div><div class="cdot on"></div><div class="cdot off"></div>
+            </div>
+          </div>
+        </div>
+        <ul class="feature-bullets">
+          <li>XP gagné à chaque partie selon mode, score et streak</li>
+          <li>Barre de progression + niveau visible sur le profil</li>
+          <li>Tables Supabase : <code style="font-size:11px;color:var(--violet);background:rgba(167,139,250,.1);padding:1px 5px;border-radius:4px">user_xp</code>, <code style="font-size:11px;color:var(--violet);background:rgba(167,139,250,.1);padding:1px 5px;border-radius:4px">user_level</code>, <code style="font-size:11px;color:var(--violet);background:rgba(167,139,250,.1);padding:1px 5px;border-radius:4px">xp_history</code></li>
+          <li>Formule : normal &lt; compétitif &lt; défi quotidien &lt; groupe</li>
+        </ul>
+        <div class="feature-why">
+          <span class="feature-why-flag">⚑</span>
+          <span>C'est la colonne vertébrale de l'économie. Tout le reste — monnaie, boutique, saisons — en dépend.</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="phase-divider"></div>
+
+  <!-- ─── Phase 2 ─── -->
+  <div class="phase">
+    <div class="phase-header">
+      <div class="phase-num">2</div>
+      <div class="phase-meta">
+        <div class="phase-title">
+          Rétention
+          <div class="phase-priority">
+            <div class="priority-dot filled"></div>
+            <div class="priority-dot filled"></div>
+            <div class="priority-dot filled"></div>
+            <div class="priority-dot empty"></div>
+          </div>
+        </div>
+        <div class="phase-tagline">Donner des raisons de revenir chaque jour</div>
+      </div>
+    </div>
+
+    <div class="features">
+      <div class="feature-card">
+        <div class="feature-top">
+          <div class="feature-name">Défi quotidien</div>
+          <div class="complexity">
+            <span class="complexity-label">Complexité</span>
+            <div class="complexity-dots">
+              <div class="cdot on"></div><div class="cdot on"></div><div class="cdot off"></div>
+            </div>
+          </div>
+        </div>
+        <ul class="feature-bullets">
+          <li>7 questions identiques pour tous les joueurs chaque jour</li>
+          <li>Classement quotidien remis à zéro à minuit</li>
+          <li>XP bonus pour participation + XP top 3</li>
+          <li>Badge "Streak quotidien" : 3j, 7j, 30j consécutifs</li>
+        </ul>
+        <div class="feature-why">
+          <span class="feature-why-flag">⚑</span>
+          <span>Mécanisme de rétention n°1. Simple à construire sur <code style="font-size:11px;color:var(--violet)">useQuiz</code> existant, questions sélectionnées à minuit via une Edge Function Supabase.</span>
+        </div>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-top">
+          <div class="feature-name">Partage de score</div>
+          <div class="complexity">
+            <span class="complexity-label">Complexité</span>
+            <div class="complexity-dots">
+              <div class="cdot on"></div><div class="cdot off"></div><div class="cdot off"></div>
+            </div>
+          </div>
+        </div>
+        <ul class="feature-bullets">
+          <li>Carte de score générée en canvas (ou Satori / OG image)</li>
+          <li>Affiche : score, rang, mode, pseudo, logo Pulse Quizz</li>
+          <li>Partage natif mobile (Web Share API) + copie image desktop</li>
+          <li>CTA "Peux-tu faire mieux ?" avec lien vers l'app</li>
+        </ul>
+        <div class="feature-why">
+          <span class="feature-why-flag">⚑</span>
+          <span>Levier viral gratuit. Chaque partage = publicité organique. À faire avant de chercher des utilisateurs.</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="phase-divider"></div>
+
+  <!-- ─── Phase 3 ─── -->
+  <div class="phase">
+    <div class="phase-header">
+      <div class="phase-num">3</div>
+      <div class="phase-meta">
+        <div class="phase-title">
+          Économie
+          <div class="phase-priority">
+            <div class="priority-dot filled"></div>
+            <div class="priority-dot filled"></div>
+            <div class="priority-dot filled"></div>
+            <div class="priority-dot empty"></div>
+          </div>
+        </div>
+        <div class="phase-tagline">Donner de la valeur à la progression</div>
+      </div>
+    </div>
+
+    <div class="features">
+      <div class="feature-card">
+        <div class="feature-top">
+          <div class="feature-name">Monnaie virtuelle</div>
+          <div class="complexity">
+            <span class="complexity-label">Complexité</span>
+            <div class="complexity-dots">
+              <div class="cdot on"></div><div class="cdot on"></div><div class="cdot off"></div>
+            </div>
+          </div>
+        </div>
+        <ul class="feature-bullets">
+          <li>"Pulses" — gagnées via XP, défis quotidiens et achievements</li>
+          <li>Jamais achetables avec de l'argent réel (évite la réglementation des loot boxes)</li>
+          <li>Tables Supabase : <code style="font-size:11px;color:var(--violet);background:rgba(167,139,250,.1);padding:1px 5px;border-radius:4px">user_wallet</code>, <code style="font-size:11px;color:var(--violet);background:rgba(167,139,250,.1);padding:1px 5px;border-radius:4px">wallet_transactions</code></li>
+        </ul>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-top">
+          <div class="feature-name">Boutique</div>
+          <div class="complexity">
+            <span class="complexity-label">Complexité</span>
+            <div class="complexity-dots">
+              <div class="cdot on"></div><div class="cdot on"></div><div class="cdot on"></div>
+            </div>
+          </div>
+        </div>
+        <ul class="feature-bullets">
+          <li>Bannières de profil (rang ou achetées)</li>
+          <li>Titres spéciaux — "Le Savant", "Imbattable", "Vétéran"…</li>
+          <li>Plaques (nom + titre affichés dans le leaderboard)</li>
+          <li>Avatars spéciaux, badges cosmétiques, fonds d'écran profil</li>
+          <li>Thèmes d'application (couleurs globales)</li>
+        </ul>
+        <div class="feature-why">
+          <span class="feature-why-flag">⚑</span>
+          <span>Les items de rang (bannières dorées…) restent liés aux performances — ils se méritent, ne s'achètent pas. Ça préserve leur valeur symbolique.</span>
+        </div>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-top">
+          <div class="feature-name">Saisons</div>
+          <div class="complexity">
+            <span class="complexity-label">Complexité</span>
+            <div class="complexity-dots">
+              <div class="cdot on"></div><div class="cdot on"></div><div class="cdot on"></div>
+            </div>
+          </div>
+        </div>
+        <ul class="feature-bullets">
+          <li>Durée : 1 mois — classement compétitif saisonnier remis à zéro</li>
+          <li>Récompenses exclusives : badge unique + titre limité par saison</li>
+          <li>Pass de saison : objectifs hebdomadaires → Pulses bonus</li>
+        </ul>
+        <div class="feature-why">
+          <span class="feature-why-flag">⚑</span>
+          <span>Crée de l'urgence et de la récurrence. Les rewards "limited edition" sont le moteur psychologique principal.</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="phase-divider"></div>
+
+  <!-- ─── Phase 4 ─── -->
+  <div class="phase">
+    <div class="phase-header">
+      <div class="phase-num">4</div>
+      <div class="phase-meta">
+        <div class="phase-title">
+          Social
+          <div class="phase-priority">
+            <div class="priority-dot filled"></div>
+            <div class="priority-dot filled"></div>
+            <div class="priority-dot empty"></div>
+            <div class="priority-dot empty"></div>
+          </div>
+        </div>
+        <div class="phase-tagline">Transformer les joueurs en communauté</div>
+      </div>
+    </div>
+
+    <div class="features">
+      <div class="feature-card">
+        <div class="feature-top">
+          <div class="feature-name">Système de groupe</div>
+          <div class="complexity">
+            <span class="complexity-label">Complexité</span>
+            <div class="complexity-dots">
+              <div class="cdot on"></div><div class="cdot on"></div><div class="cdot on"></div>
+            </div>
+          </div>
+        </div>
+        <ul class="feature-bullets">
+          <li>Créer un lobby → partager un code à ses amis</li>
+          <li>Paramètres : nombre de questions (5 / 10 / 20), catégorie, difficulté, timer</li>
+          <li>Tout le monde joue en même temps via Supabase Realtime</li>
+          <li>Classement du groupe en fin de partie avec animations</li>
+          <li>XP et Pulses bonus pour avoir défié des amis</li>
+        </ul>
+        <div class="feature-why">
+          <span class="feature-why-flag">⚑</span>
+          <span>Techniquement le plus complexe (Realtime, states distribués, lobby expiration). À faire une fois les autres systèmes stables.</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="phase-divider"></div>
+
+  <!-- ─── Phase 5 ─── -->
+  <div class="phase">
+    <div class="phase-header">
+      <div class="phase-num">5</div>
+      <div class="phase-meta">
+        <div class="phase-title">
+          Contenu &amp; Maturité
+          <div class="phase-priority">
+            <div class="priority-dot filled"></div>
+            <div class="priority-dot filled"></div>
+            <div class="priority-dot empty"></div>
+            <div class="priority-dot empty"></div>
+          </div>
+        </div>
+        <div class="phase-tagline">Scaler le contenu et préparer la croissance</div>
+      </div>
+    </div>
+
+    <div class="features">
+      <div class="feature-card">
+        <div class="feature-top">
+          <div class="feature-name">Modération &amp; soumission</div>
+          <div class="complexity">
+            <span class="complexity-label">Complexité</span>
+            <div class="complexity-dots">
+              <div class="cdot on"></div><div class="cdot on"></div><div class="cdot off"></div>
+            </div>
+          </div>
+        </div>
+        <ul class="feature-bullets">
+          <li>Page "Proposer une question" pour les utilisateurs connectés</li>
+          <li>Queue de modération dans un panel admin (route protégée)</li>
+          <li>Validation → insertion directe dans la table questions</li>
+          <li>L'auteur gagne des Pulses si sa question est acceptée</li>
+        </ul>
+        <div class="feature-why">
+          <span class="feature-why-flag">⚑</span>
+          <span>À faire quand il y a assez d'utilisateurs pour que ça vaille le coup d'animer cette communauté.</span>
+        </div>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-top">
+          <div class="feature-name">Tutoriel interactif</div>
+          <div class="complexity">
+            <span class="complexity-label">Complexité</span>
+            <div class="complexity-dots">
+              <div class="cdot on"></div><div class="cdot on"></div><div class="cdot off"></div>
+            </div>
+          </div>
+        </div>
+        <ul class="feature-bullets">
+          <li>Onboarding pour les nouveaux utilisateurs uniquement</li>
+          <li>Une vraie question guidée avec tooltips contextuels</li>
+          <li>Explication des modes, du timer, du scoring compétitif</li>
+        </ul>
+        <div class="feature-why">
+          <span class="feature-why-flag">⚑</span>
+          <span>En dernier : l'app doit être stable pour que le tutoriel ne soit pas obsolète dès le lendemain.</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="phase-divider"></div>
+
+  <!-- ─── Dépendances ─── -->
+  <div style="margin-bottom:56px">
+    <div class="section-title">Dépendances</div>
+    <div class="deps-grid">
+      <div class="dep-row">
+        <span class="dep-name">Analytics</span>
+        <div class="dep-line"></div>
+        <span class="dep-none">aucune</span>
+      </div>
+      <div class="dep-row">
+        <span class="dep-name">XP</span>
+        <div class="dep-line"></div>
+        <span class="dep-none">aucune</span>
+      </div>
+      <div class="dep-row">
+        <span class="dep-name">Défi quotidien</span>
+        <div class="dep-line"></div>
+        <span class="dep-requires">XP</span>
+      </div>
+      <div class="dep-row">
+        <span class="dep-name">Partage de score</span>
+        <div class="dep-line"></div>
+        <span class="dep-none">aucune</span>
+      </div>
+      <div class="dep-row">
+        <span class="dep-name">Monnaie virtuelle</span>
+        <div class="dep-line"></div>
+        <span class="dep-requires">XP</span>
+      </div>
+      <div class="dep-row">
+        <span class="dep-name">Boutique</span>
+        <div class="dep-line"></div>
+        <span class="dep-requires">Monnaie</span>
+      </div>
+      <div class="dep-row">
+        <span class="dep-name">Saisons</span>
+        <div class="dep-line"></div>
+        <span class="dep-requires">Boutique + XP</span>
+      </div>
+      <div class="dep-row">
+        <span class="dep-name">Système de groupe</span>
+        <div class="dep-line"></div>
+        <span class="dep-check">Amis existant ✓</span>
+      </div>
+      <div class="dep-row">
+        <span class="dep-name">Modération</span>
+        <div class="dep-line"></div>
+        <span class="dep-none">aucune</span>
+      </div>
+      <div class="dep-row">
+        <span class="dep-name">Tutoriel</span>
+        <div class="dep-line"></div>
+        <span class="dep-requires">Tout le reste</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── Résumé exécutif ─── -->
+  <div>
+    <div class="section-title">Résumé</div>
+    <div class="summary-grid">
+      <div class="summary-row">
+        <div class="summary-phase">Phase 1</div>
+        <div class="summary-arrow">→</div>
+        <div class="summary-text">Ce qui permet de tout construire ensuite</div>
+      </div>
+      <div class="summary-row">
+        <div class="summary-phase">Phase 2</div>
+        <div class="summary-arrow">→</div>
+        <div class="summary-text">Ce qui fait revenir les joueurs demain</div>
+      </div>
+      <div class="summary-row">
+        <div class="summary-phase">Phase 3</div>
+        <div class="summary-arrow">→</div>
+        <div class="summary-text">Ce qui donne envie de progresser sur le long terme</div>
+      </div>
+      <div class="summary-row">
+        <div class="summary-phase">Phase 4</div>
+        <div class="summary-arrow">→</div>
+        <div class="summary-text">Ce qui crée de la communauté et du bouche-à-oreille</div>
+      </div>
+      <div class="summary-row">
+        <div class="summary-phase">Phase 5</div>
+        <div class="summary-arrow">→</div>
+        <div class="summary-text">Ce qui scale quand il y a vraiment des utilisateurs</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <strong>Pulse Quizz</strong> — Roadmap 2026
+  </div>
+
+</div>
+</body>
+</html>

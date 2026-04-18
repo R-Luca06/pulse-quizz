@@ -27,10 +27,10 @@ const UserProfilePanel = lazy(() => import('./pages/PublicProfilePage'))
 const SocialPage = lazy(() => import('./components/social/SocialPage'))
 const DailyChallengePage = lazy(() => import('./components/daily/DailyChallengePage'))
 const DailyChallengeModal = lazy(() => import('./components/daily/DailyChallengeModal'))
-const CollectionPage = lazy(() => import('./components/collection/CollectionPage'))
+const InventoryPage = lazy(() => import('./components/inventory/InventoryPage'))
 const DailyRecapOverlay = lazy(() => import('./components/daily/DailyRecapOverlay'))
 
-export type AppScreen = 'landing' | 'quiz' | 'ranking' | 'result' | 'stats' | 'profile' | 'achievements' | 'social' | 'daily' | 'collection'
+export type AppScreen = 'landing' | 'quiz' | 'ranking' | 'result' | 'stats' | 'profile' | 'achievements' | 'social' | 'daily' | 'inventory'
 
 // Écrans pendant lesquels l'overlay d'achievement doit être mis en attente
 const GAME_SCREENS: AppScreen[] = ['quiz', 'ranking']
@@ -310,7 +310,7 @@ export default function App() {
     setScreen('profile')
   }
 
-  function handleShowCollection() { setScreen('collection') }
+  function handleShowInventory() { setScreen('inventory') }
 
   return (
     <>
@@ -336,7 +336,7 @@ export default function App() {
                 onShowSocial={() => setScreen('social')}
                 onViewProfile={setViewingUsername}
                 onShowDaily={handleShowDaily}
-                onShowCollection={handleShowCollection}
+                onShowInventory={handleShowInventory}
               />
             </motion.div>
           )}
@@ -497,16 +497,16 @@ export default function App() {
             </motion.div>
           )}
 
-          {screen === 'collection' && (
+          {screen === 'inventory' && (
             <motion.div
-              key="collection"
+              key="inventory"
               initial={{ opacity: 0, y: 40 }}
               animate={{ opacity: 1, y: 0, transition: { duration: 0.5, delay: 0.1, ease: 'easeOut' } }}
               exit={{ opacity: 0, transition: { duration: 0.25 } }}
               className="absolute inset-0 z-10"
             >
               <Suspense fallback={<div className="absolute inset-0 bg-game-bg" />}>
-                <CollectionPage onBack={() => setScreen('landing')} />
+                <InventoryPage onBack={() => setScreen('landing')} />
               </Suspense>
             </motion.div>
           )}

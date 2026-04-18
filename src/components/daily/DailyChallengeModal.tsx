@@ -34,6 +34,21 @@ function multiplierLabel(m: number): string {
   return '×1.0'
 }
 
+function CloseButton({ onClose }: { onClose: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClose}
+      className="absolute right-3 top-3 z-10 flex h-7 w-7 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/40 transition-colors hover:border-white/20 hover:text-white/70"
+      aria-label="Fermer"
+    >
+      <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+        <path d="M1 1l8 8M9 1L1 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+      </svg>
+    </button>
+  )
+}
+
 function streakNeededForNext(current: number): { needed: number; label: string } | null {
   if (current < 3)  return { needed: 3  - current, label: '×1.5 dans' }
   if (current < 7)  return { needed: 7  - current, label: '×2.0 dans' }
@@ -92,25 +107,11 @@ export default function DailyChallengeModal({ onClose, onStartGame, onShowLeader
     load()
   }, [user, today])
 
-  // Close button
-  const CloseButton = () => (
-    <button
-      type="button"
-      onClick={onClose}
-      className="absolute right-3 top-3 z-10 flex h-7 w-7 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/40 transition-colors hover:border-white/20 hover:text-white/70"
-      aria-label="Fermer"
-    >
-      <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-        <path d="M1 1l8 8M9 1L1 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-      </svg>
-    </button>
-  )
-
   // Loading state
   if (loading) {
     return (
       <div className="relative w-full max-w-sm overflow-hidden rounded-2xl border border-white/[0.06] bg-game-card">
-        <CloseButton />
+        <CloseButton onClose={onClose} />
         <div className="flex h-48 items-center justify-center">
           <div className="h-6 w-6 animate-spin rounded-full border-2 border-neon-violet border-t-transparent" />
         </div>
@@ -121,7 +122,7 @@ export default function DailyChallengeModal({ onClose, onStartGame, onShowLeader
   if (!theme) {
     return (
       <div className="relative w-full max-w-sm overflow-hidden rounded-2xl border border-white/[0.06] bg-game-card px-6 py-8 text-center">
-        <CloseButton />
+        <CloseButton onClose={onClose} />
         <span className="mb-3 block text-4xl">📅</span>
         <p className="text-sm font-bold text-white">Pas de défi aujourd'hui</p>
         <p className="mt-1 text-xs text-white/35">Aucun thème configuré. Reviens demain !</p>

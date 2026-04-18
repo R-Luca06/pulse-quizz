@@ -21,9 +21,12 @@ export default function AchievementUnlockOverlay({ achievements, onDone, onNavig
   const onNavigateRef = useRef(onNavigateToAchievements)
   const onDoneRef = useRef(onDone)
   const pendingBadgeRectRef = useRef<DOMRect | null>(null)
-  onNavigateRef.current = onNavigateToAchievements
-  onDoneRef.current = onDone
-  pendingBadgeRectRef.current = pendingBadgeRect ?? null
+
+  useEffect(() => {
+    onNavigateRef.current = onNavigateToAchievements
+    onDoneRef.current = onDone
+    pendingBadgeRectRef.current = pendingBadgeRect ?? null
+  })
 
   // Bloquer le scroll pendant l'overlay
   useEffect(() => {

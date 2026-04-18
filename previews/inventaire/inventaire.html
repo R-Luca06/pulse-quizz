@@ -1,0 +1,909 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pulse Quizz — Preview Inventaire</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+
+  :root {
+    --game-bg:      #0A0A0F;
+    --game-card:    #13131F;
+    --game-border:  #1E1E2E;
+    --neon-violet:  #8B5CF6;
+    --neon-blue:    #3B82F6;
+    --neon-cyan:    #06B6D4;
+    --neon-pink:    #EC4899;
+    --neon-gold:    #EAB308;
+    --legendary:    #f59e0b;
+    --epic:         #a78bfa;
+    --rare:         #60a5fa;
+    --common:       rgba(255,255,255,0.30);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Inter', system-ui, sans-serif;
+    background: #050508;
+    color: rgba(255,255,255,0.88);
+    min-height: 100vh;
+    padding: 24px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── Framing commentaire ─────────────────────────────────────────── */
+  .preview-label {
+    max-width: 1100px;
+    margin: 0 auto 16px;
+    padding: 10px 14px;
+    background: rgba(139,92,246,0.08);
+    border: 1px solid rgba(139,92,246,0.25);
+    border-radius: 10px;
+    color: rgba(196,181,253,0.8);
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .preview-label b { color: rgba(255,255,255,0.85); }
+
+  /* ── Container ────────────────────────────────────────────────────── */
+  .page {
+    max-width: 1100px;
+    margin: 0 auto;
+    background: var(--game-bg);
+    border-radius: 14px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    min-height: 860px;
+    border: 1px solid var(--game-border);
+    box-shadow: 0 32px 80px rgba(0,0,0,0.5);
+  }
+
+  /* ── Topbar (reprend ProfilePage) ─────────────────────────────────── */
+  .topbar {
+    display: flex; align-items: center;
+    border-bottom: 1px solid var(--game-border);
+    padding: 10px 16px;
+  }
+  .topbar .back {
+    display: flex; align-items: center; gap: 6px;
+    padding: 6px 12px;
+    border-radius: 8px;
+    color: rgba(255,255,255,0.5);
+    font-size: 13px;
+    width: 80px;
+  }
+  .topbar .back:hover { background: rgba(255,255,255,0.05); color: #fff; cursor: pointer; }
+  .topbar .title {
+    flex: 1; text-align: center; font-size: 13px;
+    color: rgba(255,255,255,0.4);
+  }
+  .topbar .title b { color: rgba(255,255,255,0.65); font-weight: 400; }
+  .topbar .spacer { width: 80px; }
+
+  /* ── Hero ─────────────────────────────────────────────────────────── */
+  .hero {
+    position: relative;
+    padding: 22px 24px;
+    background: linear-gradient(135deg, rgba(30,30,46,0.2), rgba(19,19,31,0.3), transparent);
+    overflow: hidden;
+  }
+  .hero::before {
+    content: ''; position: absolute;
+    right: -60px; top: -60px;
+    width: 192px; height: 192px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.03);
+    filter: blur(48px);
+  }
+  .hero-row { position: relative; display: flex; align-items: center; gap: 16px; }
+  .hero-icon {
+    display: flex; align-items: center; justify-content: center;
+    height: 64px; width: 64px;
+    border-radius: 50%;
+    background: rgba(139,92,246,0.10);
+    border: 1px solid rgba(139,92,246,0.20);
+    color: rgba(139,92,246,0.6);
+  }
+  .hero-text p.title { font-size: 18px; font-weight: 700; color: #fff; }
+  .hero-text p.sub { margin-top: 2px; font-size: 12px; color: rgba(255,255,255,0.35); }
+
+  /* ── Loadout ──────────────────────────────────────────────────────── */
+  .loadout {
+    border-bottom: 1px solid var(--game-border);
+    padding: 16px 20px 18px;
+    background: rgba(10,10,15,0.4);
+  }
+  .loadout-head {
+    display: flex; align-items: center; gap: 8px;
+    margin-bottom: 12px;
+  }
+  .loadout-head .label {
+    font-size: 9px; font-weight: 700;
+    letter-spacing: 0.16em; text-transform: uppercase;
+    color: rgba(167,139,250,0.55);
+  }
+  .loadout-head .helper {
+    font-size: 10px; color: rgba(255,255,255,0.28);
+    margin-left: 4px;
+  }
+  .loadout-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr) 24px repeat(3, 84px);
+    gap: 10px;
+    align-items: stretch;
+  }
+  .divider {
+    width: 1px; height: 100%;
+    background: var(--game-border);
+    justify-self: center;
+  }
+  .slot {
+    position: relative;
+    display: flex; flex-direction: column;
+    align-items: center; gap: 6px;
+    padding: 10px 8px 8px;
+    background: rgba(255,255,255,0.02);
+    border: 1px solid var(--game-border);
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.15s;
+    min-height: 108px;
+  }
+  .slot:hover {
+    border-color: rgba(139,92,246,0.35);
+    background: rgba(139,92,246,0.04);
+  }
+  .slot .type {
+    font-size: 8px; font-weight: 700;
+    letter-spacing: 0.12em; text-transform: uppercase;
+    color: rgba(255,255,255,0.28);
+  }
+  .slot .name {
+    font-size: 10px; font-weight: 700;
+    color: rgba(255,255,255,0.78);
+    text-align: center;
+    line-height: 1.2;
+    margin-top: auto;
+  }
+  .slot.equipped::after {
+    content: ''; position: absolute;
+    top: -4px; right: -4px;
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: #22c55e;
+    border: 2px solid var(--game-bg);
+    box-shadow: 0 0 8px rgba(34,197,94,0.6);
+  }
+  .slot-edit-hint {
+    position: absolute; right: 6px; top: 6px;
+    color: rgba(255,255,255,0.2);
+    opacity: 0; transition: opacity 0.15s;
+  }
+  .slot:hover .slot-edit-hint { opacity: 1; }
+
+  /* ── Mini previews par type ───────────────────────────────────────── */
+  /* Emblem */
+  .mini-emblem svg { display: block; }
+  /* Title nameplate */
+  .mini-nameplate {
+    padding: 4px 12px;
+    background: linear-gradient(180deg, rgba(255,255,255,0.065), rgba(255,255,255,0.03));
+    border: 1px solid rgba(255,255,255,0.13);
+    border-radius: 2px;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.6);
+  }
+  /* Card design mini */
+  .mini-card {
+    width: 52px; height: 42px;
+    border-radius: 6px;
+    background: linear-gradient(135deg, rgba(139,92,246,0.18), rgba(59,130,246,0.12));
+    border: 1px solid rgba(139,92,246,0.35);
+    position: relative;
+    overflow: hidden;
+  }
+  .mini-card.holo { background: linear-gradient(135deg, rgba(236,72,153,0.22), rgba(6,182,212,0.22), rgba(234,179,8,0.2)); border-color: rgba(236,72,153,0.4); }
+  .mini-card.frost { background: linear-gradient(135deg, rgba(103,232,249,0.18), rgba(59,130,246,0.12)); border-color: rgba(103,232,249,0.4); }
+  .mini-card.arcane { background: radial-gradient(circle at 30% 30%, rgba(167,139,250,0.3), rgba(10,10,15,0.9)); border-color: rgba(167,139,250,0.45); }
+  .mini-card::after {
+    content: ''; position: absolute;
+    inset: 2px; border-radius: 4px;
+    border: 1px dashed rgba(255,255,255,0.12);
+  }
+  /* Background mini */
+  .mini-bg {
+    width: 56px; height: 42px;
+    border-radius: 6px;
+    position: relative;
+    overflow: hidden;
+    border: 1px solid var(--game-border);
+  }
+  .mini-bg.aurora {
+    background: radial-gradient(circle at 20% 30%, rgba(139,92,246,0.55), transparent 60%),
+                radial-gradient(circle at 80% 70%, rgba(59,130,246,0.45), transparent 60%),
+                #0a0a15;
+  }
+  .mini-bg.constellation {
+    background: radial-gradient(circle at 25% 30%, #fff 1px, transparent 2px),
+                radial-gradient(circle at 70% 60%, #fff 1px, transparent 2px),
+                radial-gradient(circle at 45% 80%, #fff 1px, transparent 2px),
+                radial-gradient(circle at 85% 25%, #fff 1px, transparent 2px),
+                #0a0a15;
+  }
+  .mini-bg.grid {
+    background:
+      linear-gradient(rgba(139,92,246,0.35) 1px, transparent 1px) 0 0 / 10px 10px,
+      linear-gradient(90deg, rgba(139,92,246,0.35) 1px, transparent 1px) 0 0 / 10px 10px,
+      #060610;
+  }
+  .mini-bg.nebula {
+    background:
+      radial-gradient(circle at 40% 50%, rgba(234,179,8,0.55), transparent 55%),
+      radial-gradient(circle at 70% 30%, rgba(251,146,60,0.35), transparent 60%),
+      #140d05;
+  }
+  /* Animation mini */
+  .mini-anim {
+    width: 56px; height: 42px;
+    border-radius: 6px;
+    position: relative;
+    overflow: hidden;
+    background: rgba(10,10,15,0.9);
+    border: 1px solid var(--game-border);
+  }
+  .mini-anim .particle {
+    position: absolute;
+    width: 3px; height: 3px;
+    border-radius: 50%;
+    animation: fall 2.4s linear infinite;
+  }
+  .mini-anim.pulses .particle {
+    background: radial-gradient(circle, #67e8f9, rgba(103,232,249,0.4));
+    box-shadow: 0 0 4px #67e8f9;
+  }
+  .mini-anim.gold .particle {
+    background: radial-gradient(circle, #fde68a, rgba(251,191,36,0.4));
+    box-shadow: 0 0 4px #fbbf24;
+  }
+  .mini-anim.violet .particle {
+    background: radial-gradient(circle, #c4b5fd, rgba(139,92,246,0.4));
+    box-shadow: 0 0 4px #8b5cf6;
+  }
+  .mini-anim .particle:nth-child(1) { left: 10%; animation-delay: 0s; }
+  .mini-anim .particle:nth-child(2) { left: 30%; animation-delay: .6s; }
+  .mini-anim .particle:nth-child(3) { left: 50%; animation-delay: 1.2s; }
+  .mini-anim .particle:nth-child(4) { left: 70%; animation-delay: 0.3s; }
+  .mini-anim .particle:nth-child(5) { left: 88%; animation-delay: 1.5s; }
+  @keyframes fall {
+    from { top: -6px; opacity: 0; }
+    10%  { opacity: 1; }
+    90%  { opacity: 1; }
+    to   { top: 100%; opacity: 0; }
+  }
+  /* Badge mini (hexagon) */
+  .mini-badge {
+    width: 44px; height: 50px;
+    clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+  }
+  .mini-badge.legendary { background: linear-gradient(180deg, rgba(245,158,11,0.3), rgba(245,158,11,0.08)); box-shadow: 0 0 10px rgba(245,158,11,0.35); }
+  .mini-badge.epic      { background: linear-gradient(180deg, rgba(167,139,250,0.3), rgba(167,139,250,0.08)); box-shadow: 0 0 10px rgba(167,139,250,0.35); }
+  .mini-badge.rare      { background: linear-gradient(180deg, rgba(96,165,250,0.3), rgba(96,165,250,0.08)); box-shadow: 0 0 8px rgba(96,165,250,0.3); }
+  .mini-badge.common    { background: linear-gradient(180deg, rgba(255,255,255,0.15), rgba(255,255,255,0.04)); }
+
+  .loadout-pinned-head {
+    display: flex; align-items: baseline; justify-content: space-between;
+    margin-bottom: 6px;
+  }
+  .loadout-pinned-count {
+    font-size: 10px; font-weight: 900; color: var(--neon-violet);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ── Body (sidebar + grid) ────────────────────────────────────────── */
+  .body { display: flex; flex: 1; overflow: hidden; }
+  .sidebar {
+    width: 176px; flex-shrink: 0;
+    border-right: 1px solid var(--game-border);
+    padding: 12px;
+    display: flex; flex-direction: column; gap: 2px;
+  }
+  .sidebar h4 {
+    padding: 0 8px; margin: 4px 0;
+    font-size: 10px; font-weight: 700;
+    letter-spacing: 0.16em; text-transform: uppercase;
+    color: rgba(255,255,255,0.2);
+  }
+  .sidebar button {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 10px;
+    border-radius: 8px;
+    font-size: 12px; font-weight: 500;
+    color: rgba(255,255,255,0.35);
+    cursor: pointer;
+    transition: all 0.1s;
+  }
+  .sidebar button:hover { background: rgba(255,255,255,0.05); color: rgba(255,255,255,0.6); }
+  .sidebar button.active {
+    background: rgba(139,92,246,0.1);
+    color: var(--neon-violet);
+  }
+  .sidebar button .count {
+    font-size: 10px; font-variant-numeric: tabular-nums;
+    color: rgba(255,255,255,0.2);
+  }
+  .sidebar button.active .count { color: rgba(139,92,246,0.7); }
+  .sidebar .sep { height: 1px; background: var(--game-border); margin: 8px; opacity: 0.7; }
+
+  .content { flex: 1; overflow-y: auto; display: flex; flex-direction: column; }
+
+  /* Tabs type d'item */
+  .type-tabs {
+    display: flex; align-items: center; gap: 4px;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--game-border);
+    overflow-x: auto;
+  }
+  .type-tabs button {
+    display: flex; align-items: center; gap: 6px;
+    padding: 6px 12px;
+    border-radius: 999px;
+    font-size: 11px; font-weight: 600;
+    color: rgba(255,255,255,0.4);
+    background: rgba(255,255,255,0.03);
+    border: 1px solid transparent;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.15s;
+  }
+  .type-tabs button:hover { background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.7); }
+  .type-tabs button.active {
+    background: rgba(139,92,246,0.12);
+    border-color: rgba(139,92,246,0.35);
+    color: var(--neon-violet);
+  }
+  .type-tabs button .count {
+    font-size: 10px;
+    background: rgba(255,255,255,0.06);
+    padding: 1px 6px;
+    border-radius: 999px;
+    font-variant-numeric: tabular-nums;
+    color: rgba(255,255,255,0.45);
+  }
+  .type-tabs button.active .count { background: rgba(139,92,246,0.2); color: rgba(196,181,253,0.9); }
+
+  /* Grid */
+  .grid {
+    padding: 16px;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 12px;
+  }
+  .item-card {
+    position: relative;
+    display: flex; flex-direction: column; align-items: center;
+    gap: 8px;
+    padding: 10px;
+    min-height: 170px;
+    border-radius: 12px;
+    background: var(--game-card);
+    border: 1px solid var(--game-border);
+    transition: all 0.15s;
+  }
+  .item-card:hover {
+    border-color: rgba(139,92,246,0.3);
+    transform: translateY(-1px);
+  }
+  .item-card.equipped {
+    border-color: rgba(34,197,94,0.4);
+    background: linear-gradient(180deg, rgba(34,197,94,0.04), var(--game-card));
+  }
+  .item-card.locked {
+    opacity: 0.4;
+    filter: grayscale(1);
+  }
+
+  .item-tier-pill {
+    position: absolute; top: 8px; left: 8px;
+    display: flex; align-items: center; gap: 4px;
+    opacity: 0.55;
+  }
+  .item-tier-pill .dot { width: 5px; height: 5px; border-radius: 50%; }
+  .item-tier-pill.legendary .dot { background: var(--legendary); }
+  .item-tier-pill.epic .dot      { background: var(--epic); }
+  .item-tier-pill.rare .dot      { background: var(--rare); }
+  .item-tier-pill.common .dot    { background: var(--common); }
+  .item-tier-pill span {
+    font-size: 8px; font-weight: 500;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    color: rgba(255,255,255,0.55);
+  }
+
+  .item-type-icon {
+    position: absolute; top: 8px; right: 8px;
+    width: 18px; height: 18px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 6px;
+    background: rgba(255,255,255,0.04);
+    color: rgba(255,255,255,0.35);
+  }
+
+  .item-preview {
+    margin-top: 14px;
+    display: flex; align-items: center; justify-content: center;
+    height: 60px;
+  }
+  .item-name {
+    font-size: 11px; font-weight: 700;
+    color: #fff;
+    text-align: center;
+    line-height: 1.2;
+  }
+  .item-source-tag {
+    font-size: 7px; font-weight: 700;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    padding: 2px 6px;
+    border-radius: 999px;
+    border: 1px solid rgba(34,197,94,0.2);
+    background: rgba(34,197,94,0.1);
+    color: rgba(34,197,94,0.85);
+  }
+  .item-source-tag.shop    { background: rgba(234,179,8,0.1); color: rgba(234,179,8,0.85); border-color: rgba(234,179,8,0.2); }
+  .item-source-tag.season  { background: rgba(236,72,153,0.1); color: rgba(236,72,153,0.85); border-color: rgba(236,72,153,0.2); }
+  .item-source-tag.rank    { background: rgba(59,130,246,0.1); color: rgba(59,130,246,0.85); border-color: rgba(59,130,246,0.2); }
+
+  .item-cta {
+    margin-top: auto;
+    display: flex; align-items: center; gap: 4px;
+    padding: 6px 10px;
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.1);
+    background: rgba(255,255,255,0.03);
+    font-size: 10px; font-weight: 700;
+    color: rgba(255,255,255,0.55);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .item-cta:hover {
+    background: rgba(139,92,246,0.15);
+    border-color: rgba(139,92,246,0.4);
+    color: var(--neon-violet);
+  }
+  .item-cta.equipped {
+    background: rgba(34,197,94,0.08);
+    border-color: rgba(34,197,94,0.3);
+    color: rgba(34,197,94,0.9);
+    cursor: default;
+  }
+  .item-cta.pin-active {
+    background: rgba(139,92,246,0.2);
+    border-color: rgba(139,92,246,0.4);
+    color: var(--neon-violet);
+  }
+  .item-card .item-cta-wrap {
+    width: 100%;
+    display: flex; justify-content: center;
+  }
+
+  /* Badges preview — reprennent le code d'achievements */
+  .badge-hex-preview {
+    width: 48px; height: 54px;
+    clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px;
+    position: relative;
+  }
+  .badge-hex-preview::before {
+    content: '';
+    position: absolute; inset: 0;
+    clip-path: inherit;
+  }
+  .badge-hex-preview.legendary { background: linear-gradient(180deg, rgba(245,158,11,0.55), rgba(245,158,11,0.1)); filter: drop-shadow(0 0 6px rgba(245,158,11,0.45)); }
+  .badge-hex-preview.epic      { background: linear-gradient(180deg, rgba(167,139,250,0.55), rgba(167,139,250,0.1)); filter: drop-shadow(0 0 6px rgba(167,139,250,0.4)); }
+  .badge-hex-preview.rare      { background: linear-gradient(180deg, rgba(96,165,250,0.5), rgba(96,165,250,0.08)); filter: drop-shadow(0 0 5px rgba(96,165,250,0.3)); }
+  .badge-hex-preview.common    { background: linear-gradient(180deg, rgba(255,255,255,0.2), rgba(255,255,255,0.05)); }
+
+  /* Explication top */
+  .note {
+    max-width: 1100px; margin: 40px auto 8px;
+    color: rgba(196,181,253,0.7);
+    font-size: 12px;
+    padding: 0 14px;
+  }
+</style>
+</head>
+<body>
+
+<div class="preview-label">
+  <b>Preview 1 / 2 — Inventaire, vue principale.</b>
+  On garde la logique actuelle de la page Collection mais on (1) renomme en <b>Inventaire</b>, (2) ajoute un bloc <b>Équipement</b> au-dessus (5 slots cosmétiques + 3 slots badges), (3) ajoute une rangée d'onglets <b>Type d'objet</b>, (4) adapte la grille pour afficher tous les types avec un CTA <b>Équiper</b> ou <b>Épingler</b>.
+</div>
+
+<div class="page">
+
+  <!-- Topbar -->
+  <div class="topbar">
+    <div class="back">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg>
+      Retour
+    </div>
+    <div class="title">Paramètres <span style="color:rgba(255,255,255,0.15);margin:0 4px;">·</span><b>Inventaire</b></div>
+    <div class="spacer"></div>
+  </div>
+
+  <!-- Hero -->
+  <div class="hero">
+    <div class="hero-row">
+      <div class="hero-icon">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+          <path d="M12 2 4 6v6c0 5 3.5 9.5 8 10 4.5-.5 8-5 8-10V6l-8-4z"/>
+        </svg>
+      </div>
+      <div class="hero-text">
+        <p class="title">Inventaire</p>
+        <p class="sub">47 objets possédés · 5 cosmétiques équipés · 3 badges épinglés</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Loadout -->
+  <div class="loadout">
+    <div class="loadout-head">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="rgba(167,139,250,0.7)" stroke-width="2" stroke-linecap="round">
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+      </svg>
+      <span class="label">Équipement</span>
+      <span class="helper">Clique sur un slot pour changer</span>
+    </div>
+
+    <div class="loadout-grid">
+
+      <!-- Slot 1 — Blason (emblem) -->
+      <div class="slot equipped" title="Blason équipé : Flamme d'or">
+        <div class="type">Blason</div>
+        <div class="mini-emblem" style="margin-top: -2px;">
+          <!-- Flamme d'or, mini -->
+          <svg width="44" height="52" viewBox="-32 -37 64 74">
+            <path d="M -24,-33 L 24,-33 L 24,4 C 24,16 9,30 0,36 C -9,30 -24,16 -24,4 Z"
+                  fill="rgba(14,10,28,0.95)" stroke="#fbbf24" stroke-width="1.5"/>
+            <path d="M 0,-18 C -7,-9 -11,1 -8,9 C -5,16 5,16 8,9 C 11,1 7,-9 0,-18 Z" fill="#fbbf24" fill-opacity="0.85"/>
+            <path d="M 0,-8 C -3,-3 -4,3 -2,7 C 0,9 3,8 3,3 C 3,-1 1,-5 0,-8 Z" fill="#fde68a"/>
+          </svg>
+        </div>
+        <div class="name">Flamme d'or</div>
+        <div class="slot-edit-hint">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        </div>
+      </div>
+
+      <!-- Slot 2 — Titre -->
+      <div class="slot equipped">
+        <div class="type">Titre</div>
+        <div style="flex:1;display:flex;align-items:center;">
+          <div class="mini-nameplate">FOUDRE MENTALE</div>
+        </div>
+        <div class="name">Foudre Mentale</div>
+      </div>
+
+      <!-- Slot 3 — Carte -->
+      <div class="slot equipped">
+        <div class="type">Carte</div>
+        <div style="flex:1;display:flex;align-items:center;"><div class="mini-card holo"></div></div>
+        <div class="name">Holographique</div>
+      </div>
+
+      <!-- Slot 4 — Fond -->
+      <div class="slot equipped">
+        <div class="type">Fond</div>
+        <div style="flex:1;display:flex;align-items:center;"><div class="mini-bg aurora"></div></div>
+        <div class="name">Aurore violette</div>
+      </div>
+
+      <!-- Slot 5 — Animation -->
+      <div class="slot equipped">
+        <div class="type">Animation</div>
+        <div style="flex:1;display:flex;align-items:center;"><div class="mini-anim violet">
+          <span class="particle"></span><span class="particle"></span><span class="particle"></span><span class="particle"></span><span class="particle"></span>
+        </div></div>
+        <div class="name">Particules violet</div>
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- Slot Badge 1 -->
+      <div class="slot equipped">
+        <div class="type">Badge 1</div>
+        <div style="flex:1;display:flex;align-items:center;"><div class="mini-badge legendary">🏆</div></div>
+        <div class="name" style="font-size:9px;color:rgba(255,255,255,0.55);">Mythique</div>
+      </div>
+
+      <!-- Slot Badge 2 -->
+      <div class="slot equipped">
+        <div class="type">Badge 2</div>
+        <div style="flex:1;display:flex;align-items:center;"><div class="mini-badge epic">⚡</div></div>
+        <div class="name" style="font-size:9px;color:rgba(255,255,255,0.55);">Foudroyant</div>
+      </div>
+
+      <!-- Slot Badge 3 -->
+      <div class="slot equipped">
+        <div class="type">Badge 3</div>
+        <div style="flex:1;display:flex;align-items:center;"><div class="mini-badge rare">🎯</div></div>
+        <div class="name" style="font-size:9px;color:rgba(255,255,255,0.55);">Centenaire</div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Body (sidebar + content) -->
+  <div class="body">
+
+    <!-- Sidebar (desktop) -->
+    <div class="sidebar">
+      <h4>Rareté</h4>
+      <button class="active"><span>Tous</span><span class="count">47</span></button>
+      <button><span>Légendaire</span><span class="count">3</span></button>
+      <button><span>Épique</span><span class="count">11</span></button>
+      <button><span>Rare</span><span class="count">18</span></button>
+      <button><span>Commun</span><span class="count">15</span></button>
+
+      <div class="sep"></div>
+
+      <h4>Provenance</h4>
+      <button class="active"><span>Tous</span><span class="count">47</span></button>
+      <button><span>Succès</span><span class="count">32</span></button>
+      <button><span>Boutique</span><span class="count">8</span></button>
+      <button><span>Saison</span><span class="count">4</span></button>
+      <button><span>Classement</span><span class="count">3</span></button>
+    </div>
+
+    <!-- Content -->
+    <div class="content">
+
+      <!-- Type tabs (nouveau) -->
+      <div class="type-tabs">
+        <button class="active">
+          Tous <span class="count">47</span>
+        </button>
+        <button>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          Badges <span class="count">32</span>
+        </button>
+        <button>
+          <svg width="12" height="14" viewBox="0 0 24 28" fill="currentColor"><path d="M12 2 4 5v8c0 5 3.5 10 8 12 4.5-2 8-7 8-12V5l-8-3z"/></svg>
+          Blasons <span class="count">4</span>
+        </button>
+        <button>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h10M4 17h16"/></svg>
+          Titres <span class="count">4</span>
+        </button>
+        <button>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/></svg>
+          Cartes <span class="count">3</span>
+        </button>
+        <button>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5" fill="currentColor"/><path d="m21 15-5-5L5 21"/></svg>
+          Fonds <span class="count">3</span>
+        </button>
+        <button>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+          Animations <span class="count">4</span>
+        </button>
+      </div>
+
+      <!-- Grid — items mixtes -->
+      <div class="grid">
+
+        <!-- Badge épinglé -->
+        <div class="item-card equipped">
+          <div class="item-tier-pill legendary"><span class="dot"></span><span>Légendaire</span></div>
+          <div class="item-type-icon" title="Badge">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          </div>
+          <div class="item-preview"><div class="badge-hex-preview legendary">👑</div></div>
+          <div class="item-name">Mythique</div>
+          <div class="item-source-tag">Succès</div>
+          <div class="item-cta-wrap"><div class="item-cta pin-active">
+            <svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor"><line x1="12" y1="17" x2="12" y2="22" stroke="currentColor" stroke-width="2"/><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"/></svg>
+            Épinglé
+          </div></div>
+        </div>
+
+        <!-- Emblem équipé -->
+        <div class="item-card equipped">
+          <div class="item-tier-pill legendary"><span class="dot"></span><span>Légendaire</span></div>
+          <div class="item-type-icon" title="Blason">
+            <svg width="10" height="12" viewBox="0 0 24 28" fill="currentColor"><path d="M12 2 4 5v8c0 5 3.5 10 8 12 4.5-2 8-7 8-12V5l-8-3z"/></svg>
+          </div>
+          <div class="item-preview">
+            <svg width="44" height="52" viewBox="-32 -37 64 74">
+              <path d="M -24,-33 L 24,-33 L 24,4 C 24,16 9,30 0,36 C -9,30 -24,16 -24,4 Z"
+                    fill="rgba(14,10,28,0.95)" stroke="#fbbf24" stroke-width="1.5"/>
+              <path d="M 0,-18 C -7,-9 -11,1 -8,9 C -5,16 5,16 8,9 C 11,1 7,-9 0,-18 Z" fill="#fbbf24" fill-opacity="0.85"/>
+              <path d="M 0,-8 C -3,-3 -4,3 -2,7 C 0,9 3,8 3,3 C 3,-1 1,-5 0,-8 Z" fill="#fde68a"/>
+            </svg>
+          </div>
+          <div class="item-name">Flamme d'or</div>
+          <div class="item-source-tag shop">Boutique</div>
+          <div class="item-cta-wrap"><div class="item-cta equipped">
+            <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+            Équipé
+          </div></div>
+        </div>
+
+        <!-- Titre -->
+        <div class="item-card">
+          <div class="item-tier-pill epic"><span class="dot"></span><span>Épique</span></div>
+          <div class="item-type-icon" title="Titre">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h10M4 17h16"/></svg>
+          </div>
+          <div class="item-preview">
+            <div class="mini-nameplate" style="font-size:9px;padding:4px 10px;">FOUDRE MENTALE</div>
+          </div>
+          <div class="item-name">Foudre Mentale</div>
+          <div class="item-source-tag rank">Classement</div>
+          <div class="item-cta-wrap"><div class="item-cta equipped">
+            <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+            Équipé
+          </div></div>
+        </div>
+
+        <!-- Titre Érudit (non équipé) -->
+        <div class="item-card">
+          <div class="item-tier-pill common"><span class="dot"></span><span>Commun</span></div>
+          <div class="item-type-icon" title="Titre">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h10M4 17h16"/></svg>
+          </div>
+          <div class="item-preview">
+            <div class="mini-nameplate" style="font-size:9px;padding:4px 10px;color:rgba(255,255,255,0.4);">ÉRUDIT</div>
+          </div>
+          <div class="item-name">Érudit</div>
+          <div class="item-source-tag">Succès</div>
+          <div class="item-cta-wrap"><div class="item-cta">Équiper</div></div>
+        </div>
+
+        <!-- Card design -->
+        <div class="item-card equipped">
+          <div class="item-tier-pill epic"><span class="dot"></span><span>Épique</span></div>
+          <div class="item-type-icon" title="Carte">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/></svg>
+          </div>
+          <div class="item-preview"><div class="mini-card holo" style="width:54px;height:44px;"></div></div>
+          <div class="item-name">Carte holographique</div>
+          <div class="item-source-tag shop">Boutique</div>
+          <div class="item-cta-wrap"><div class="item-cta equipped">
+            <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+            Équipé
+          </div></div>
+        </div>
+
+        <!-- Card design givrée (non équipé) -->
+        <div class="item-card">
+          <div class="item-tier-pill rare"><span class="dot"></span><span>Rare</span></div>
+          <div class="item-type-icon" title="Carte">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/></svg>
+          </div>
+          <div class="item-preview"><div class="mini-card frost" style="width:54px;height:44px;"></div></div>
+          <div class="item-name">Carte givrée</div>
+          <div class="item-source-tag season">Saison</div>
+          <div class="item-cta-wrap"><div class="item-cta">Équiper</div></div>
+        </div>
+
+        <!-- Background équipé -->
+        <div class="item-card equipped">
+          <div class="item-tier-pill epic"><span class="dot"></span><span>Épique</span></div>
+          <div class="item-type-icon" title="Fond">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5" fill="currentColor"/><path d="m21 15-5-5L5 21"/></svg>
+          </div>
+          <div class="item-preview"><div class="mini-bg aurora" style="width:58px;height:44px;"></div></div>
+          <div class="item-name">Aurore violette</div>
+          <div class="item-source-tag shop">Boutique</div>
+          <div class="item-cta-wrap"><div class="item-cta equipped">
+            <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+            Équipé
+          </div></div>
+        </div>
+
+        <!-- Background constellation -->
+        <div class="item-card">
+          <div class="item-tier-pill rare"><span class="dot"></span><span>Rare</span></div>
+          <div class="item-type-icon" title="Fond">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+          </div>
+          <div class="item-preview"><div class="mini-bg constellation" style="width:58px;height:44px;"></div></div>
+          <div class="item-name">Constellation</div>
+          <div class="item-source-tag">Succès</div>
+          <div class="item-cta-wrap"><div class="item-cta">Équiper</div></div>
+        </div>
+
+        <!-- Screen animation équipée -->
+        <div class="item-card equipped">
+          <div class="item-tier-pill epic"><span class="dot"></span><span>Épique</span></div>
+          <div class="item-type-icon" title="Animation">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4M12 18v4"/></svg>
+          </div>
+          <div class="item-preview"><div class="mini-anim violet" style="width:58px;height:44px;">
+            <span class="particle"></span><span class="particle"></span><span class="particle"></span><span class="particle"></span><span class="particle"></span>
+          </div></div>
+          <div class="item-name">Particules violet</div>
+          <div class="item-source-tag shop">Boutique</div>
+          <div class="item-cta-wrap"><div class="item-cta equipped">
+            <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+            Équipé
+          </div></div>
+        </div>
+
+        <!-- Screen anim pluie de pulses -->
+        <div class="item-card">
+          <div class="item-tier-pill legendary"><span class="dot"></span><span>Légendaire</span></div>
+          <div class="item-type-icon" title="Animation">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4M12 18v4"/></svg>
+          </div>
+          <div class="item-preview"><div class="mini-anim pulses" style="width:58px;height:44px;">
+            <span class="particle"></span><span class="particle"></span><span class="particle"></span><span class="particle"></span><span class="particle"></span>
+          </div></div>
+          <div class="item-name">Pluie de Pulses ◈</div>
+          <div class="item-source-tag season">Saison</div>
+          <div class="item-cta-wrap"><div class="item-cta">Équiper</div></div>
+        </div>
+
+        <!-- Badge libre -->
+        <div class="item-card">
+          <div class="item-tier-pill epic"><span class="dot"></span><span>Épique</span></div>
+          <div class="item-type-icon" title="Badge">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          </div>
+          <div class="item-preview"><div class="badge-hex-preview epic">⚡</div></div>
+          <div class="item-name">Supersonique</div>
+          <div class="item-source-tag">Succès</div>
+          <div class="item-cta-wrap"><div class="item-cta">
+            <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="17" x2="12" y2="22"/><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"/></svg>
+            Épingler
+          </div></div>
+        </div>
+
+        <!-- Emblem rose cyberpunk -->
+        <div class="item-card">
+          <div class="item-tier-pill epic"><span class="dot"></span><span>Épique</span></div>
+          <div class="item-type-icon" title="Blason">
+            <svg width="10" height="12" viewBox="0 0 24 28" fill="currentColor"><path d="M12 2 4 5v8c0 5 3.5 10 8 12 4.5-2 8-7 8-12V5l-8-3z"/></svg>
+          </div>
+          <div class="item-preview">
+            <svg width="44" height="52" viewBox="-32 -37 64 74">
+              <path d="M -24,-33 L 24,-33 L 24,4 C 24,16 9,30 0,36 C -9,30 -24,16 -24,4 Z"
+                    fill="rgba(14,10,28,0.95)" stroke="#ec4899" stroke-width="1.5"/>
+              <g transform="translate(0 -4)">
+                <path d="M 0,0 L 6,-4 L 0,-12 L -6,-4 Z" fill="#ec489933" stroke="#ec4899" stroke-width="0.8"/>
+                <path d="M 0,0 L 6,-4 L 0,-12 L -6,-4 Z" fill="#ec489933" stroke="#ec4899" stroke-width="0.8" transform="rotate(60)"/>
+                <path d="M 0,0 L 6,-4 L 0,-12 L -6,-4 Z" fill="#ec489933" stroke="#ec4899" stroke-width="0.8" transform="rotate(120)"/>
+                <path d="M 0,0 L 6,-4 L 0,-12 L -6,-4 Z" fill="#ec489933" stroke="#ec4899" stroke-width="0.8" transform="rotate(180)"/>
+                <path d="M 0,0 L 6,-4 L 0,-12 L -6,-4 Z" fill="#ec489933" stroke="#ec4899" stroke-width="0.8" transform="rotate(240)"/>
+                <path d="M 0,0 L 6,-4 L 0,-12 L -6,-4 Z" fill="#ec489933" stroke="#ec4899" stroke-width="0.8" transform="rotate(300)"/>
+                <circle r="3.5" fill="#fbcfe8" stroke="#ec4899" stroke-width="0.8"/>
+              </g>
+            </svg>
+          </div>
+          <div class="item-name">Rose cyberpunk</div>
+          <div class="item-source-tag season">Saison</div>
+          <div class="item-cta-wrap"><div class="item-cta">Équiper</div></div>
+        </div>
+
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<div class="note">
+  <b>Le bottom-sheet d'équipement</b> — voir <a href="./inventaire-equip-picker.html" style="color:#c4b5fd;">inventaire-equip-picker.html</a>
+</div>
+
+</body>
+</html>

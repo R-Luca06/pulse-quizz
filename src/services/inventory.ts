@@ -1,6 +1,6 @@
 import { supabase } from './supabase'
 import { AppError } from './errors'
-import type { InventoryItem, ItemType, OwnedBadge, BadgeSource } from '../types/quiz'
+import type { InventoryItem, ItemType, OwnedBadge, BadgeSource, CosmeticType } from '../types/quiz'
 
 // ─── Fetch ────────────────────────────────────────────────────────────────────
 
@@ -27,4 +27,23 @@ export async function getUserInventory(userId: string, itemType?: ItemType): Pro
 export async function getUserBadges(userId: string): Promise<OwnedBadge[]> {
   const items = await getUserInventory(userId, 'badge')
   return items as OwnedBadge[]
+}
+
+// ─── Equip cosmétiques ────────────────────────────────────────────────────────
+
+const EQUIPPED_COLUMN: Record<CosmeticType, string> = {
+  emblem:           'equipped_emblem_id',
+  background:       'equipped_background_id',
+  title:            'equipped_title_id',
+  card_design:      'equipped_card_design_id',
+  screen_animation: 'equipped_screen_anim_id',
+}
+
+export async function equipCosmetic(userId: string, type: CosmeticType, itemId: string | null): Promise<void> {
+  const column = EQUIPPED_COLUMN[type]
+  const { error } = await supabase
+    .from('profiles')
+    .update({ [column]: itemId })
+    .eq('id', userId)
+  if (error) throw new AppError('db_error', error.message)
 }

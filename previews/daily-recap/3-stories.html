@@ -1,0 +1,408 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <title>Daily Recap — Preview #3 Stories</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] },
+          colors: {
+            neon:  { violet:'#8B5CF6', blue:'#3B82F6', cyan:'#06B6D4', pink:'#EC4899', gold:'#EAB308' },
+            game:  { bg:'#0A0A0F', card:'#13131F', border:'#1E1E2E', success:'#22C55E', danger:'#EF4444', warning:'#F97316' },
+          },
+        },
+      },
+    }
+  </script>
+  <style>
+    html, body { height: 100%; }
+    body { background:#000; color:#fff; font-family: Inter, system-ui, sans-serif; -webkit-font-smoothing: antialiased; overflow:hidden; display:flex; align-items:center; justify-content:center; }
+    .tabular { font-variant-numeric: tabular-nums; }
+
+    /* Phone-like container (looks good on desktop too) */
+    .phone {
+      position: relative;
+      width: 100%; max-width: 420px; height: 100%; max-height: 860px;
+      background: #0A0A0F;
+      overflow: hidden;
+      border-radius: 24px;
+      box-shadow: 0 40px 80px rgba(0,0,0,.6);
+    }
+
+    .story { position:absolute; inset:0; opacity:0; pointer-events:none; transition: opacity .35s ease; }
+    .story.active { opacity:1; pointer-events:auto; }
+
+    /* Tap zones */
+    .zone { position:absolute; top:0; bottom:0; width:38%; z-index:40; }
+    .zone.left  { left: 0;  }
+    .zone.right { right: 0; }
+
+    /* Progress bars */
+    .pb { position:absolute; top:10px; left:12px; right:12px; display:flex; gap:3px; z-index: 45; }
+    .pb > div { flex:1; height: 2.5px; border-radius: 9999px; background: rgba(255,255,255,.25); overflow:hidden; }
+    .pb > div > span { display:block; height:100%; width:0; background:#fff; border-radius: inherit; }
+    .pb > div.done > span { width:100%; }
+    .pb > div.active > span { width:0; animation: fill var(--dur,5s) linear forwards; }
+    .pb.paused > div.active > span { animation-play-state: paused; }
+    @keyframes fill { to { width:100%; } }
+
+    /* Header */
+    .hdr { position:absolute; top:22px; left:12px; right:12px; z-index:40; display:flex; align-items:center; justify-content:space-between; }
+    .hdr .title { display:flex; align-items:center; gap:8px; }
+    .hdr .emoji { width: 28px; height: 28px; border-radius: 50%; background: rgba(255,255,255,.06); display:flex; align-items:center; justify-content:center; font-size: 14px; }
+    .hdr .txt { font-size: 11px; color: rgba(255,255,255,.7); font-weight:600; }
+    .hdr .sub { font-size: 9px; color: rgba(255,255,255,.35); font-weight:500; letter-spacing:.05em; text-transform: uppercase; }
+    .hdr .close { background: rgba(255,255,255,.08); width: 28px; height:28px; border-radius: 9999px; display:flex; align-items:center; justify-content:center; color: rgba(255,255,255,.7); }
+
+    /* Shared animations */
+    @keyframes pop       { 0% { transform: scale(.7); opacity:0 } 60% { transform: scale(1.05); opacity:1 } 100% { transform: scale(1) } }
+    @keyframes fadeUp    { from { opacity:0; transform: translateY(24px) } to { opacity:1; transform:translateY(0) } }
+    @keyframes fadeIn    { from { opacity:0 } to { opacity:1 } }
+    @keyframes float     { 0%,100% { transform: translateY(0) } 50% { transform: translateY(-7px) } }
+    @keyframes slideL    { from { opacity:0; transform: translateX(-16px) } to { opacity:1; transform: translateX(0) } }
+    @keyframes barfill   { from { width:0 } }
+    @keyframes shimmer   { 0% { transform: translateX(-100%) } 100% { transform: translateX(100%) } }
+
+    .story.active .anim-pop    { animation: pop   .6s cubic-bezier(.22,1,.36,1) both; }
+    .story.active .anim-fadeup { animation: fadeUp .55s cubic-bezier(.22,1,.36,1) both; }
+    .story.active .anim-fadein { animation: fadeIn .6s ease-out both; }
+    .story.active .anim-slideL { animation: slideL .55s cubic-bezier(.22,1,.36,1) both; }
+    .story.active .anim-float  { animation: float 4s ease-in-out infinite; }
+    .story.active .anim-barfill{ animation: barfill 1s .4s cubic-bezier(.22,1,.36,1) both; }
+
+    .hex { clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%); display:flex; align-items:center; justify-content:center; }
+
+    /* Backgrounds per scene */
+    .bg-theme   { background: radial-gradient(ellipse at 50% 20%, rgba(139,92,246,.35) 0%, transparent 60%), #0A0A0F; }
+    .bg-score   { background: radial-gradient(ellipse at 50% 50%, rgba(139,92,246,.25) 0%, transparent 60%), #0A0A0F; }
+    .bg-rank    { background: radial-gradient(ellipse at 50% 30%, rgba(234,179,8,.25) 0%, transparent 60%), #0A0A0F; }
+    .bg-q       { background: linear-gradient(180deg, #0A0A0F 0%, #13131F 100%); }
+    .bg-ach-ep  { background: radial-gradient(ellipse at 50% 30%, rgba(139,92,246,.35) 0%, transparent 60%), #0A0A0F; }
+    .bg-ach-ra  { background: radial-gradient(ellipse at 50% 30%, rgba(59,130,246,.3) 0%, transparent 60%), #0A0A0F; }
+    .bg-rewards { background: radial-gradient(ellipse at 50% 40%, rgba(6,182,212,.22) 0%, rgba(139,92,246,.16) 40%, transparent 75%), #0A0A0F; }
+  </style>
+</head>
+<body>
+  <div class="phone" id="phone">
+    <!-- Progress bars -->
+    <div class="pb" id="pb"></div>
+
+    <!-- Header -->
+    <div class="hdr">
+      <div class="title">
+        <div class="emoji">🎸</div>
+        <div>
+          <div class="txt">Rétro 80s</div>
+          <div class="sub">Ton récap d'hier</div>
+        </div>
+      </div>
+      <a class="close" href="index.html" title="Fermer">
+        <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M1 1l10 10M11 1L1 11" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+      </a>
+    </div>
+
+    <!-- Tap zones -->
+    <div class="zone left"  id="zone-prev"></div>
+    <div class="zone right" id="zone-next"></div>
+
+    <!-- ───────────────── STORIES ───────────────── -->
+
+    <!-- Story 1 : Theme / intro -->
+    <section class="story bg-theme" data-dur="4000">
+      <div class="absolute inset-0 flex flex-col items-center justify-center px-8 pt-20 pb-24 text-center">
+        <span class="mb-3 rounded-full border border-emerald-500/25 bg-emerald-500/[0.07] px-3 py-1 text-[9px] font-bold uppercase tracking-widest text-emerald-400/80 anim-fadein">Pendant votre absence…</span>
+        <span class="block text-[108px] anim-pop anim-float" style="filter: drop-shadow(0 0 28px rgba(139,92,246,.7))">🎸</span>
+        <h1 class="mt-3 text-4xl font-black tracking-tight anim-fadeup" style="animation-delay:.2s; background: linear-gradient(135deg,#fff 0%,rgba(167,139,250,.9) 100%); -webkit-background-clip:text; -webkit-text-fill-color:transparent">Rétro 80s</h1>
+        <p class="mt-2 text-xs text-white/35 anim-fadeup" style="animation-delay:.3s">Défi du mercredi 16 avril · terminé</p>
+        <p class="mt-6 max-w-xs text-sm leading-relaxed text-white/55 anim-fadeup" style="animation-delay:.45s">Voici ce qui s'est passé pendant que tu étais absent. Touche pour avancer.</p>
+      </div>
+      <div class="absolute bottom-4 left-0 right-0 flex items-center justify-center gap-1 text-[10px] text-white/30">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg>
+        <span>Appuie pour continuer</span>
+      </div>
+    </section>
+
+    <!-- Story 2 : Score -->
+    <section class="story bg-score" data-dur="5500">
+      <div class="absolute inset-0 flex flex-col items-center justify-center px-6 pt-20 pb-24 text-center">
+        <span class="mb-5 text-[9px] font-bold uppercase tracking-[0.3em] text-white/30 anim-fadein">Ton score final</span>
+        <div class="flex items-end gap-2 anim-pop">
+          <span class="text-7xl font-black leading-none tabular" style="color:#8B5CF6">1 847</span>
+          <span class="mb-2 text-lg font-black text-white/25">pts</span>
+        </div>
+        <span class="mt-3 rounded-full bg-yellow-400/15 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-yellow-400 anim-fadeup" style="animation-delay:.2s">Performance Élite</span>
+
+        <div class="mt-6 grid w-full max-w-xs grid-cols-4 gap-1.5 anim-fadeup" style="animation-delay:.35s">
+          <div class="flex flex-col items-center gap-0.5 rounded-lg border border-white/10 bg-white/[0.03] py-2">
+            <span class="text-base font-black text-game-success">8</span>
+            <span class="text-[9px] font-semibold uppercase tracking-wider text-white/30">Correct</span>
+          </div>
+          <div class="flex flex-col items-center gap-0.5 rounded-lg border border-white/10 bg-white/[0.03] py-2">
+            <span class="text-base font-black text-game-danger">1</span>
+            <span class="text-[9px] font-semibold uppercase tracking-wider text-white/30">Faux</span>
+          </div>
+          <div class="flex flex-col items-center gap-0.5 rounded-lg border border-white/10 bg-white/[0.03] py-2">
+            <span class="text-base font-black text-white/40">1</span>
+            <span class="text-[9px] font-semibold uppercase tracking-wider text-white/30">TO</span>
+          </div>
+          <div class="flex flex-col items-center gap-0.5 rounded-lg border border-white/10 bg-white/[0.03] py-2">
+            <span class="text-base font-black text-yellow-400">7×</span>
+            <span class="text-[9px] font-semibold uppercase tracking-wider text-white/30">Série</span>
+          </div>
+        </div>
+
+        <p class="mt-4 max-w-xs text-xs text-white/40 anim-fadeup" style="animation-delay:.5s">8 questions sur 10 bien senties — gros combo de 7 d'affilée.</p>
+      </div>
+    </section>
+
+    <!-- Story 3 : Rank -->
+    <section class="story bg-rank" data-dur="5500">
+      <div class="absolute inset-0 flex flex-col items-center justify-center px-6 pt-20 pb-24 text-center">
+        <span class="mb-5 text-[9px] font-bold uppercase tracking-[0.3em] text-white/30 anim-fadein">Classement définitif</span>
+        <div class="relative flex flex-col items-center anim-pop">
+          <div class="flex h-28 w-28 items-center justify-center rounded-full border-2 bg-neon-violet/10" style="border-color:#8B5CF6; box-shadow: 0 0 32px rgba(139,92,246,.5)">
+            <span class="text-4xl font-black text-white">#12</span>
+          </div>
+        </div>
+        <p class="mt-4 text-sm text-white/70 anim-fadeup" style="animation-delay:.2s">sur <strong class="text-white">1 247 joueurs</strong> aujourd'hui</p>
+        <p class="mt-1 text-[11px] text-white/30 anim-fadeup" style="animation-delay:.3s">Top 1% · ton meilleur rang quotidien</p>
+
+        <div class="mt-6 w-full max-w-xs rounded-xl border border-white/10 bg-white/[0.03] p-2.5 anim-fadeup" style="animation-delay:.4s">
+          <div class="flex flex-col gap-1">
+            <div class="flex items-center gap-2 rounded-md px-2 py-1.5">
+              <span class="w-4 text-center text-[10px] font-black tabular" style="color:#EAB308">#1</span>
+              <span class="flex-1 truncate text-xs font-bold text-white">MelodyHunter</span>
+              <span class="text-[11px] font-black tabular text-white/80">3 240</span>
+            </div>
+            <div class="flex items-center gap-2 rounded-md px-2 py-1.5">
+              <span class="w-4 text-center text-[10px] font-black tabular" style="color:#94A3B8">#2</span>
+              <span class="flex-1 truncate text-xs font-bold text-white">Retro_K</span>
+              <span class="text-[11px] font-black tabular text-white/80">2 995</span>
+            </div>
+            <div class="flex items-center gap-2 rounded-md px-2 py-1.5">
+              <span class="w-4 text-center text-[10px] font-black tabular" style="color:#CD7C35">#3</span>
+              <span class="flex-1 truncate text-xs font-bold text-white">VinylGirl</span>
+              <span class="text-[11px] font-black tabular text-white/80">2 810</span>
+            </div>
+            <div class="my-0.5 text-center text-[9px] text-white/20">···</div>
+            <div class="flex items-center gap-2 rounded-md border border-neon-violet/30 bg-neon-violet/[0.08] px-2 py-1.5">
+              <span class="w-4 text-center text-[10px] font-black tabular text-neon-violet">#12</span>
+              <span class="flex-1 truncate text-xs font-bold text-neon-violet">Toi</span>
+              <span class="text-[11px] font-black tabular text-neon-violet">1 847</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Stories 4-6 : Les 3 questions marquantes + anecdotes (Q1, Q5 wrong, Q10) -->
+    <!-- Question card template rendered via JS -->
+
+    <!-- Story 7 : Achievement 1 (epic) -->
+    <section class="story bg-ach-ep" data-dur="5500">
+      <div class="absolute inset-0 flex flex-col items-center justify-center px-6 pt-20 pb-24 text-center">
+        <span class="mb-4 text-[9px] font-bold uppercase tracking-[0.3em] text-white/30 anim-fadein">Achievement débloqué</span>
+
+        <div class="relative mb-5 anim-pop">
+          <div class="absolute inset-0 -z-10 rounded-full" style="background: radial-gradient(circle, rgba(139,92,246,.6) 0%, transparent 70%); filter: blur(28px); width: 260px; height:260px; left:-50%; top:-50%; transform: translate(-16px,-16px)"></div>
+          <div class="hex" style="width: 128px; height:144px; background: #1E1E2E; border: 2.5px solid #8B5CF6; filter: drop-shadow(0 0 22px rgba(139,92,246,.7))">
+            <span class="text-7xl">🎯</span>
+          </div>
+        </div>
+
+        <span class="mb-2 rounded-full px-4 py-1 text-[10px] font-bold uppercase tracking-[0.2em] anim-fadeup" style="animation-delay:.2s; background: rgba(139,92,246,.15); color: #C4B5FD">✦ Epic</span>
+        <h2 class="text-2xl font-black text-white anim-fadeup" style="animation-delay:.3s">Top 100 du jour</h2>
+        <p class="mt-1 max-w-xs text-sm text-white/50 anim-fadeup" style="animation-delay:.4s">Termine dans le top 100 d'un défi quotidien</p>
+        <p class="mt-4 text-[11px] font-semibold text-neon-violet/80 anim-fadeup" style="animation-delay:.5s">+200 XP · +80 ◈</p>
+      </div>
+    </section>
+
+    <!-- Story 8 : Achievement 2 (rare) -->
+    <section class="story bg-ach-ra" data-dur="5500">
+      <div class="absolute inset-0 flex flex-col items-center justify-center px-6 pt-20 pb-24 text-center">
+        <span class="mb-4 text-[9px] font-bold uppercase tracking-[0.3em] text-white/30 anim-fadein">Achievement débloqué</span>
+
+        <div class="relative mb-5 anim-pop">
+          <div class="absolute inset-0 -z-10 rounded-full" style="background: radial-gradient(circle, rgba(59,130,246,.55) 0%, transparent 70%); filter: blur(28px); width: 260px; height:260px; left:-50%; top:-50%; transform: translate(-16px,-16px)"></div>
+          <div class="hex" style="width: 128px; height:144px; background: #1E1E2E; border: 2.5px solid #3B82F6; filter: drop-shadow(0 0 22px rgba(59,130,246,.7))">
+            <span class="text-7xl">🔥</span>
+          </div>
+        </div>
+
+        <span class="mb-2 rounded-full px-4 py-1 text-[10px] font-bold uppercase tracking-[0.2em] anim-fadeup" style="animation-delay:.2s; background: rgba(59,130,246,.15); color: #93C5FD">◆ Rare</span>
+        <h2 class="text-2xl font-black text-white anim-fadeup" style="animation-delay:.3s">Cinq d'affilée</h2>
+        <p class="mt-1 max-w-xs text-sm text-white/50 anim-fadeup" style="animation-delay:.4s">Joue au défi quotidien 5 jours de suite — multiplicateur ×1.5 actif !</p>
+        <p class="mt-4 text-[11px] font-semibold text-neon-blue/80 anim-fadeup" style="animation-delay:.5s">+75 XP · +30 ◈</p>
+      </div>
+    </section>
+
+    <!-- Story 9 : Rewards total + CTA -->
+    <section class="story bg-rewards" data-dur="7000">
+      <div class="absolute inset-0 flex flex-col items-center justify-center px-6 pt-20 pb-24">
+        <span class="mb-4 text-center text-[9px] font-bold uppercase tracking-[0.3em] text-white/30 anim-fadein">Total gagné</span>
+
+        <div class="flex w-full max-w-sm gap-3 anim-pop">
+          <div class="flex-1 rounded-xl border border-neon-violet/30 bg-neon-violet/[0.08] p-3 text-center">
+            <div class="text-[9px] font-bold uppercase tracking-widest text-neon-violet/80">✦ XP</div>
+            <div class="mt-1 text-3xl font-black text-neon-violet tabular">+560</div>
+          </div>
+          <div class="flex-1 rounded-xl border border-cyan-400/30 bg-cyan-400/[0.06] p-3 text-center">
+            <div class="text-[9px] font-bold uppercase tracking-widest text-cyan-300/80">◈ Pulses</div>
+            <div class="mt-1 text-3xl font-black text-cyan-300 tabular">+188</div>
+          </div>
+        </div>
+
+        <!-- Level up -->
+        <div class="mt-4 w-full max-w-sm rounded-xl border border-yellow-400/25 bg-yellow-400/[0.05] p-3 anim-fadeup" style="animation-delay:.25s">
+          <div class="flex items-center gap-2">
+            <span class="rounded-full bg-yellow-400/20 px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-yellow-400">Niveau 14 !</span>
+            <span class="ml-auto text-[10px] text-white/40">820 / 1400 XP</span>
+          </div>
+          <div class="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-white/5">
+            <div class="h-full rounded-full anim-barfill" style="width:58%; background: linear-gradient(90deg, #7c3aed, #2563eb)"></div>
+          </div>
+        </div>
+
+        <!-- Solde -->
+        <div class="mt-3 flex w-full max-w-sm items-center justify-between rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2 anim-fadeup" style="animation-delay:.4s">
+          <span class="text-[10px] font-bold uppercase tracking-widest text-cyan-300/60">Solde Pulses</span>
+          <span class="flex items-center gap-1 tabular text-xs font-black text-cyan-300"><span class="text-[10px]">◈</span>2 374</span>
+        </div>
+
+        <div class="mt-4 flex w-full max-w-sm flex-col items-center gap-2 anim-fadeup" style="animation-delay:.6s">
+          <span class="mb-1 text-center text-[11px] text-white/40">Le défi du jour t'attend, rang différent — tente ta chance !</span>
+          <button class="relative w-full overflow-hidden rounded-xl py-3 text-center text-sm font-black text-white"
+                  style="background: linear-gradient(135deg, #7c3aed 0%, #2563eb 100%); box-shadow: 0 0 28px rgba(124,58,237,0.45)">
+            <span class="pointer-events-none absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent" style="animation: shimmer 3s linear infinite"></span>
+            <span class="relative">Jouer le défi d'aujourd'hui →</span>
+          </button>
+          <button class="text-[11px] text-white/30 hover:text-white/60">Plus tard</button>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script src="_mock.js"></script>
+  <script>
+    const phone = document.getElementById('phone');
+    const pb    = document.getElementById('pb');
+
+    // ── Insert 3 "question" stories programmatically (Q1, Q5, Q10) between rank (3) and achievement (4 in markup) ──
+    const featured = [ MOCK.questions[0], MOCK.questions[4], MOCK.questions[9] ];
+    const refNode = phone.querySelector('.story.bg-ach-ep'); // achievement 1 — we insert before
+    featured.slice().reverse().forEach(q => {
+      const statusLabel = q.userAnswer === null ? 'Timeout' : q.isCorrect ? 'Bonne réponse' : 'Mauvaise réponse';
+      const borderColor = q.isCorrect ? '#22C55E' : '#EF4444';
+      const tone = q.isCorrect ? 'rgba(34,197,94,.18)' : 'rgba(239,68,68,.18)';
+      const node = document.createElement('section');
+      node.className = 'story bg-q';
+      node.dataset.dur = '7000';
+      node.innerHTML = `
+        <div class="absolute inset-0 flex flex-col justify-center px-6 pt-20 pb-24">
+          <div class="anim-slideL rounded-2xl border border-white/[0.08] bg-game-card p-5" style="border-left: 3px solid ${borderColor}; box-shadow: 0 20px 60px ${tone}">
+            <div class="mb-3 flex items-center justify-between">
+              <span class="tabular text-[10px] font-black ${q.isCorrect ? 'text-game-success' : 'text-game-danger'}">Question ${String(q.n).padStart(2,'0')} / ${MOCK.questions.length}</span>
+              <span class="text-[10px] font-bold uppercase tracking-wider ${q.isCorrect?'text-game-success/80':'text-game-danger/80'}">${statusLabel}</span>
+            </div>
+            <h3 class="mb-3 text-base font-bold text-white leading-snug">${q.question}</h3>
+            <div class="mb-3 flex flex-col gap-0.5 text-xs">
+              ${q.userAnswer !== null
+                ? `<p><span class="text-white/30">Ta réponse · </span><span class="font-semibold ${q.isCorrect?'text-game-success':'text-game-danger'}">${q.userAnswer}</span></p>`
+                : `<p class="italic text-white/30">Pas de réponse dans le temps</p>`}
+              ${!q.isCorrect ? `<p><span class="text-white/30">Bonne réponse · </span><span class="font-semibold text-game-success">${q.correctAnswer}</span></p>` : ''}
+            </div>
+            ${q.isCorrect ? `
+              <div class="mb-4 flex items-center gap-2">
+                <span class="rounded-full px-1.5 py-0.5 text-[10px] font-black ${q.multiplier>=3?'bg-yellow-500/15 text-yellow-400':'bg-purple-500/15 text-purple-400'}">×${q.multiplier}</span>
+                <span class="text-[10px] font-bold text-orange-400">+${q.points} pts</span>
+                <span class="ml-auto tabular text-[10px] text-white/30">${q.timeSpent.toFixed(1)}s</span>
+              </div>
+            ` : ''}
+            <div class="flex gap-3 rounded-xl border border-neon-cyan/15 bg-neon-cyan/[0.04] px-3 py-3">
+              <span class="shrink-0 text-base">💡</span>
+              <div>
+                <p class="mb-1 text-[9px] font-bold uppercase tracking-widest text-neon-cyan/80">Le saviez-vous ?</p>
+                <p class="text-[12px] leading-relaxed text-white/75">${q.anecdote}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+      refNode.parentNode.insertBefore(node, refNode);
+    });
+
+    // ── Stories engine ──
+    const stories = Array.from(phone.querySelectorAll('.story'));
+    stories.forEach(() => {
+      const d = document.createElement('div');
+      d.innerHTML = '<span></span>';
+      pb.appendChild(d);
+    });
+    const segs = Array.from(pb.children);
+
+    let idx = 0;
+    let timer = null;
+
+    function setActive(n) {
+      clearTimeout(timer);
+      idx = Math.max(0, Math.min(stories.length - 1, n));
+      stories.forEach((s, i) => s.classList.toggle('active', i === idx));
+      segs.forEach((seg, i) => {
+        seg.classList.remove('active', 'done');
+        if (i < idx) seg.classList.add('done');
+        if (i === idx) {
+          const dur = stories[idx].dataset.dur || '5000';
+          seg.style.setProperty('--dur', dur + 'ms');
+          seg.classList.add('active');
+          // re-run bar animation
+          const bar = seg.querySelector('span');
+          bar.style.animation = 'none'; bar.offsetHeight; bar.style.animation = '';
+          timer = setTimeout(() => setActive(idx + 1 < stories.length ? idx + 1 : idx), parseInt(dur,10));
+        }
+      });
+    }
+
+    document.getElementById('zone-next').addEventListener('click', () => setActive(idx + 1 < stories.length ? idx + 1 : idx));
+    document.getElementById('zone-prev').addEventListener('click', () => setActive(Math.max(0, idx - 1)));
+    document.addEventListener('keydown', e => {
+      if (e.key === 'ArrowRight') setActive(idx + 1 < stories.length ? idx + 1 : idx);
+      if (e.key === 'ArrowLeft')  setActive(Math.max(0, idx - 1));
+    });
+
+    // pause on press-and-hold
+    let holdTimer;
+    const pausePress = (on) => {
+      pb.classList.toggle('paused', on);
+      stories[idx].querySelectorAll('[class*="anim-"]').forEach(el => el.style.animationPlayState = on ? 'paused' : 'running');
+      if (on) { clearTimeout(timer); }
+      else {
+        // resume: recalc remaining based on bar width
+        const bar = segs[idx].querySelector('span');
+        const rect = bar.getBoundingClientRect();
+        const parent = bar.parentElement.getBoundingClientRect();
+        const pct = Math.min(1, rect.width / parent.width);
+        const total = parseInt(stories[idx].dataset.dur || '5000', 10);
+        const remaining = Math.max(300, total * (1 - pct));
+        timer = setTimeout(() => setActive(idx + 1 < stories.length ? idx + 1 : idx), remaining);
+      }
+    };
+    phone.addEventListener('mousedown', e => {
+      // ignore mouse down on the close link
+      if (e.target.closest('.close')) return;
+      holdTimer = setTimeout(() => pausePress(true), 180);
+    });
+    const release = () => { clearTimeout(holdTimer); pausePress(false); };
+    phone.addEventListener('mouseup', release);
+    phone.addEventListener('mouseleave', release);
+
+    setActive(0);
+  </script>
+</body>
+</html>

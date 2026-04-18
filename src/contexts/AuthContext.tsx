@@ -2,10 +2,19 @@ import { createContext, useContext, useEffect, useRef, useState, type ReactNode 
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '../services/supabase'
 import { checkAndUnlockAchievements, type AchievementContext } from '../services/achievements'
-import type { AchievementWithStatus, EquippedCosmetics, PulsesBreakdown, XpBreakdown } from '../types/quiz'
+import type { AchievementWithStatus, CosmeticType, EquippedCosmetics, InventoryItem, PulsesBreakdown, XpBreakdown } from '../types/quiz'
 import { identifyUser, resetIdentity, trackUserSignedUp, trackUserSignedIn } from '../services/analytics'
 import { getLevelFromXp } from '../constants/levels'
 import { getWallet } from '../services/pulses'
+import { getUserInventory } from '../services/inventory'
+
+const EQUIPPED_KEY: Record<CosmeticType, keyof EquippedCosmetics> = {
+  emblem:           'emblem_id',
+  background:       'background_id',
+  title:            'title_id',
+  card_design:      'card_design_id',
+  screen_animation: 'screen_anim_id',
+}
 
 interface Profile {
   username: string
@@ -84,6 +93,9 @@ interface AuthContextValue {
   refreshStats: () => void
   setLocalFeaturedBadges: (badges: string[]) => void
   setLocalDescription: (description: string) => void
+  setLocalEquipped: (type: CosmeticType, itemId: string | null) => void
+  ownedItems: InventoryItem[] | null
+  refreshInventory: () => Promise<void>
   triggerAchievementCheck: (context?: AchievementContext) => Promise<void>
   signUp: (email: string, password: string, username: string) => Promise<void>
   signIn: (email: string, password: string) => Promise<void>
@@ -107,6 +119,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const toastIdRef = useRef(0)
   const [pendingAchievements, setPendingAchievements] = useState<AchievementWithStatus[]>([])
   const [statsRefreshKey, setStatsRefreshKey] = useState(0)
+  const [ownedItems, setOwnedItems] = useState<InventoryItem[] | null>(null)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -124,7 +137,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!user) {
       let cancelled = false
-      queueMicrotask(() => { if (!cancelled) { setProfile(null); setTotalXp(0); setPulsesBalance(0); resetIdentity() } })
+      queueMicrotask(() => { if (!cancelled) { setProfile(null); setTotalXp(0); setPulsesBalance(0); setOwnedItems(null); resetIdentity() } })
       return () => { cancelled = true }
     }
     let cancelled = false
@@ -132,7 +145,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       supabase.from('profiles').select(PROFILE_SELECT).eq('id', user.id).maybeSingle(),
       supabase.from('user_global_stats').select('total_xp').eq('user_id', user.id).maybeSingle(),
       getWallet(user.id).catch(() => ({ balance: 0, lifetime_earned: 0, updated_at: null })),
-    ]).then(([profileRes, xpRes, wallet]) => {
+      getUserInventory(user.id).catch(() => [] as InventoryItem[]),
+    ]).then(([profileRes, xpRes, wallet, inventory]) => {
       if (!cancelled) {
         if (profileRes.data) {
           setProfile(mapProfileRow(profileRes.data as ProfileRow))
@@ -142,6 +156,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setTotalXp(xp)
         totalXpRef.current = xp
         setPulsesBalance(wallet.balance ?? 0)
+        setOwnedItems(inventory)
       }
     })
     // Vérification rétroactive silencieuse — fire and forget
@@ -190,13 +205,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setProfile(prev => prev ? { ...prev, description } : prev)
   }
 
+  function setLocalEquipped(type: CosmeticType, itemId: string | null) {
+    const key = EQUIPPED_KEY[type]
+    setProfile(prev => prev ? { ...prev, equipped: { ...prev.equipped, [key]: itemId } } : prev)
+  }
+
+  async function refreshInventory(): Promise<void> {
+    if (!user) { setOwnedItems(null); return }
+    const items = await getUserInventory(user.id).catch(() => null)
+    if (items) setOwnedItems(items)
+  }
+
   async function triggerAchievementCheck(context?: AchievementContext): Promise<void> {
     if (!user) return
     const unlocked = await checkAndUnlockAchievements(user.id, context).catch(err => {
       console.error('Achievement check failed:', err)
       return [] as AchievementWithStatus[]
     })
-    if (unlocked.length > 0) setPendingAchievements(prev => [...prev, ...unlocked])
+    if (unlocked.length > 0) {
+      setPendingAchievements(prev => [...prev, ...unlocked])
+      // Trigger sync_achievement_to_badge pushes new badges into user_inventory — refresh cache.
+      refreshInventory().catch(() => {})
+    }
   }
 
   async function signUp(email: string, password: string, username: string) {
@@ -247,6 +277,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setTotalXp(0)
     totalXpRef.current = 0
     setPulsesBalance(0)
+    setOwnedItems(null)
   }
 
   async function refreshProfile(): Promise<void> {
@@ -277,7 +308,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, totalXp, pulsesBalance, rewardNotification, showRewardGain, clearRewardNotification, pendingAchievements, clearPendingAchievements, statsRefreshKey, refreshStats, setLocalFeaturedBadges, setLocalDescription, triggerAchievementCheck, signUp, signIn, signOut, refreshProfile, refreshWallet, bumpPulses, bumpXp }}>
+    <AuthContext.Provider value={{ user, profile, loading, totalXp, pulsesBalance, rewardNotification, showRewardGain, clearRewardNotification, pendingAchievements, clearPendingAchievements, statsRefreshKey, refreshStats, setLocalFeaturedBadges, setLocalDescription, setLocalEquipped, ownedItems, refreshInventory, triggerAchievementCheck, signUp, signIn, signOut, refreshProfile, refreshWallet, bumpPulses, bumpXp }}>
       {children}
     </AuthContext.Provider>
   )

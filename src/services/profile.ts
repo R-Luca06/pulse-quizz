@@ -58,6 +58,8 @@ export async function updateUsername(userId: string, username: string): Promise<
     .maybeSingle()
   if (conflict) throw new AppError('validation_error', 'Ce pseudo est déjà utilisé')
 
+  // Le trigger `trg_sync_username_to_leaderboard` propage automatiquement
+  // le pseudo dans leaderboard.username (RLS interdit l'UPDATE direct côté client).
   const { error } = await supabase
     .from('profiles')
     .update({ username: trimmed, username_changed: true })
@@ -68,11 +70,4 @@ export async function updateUsername(userId: string, username: string): Promise<
       : error.message
     throw new AppError('db_error', msg)
   }
-
-  // Synchroniser le pseudo dans toutes les entrées leaderboard de l'utilisateur
-  const { error: lbError } = await supabase
-    .from('leaderboard')
-    .update({ username: trimmed })
-    .eq('user_id', userId)
-  if (lbError) throw new AppError('db_error', lbError.message)
 }

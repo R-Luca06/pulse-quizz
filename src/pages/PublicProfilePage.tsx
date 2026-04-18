@@ -1,14 +1,14 @@
 import { useState, useEffect, useRef, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion } from 'framer-motion'
 import MiniBadge from '../components/shared/MiniBadge'
 import { BADGE_TIER, TIER_GLOW_COLOR } from '../constants/achievementColors'
 import { ACHIEVEMENT_MAP } from '../constants/achievements'
-import type { AchievementId, AchievementTier } from '../types/quiz'
+import type { AchievementId, AchievementTier, ItemType } from '../types/quiz'
 import { getPublicProfile, type PublicProfile } from '../services/publicProfile'
 import { getLevelFromXp } from '../constants/levels'
 import { useAuth } from '../hooks/useAuth'
-import { updateFeaturedBadges, updateUsername, updateDescription } from '../services/profile'
+import { updateUsername, updateDescription } from '../services/profile'
 import { sendFriendRequest, removeFriendship, getFriendshipStatus, type FriendshipStatus } from '../services/social'
 import { useToast } from '../contexts/ToastContext'
 import EmblemSlot from '../components/cosmetics/EmblemSlot'
@@ -16,6 +16,7 @@ import TitleSlot from '../components/cosmetics/TitleSlot'
 import CardDesignSlot from '../components/cosmetics/CardDesignSlot'
 import BackgroundSlot from '../components/cosmetics/BackgroundSlot'
 import ScreenAnimationSlot from '../components/cosmetics/ScreenAnimationSlot'
+import ItemPicker from '../components/inventory/ItemPicker'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -126,17 +127,13 @@ function EmptyBanner({ index, onClick }: { index: number; onClick?: () => void }
 function Nameplate({ username, title }: { username: string; title: ReactNode }) {
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.55, duration: 0.65 }}
-      style={{ position: 'relative', display: 'inline-flex', flexDirection: 'column', alignItems: 'center' }}
+      style={{ position: 'relative', padding: '7px 28px 6px', background: 'linear-gradient(180deg, rgba(255,255,255,0.065) 0%, rgba(255,255,255,0.03) 100%)', border: '1px solid rgba(255,255,255,0.13)', borderRadius: 3, boxShadow: '0 4px 16px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.07)', minWidth: 180, display: 'inline-flex', flexDirection: 'column', alignItems: 'center', gap: 3, verticalAlign: 'top' }}
     >
-      <div style={{ width: 1.5, height: 8, background: 'rgba(255,255,255,0.12)' }} />
-      <div style={{ position: 'relative', padding: '7px 28px 6px', background: 'linear-gradient(180deg, rgba(255,255,255,0.065) 0%, rgba(255,255,255,0.03) 100%)', border: '1px solid rgba(255,255,255,0.13)', borderRadius: 3, boxShadow: '0 4px 16px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.07)', minWidth: 180, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
-        {[['top','left'], ['top','right'], ['bottom','left'], ['bottom','right']].map(([v, h]) => (
-          <div key={`${v}${h}`} style={{ position: 'absolute', [v]: 4, [h]: 7, width: 9, height: 9, borderTop: v==='top' ? '1px solid rgba(255,255,255,0.22)' : 'none', borderBottom: v==='bottom' ? '1px solid rgba(255,255,255,0.22)' : 'none', borderLeft: h==='left' ? '1px solid rgba(255,255,255,0.22)' : 'none', borderRight: h==='right' ? '1px solid rgba(255,255,255,0.22)' : 'none' }} />
-        ))}
-        <span style={{ fontSize: 14, fontWeight: 900, color: 'rgba(255,255,255,0.88)', letterSpacing: '0.06em' }}>@{username}</span>
-        <span style={{ fontSize: 8.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.16em', color: 'rgba(255,255,255,0.32)' }}>{title}</span>
-      </div>
-      <div style={{ width: '90%', height: 3, background: 'rgba(0,0,0,0.3)', borderRadius: '0 0 3px 3px', filter: 'blur(2px)', marginTop: 1 }} />
+      {[['top','left'], ['top','right'], ['bottom','left'], ['bottom','right']].map(([v, h]) => (
+        <div key={`${v}${h}`} style={{ position: 'absolute', [v]: 4, [h]: 7, width: 9, height: 9, borderTop: v==='top' ? '1px solid rgba(255,255,255,0.22)' : 'none', borderBottom: v==='bottom' ? '1px solid rgba(255,255,255,0.22)' : 'none', borderLeft: h==='left' ? '1px solid rgba(255,255,255,0.22)' : 'none', borderRight: h==='right' ? '1px solid rgba(255,255,255,0.22)' : 'none' }} />
+      ))}
+      <span style={{ fontSize: 14, fontWeight: 900, color: 'rgba(255,255,255,0.88)', letterSpacing: '0.06em' }}>@{username}</span>
+      <span style={{ fontSize: 8.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.16em', color: 'rgba(255,255,255,0.32)' }}>{title}</span>
     </motion.div>
   )
 }
@@ -256,126 +253,6 @@ function BadgeShelf({ achievements, achievementDates }: { achievements: Achievem
   )
 }
 
-function BadgePicker({
-  achievements,
-  currentBadges,
-  slotIndex,
-  onSelect,
-  onClose,
-}: {
-  achievements: AchievementId[]
-  currentBadges: (AchievementId | null)[]
-  slotIndex: number
-  onSelect: (id: AchievementId | null) => void
-  onClose: () => void
-}) {
-  const unlockedSet = new Set(achievements)
-  const TIER_ORDER: Record<AchievementTier, number> = { legendary: 0, epic: 1, rare: 2, common: 3 }
-  const sorted = [...ALL_BADGE_IDS].sort((a, b) => {
-    const au = unlockedSet.has(a), bu = unlockedSet.has(b)
-    if (au !== bu) return au ? -1 : 1
-    return TIER_ORDER[BADGE_TIER[a]] - TIER_ORDER[BADGE_TIER[b]]
-  })
-  const currentSlotBadge = currentBadges[slotIndex]
-
-  return (
-    <motion.div
-      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-      className="fixed inset-0 z-[200] flex items-end justify-center"
-    >
-      {/* Backdrop */}
-      <motion.div
-        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-        className="absolute inset-0 bg-black/70 backdrop-blur-sm"
-        onClick={onClose}
-      />
-
-      {/* Sheet */}
-      <motion.div
-        initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
-        transition={{ type: 'spring', stiffness: 380, damping: 40 }}
-        className="relative w-full max-w-lg rounded-t-2xl border-t border-game-border bg-game-card flex flex-col"
-        style={{ maxHeight: '72vh' }}
-      >
-        {/* Handle */}
-        <div className="flex justify-center pt-3 pb-1">
-          <div className="h-1 w-10 rounded-full bg-white/10" />
-        </div>
-
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-3 border-b border-game-border">
-          <div>
-            <p className="text-sm font-bold text-white/80">Bannière {slotIndex + 1}</p>
-            <p className="text-[11px] text-white/30">Choisir un badge à épingler</p>
-          </div>
-          <button
-            onClick={onClose}
-            className="flex h-8 w-8 items-center justify-center rounded-lg text-white/30 transition-colors hover:bg-white/5 hover:text-white/60"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-            </svg>
-          </button>
-        </div>
-
-        {/* Grid */}
-        <div className="flex-1 overflow-y-auto px-4 py-4">
-          {currentSlotBadge && (
-            <button
-              onClick={() => onSelect(null)}
-              className="mb-4 flex w-full items-center justify-center gap-2 rounded-xl border border-game-border py-2.5 text-xs font-semibold text-white/35 transition-colors hover:border-red-500/30 hover:bg-red-500/5 hover:text-red-400/70"
-            >
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/>
-              </svg>
-              Retirer le badge
-            </button>
-          )}
-          <div className="grid grid-cols-5 gap-2.5 sm:grid-cols-6">
-            {sorted.map(id => {
-              const unlocked = unlockedSet.has(id)
-              const pinnedInOtherSlot = currentBadges.some((b, i) => b === id && i !== slotIndex)
-              const isCurrentSlot = currentBadges[slotIndex] === id
-              const isDisabled = !unlocked || pinnedInOtherSlot
-              const tier = BADGE_TIER[id]
-              const glow = TIER_GLOW_COLOR[tier]
-              return (
-                <motion.button
-                  key={id}
-                  type="button"
-                  disabled={isDisabled}
-                  onClick={() => !isDisabled && onSelect(id)}
-                  whileHover={!isDisabled ? { scale: 1.08 } : undefined}
-                  whileTap={!isDisabled ? { scale: 0.95 } : undefined}
-                  className="relative flex flex-col items-center gap-1.5 rounded-xl p-2 focus:outline-none transition-colors"
-                  style={{
-                    background: isCurrentSlot ? `${glow}18` : 'transparent',
-                    border: isCurrentSlot ? `1px solid ${glow}55` : '1px solid transparent',
-                    opacity: isDisabled ? 0.2 : 1,
-                    cursor: isDisabled ? 'default' : 'pointer',
-                  }}
-                >
-                  <div style={{ filter: unlocked ? 'none' : 'grayscale(1)' }}>
-                    <MiniBadge achievementId={id} size={32} unlocked={unlocked} />
-                  </div>
-                  {/* checkmark pour le slot courant */}
-                  {isCurrentSlot && (
-                    <div className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full" style={{ background: glow }}>
-                      <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
-                        <polyline points="20 6 9 17 4 12"/>
-                      </svg>
-                    </div>
-                  )}
-                </motion.button>
-              )
-            })}
-          </div>
-        </div>
-      </motion.div>
-    </motion.div>
-  )
-}
-
 function StatCard({ label, value, accent, delay }: { label: string; value: string; accent: string; delay: number }) {
   return (
     <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay, duration: 0.5 }}
@@ -442,7 +319,7 @@ function NotFoundState({ username, onClose, hideNav }: { username: string; onClo
 // ─── Page principale ──────────────────────────────────────────────────────────
 
 function WallPage({ profile, onClose, hideNav }: { profile: PublicProfile; onClose: () => void; hideNav?: boolean }) {
-  const { user, profile: authProfile, setLocalFeaturedBadges, setLocalDescription: setAuthDescription, refreshProfile, triggerAchievementCheck } = useAuth()
+  const { user, profile: authProfile, setLocalDescription: setAuthDescription, refreshProfile, triggerAchievementCheck } = useAuth()
   const toast = useToast()
   const [isOwnProfile] = useState(() =>
     !!user && !!authProfile && authProfile.username.toLowerCase() === profile.username.toLowerCase()
@@ -510,13 +387,8 @@ function WallPage({ profile, onClose, hideNav }: { profile: PublicProfile; onClo
     }
   }, [isOwnProfile, authProfile?.description])
 
-  // Bannières épinglées — toujours 3 slots (null = slot vide), éditable si own profile
-  const [localFeatured, setLocalFeatured] = useState<(AchievementId | null)[]>([
-    profile.featured_badges[0] ?? null,
-    profile.featured_badges[1] ?? null,
-    profile.featured_badges[2] ?? null,
-  ])
-  const [pickerSlot, setPickerSlot] = useState<0 | 1 | 2 | null>(null)
+  // Picker unifié (badge ou cosmétique) — `null` = fermé
+  const [picker, setPicker] = useState<{ type: ItemType; slotIndex?: 0 | 1 | 2 } | null>(null)
 
   // Édition inline
   const [editingField, setEditingField] = useState<'username' | 'description' | null>(null)
@@ -554,23 +426,21 @@ function WallPage({ profile, onClose, hideNav }: { profile: PublicProfile; onClo
     }
   }
 
-  async function handleSelectBadge(id: AchievementId | null) {
-    if (pickerSlot === null || !user) return
-    const prev = localFeatured
-    const next = localFeatured.map((b, i) => i === pickerSlot ? id : b) as (AchievementId | null)[]
-    const toSave = next.filter((b): b is AchievementId => b !== null)
-    setLocalFeatured(next)
-    setLocalFeaturedBadges(toSave)
-    setPickerSlot(null)
-    try {
-      await updateFeaturedBadges(user.id, toSave)
-    } catch {
-      setLocalFeatured(prev)
-      setLocalFeaturedBadges(prev.filter((b): b is AchievementId => b !== null))
-    }
-  }
+  // Source de vérité — pour own profile, on lit depuis AuthContext (live) ;
+  // pour les autres, on reste sur `profile` (snapshot fetch).
+  const liveFeatured = isOwnProfile ? (authProfile?.featured_badges ?? []) : profile.featured_badges
+  const liveEquipped = isOwnProfile && authProfile ? authProfile.equipped : profile.equipped
 
-  const pinnedBadges = localFeatured
+  const pinnedBadges: (AchievementId | null)[] = [
+    (liveFeatured[0] as AchievementId | undefined) ?? null,
+    (liveFeatured[1] as AchievementId | undefined) ?? null,
+    (liveFeatured[2] as AchievementId | undefined) ?? null,
+  ]
+
+  function firstFreeBadgeSlot(): 0 | 1 | 2 {
+    for (let i = 0; i < 3; i++) if (!pinnedBadges[i]) return i as 0 | 1 | 2
+    return 0
+  }
 
   const stats = [
     { label: 'Parties',        value: profile.games_played > 0 ? String(profile.games_played) : '—', accent: 'rgba(255,255,255,0.75)' },
@@ -833,26 +703,61 @@ function WallPage({ profile, onClose, hideNav }: { profile: PublicProfile; onClo
 
       <div className="relative flex flex-1 flex-col gap-4 overflow-y-auto pb-8 pt-4" style={{ WebkitOverflowScrolling: 'touch' } as React.CSSProperties}>
 
-        <BackgroundSlot equippedId={profile.equipped.background_id} />
-
         {/* ── La Salle ───────────────────────────────────────────────────── */}
         <div className="relative z-10 px-4">
-          <CardDesignSlot equippedId={profile.equipped.card_design_id}>
+          <BackgroundSlot
+            equippedId={liveEquipped.background_id}
+            onClick={isOwnProfile ? () => setPicker({ type: 'background' }) : undefined}
+          >
+            {/* Bouton Animation (haut-gauche du container) */}
+            {isOwnProfile && (
+              <button
+                type="button"
+                onClick={() => setPicker({ type: 'screen_animation' })}
+                aria-label="Modifier l'animation"
+                className="absolute left-3 top-3 z-20 flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-semibold text-white/70 backdrop-blur-sm transition-all hover:bg-neon-violet/20 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-neon-violet/50"
+                style={{ background: 'rgba(12,8,26,0.75)', border: '1px solid rgba(255,255,255,0.12)' }}
+              >
+                <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                </svg>
+                Animation
+              </button>
+            )}
+
             {/* Contenu mural */}
             <div style={{ padding: '18px 12px 0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
-              <EmblemSlot equippedId={profile.equipped.emblem_id} rank={profile.rank} />
+              <EmblemSlot
+                equippedId={liveEquipped.emblem_id}
+                rank={profile.rank}
+                onClick={isOwnProfile ? () => setPicker({ type: 'emblem' }) : undefined}
+              />
               <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'center', gap: 8, width: '100%' }}>
                 {pinnedBadges.map((id, i) => (
                   <Banner
                     key={i} id={id} index={i}
-                    onClick={isOwnProfile ? () => setPickerSlot(i as 0 | 1 | 2) : undefined}
+                    onClick={isOwnProfile ? () => setPicker({ type: 'badge', slotIndex: i as 0 | 1 | 2 }) : undefined}
                   />
                 ))}
               </div>
-              <Nameplate
-                username={profile.username}
-                title={<TitleSlot equippedId={profile.equipped.title_id} rank={profile.rank} />}
-              />
+              <div style={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
+                <CardDesignSlot
+                  equippedId={liveEquipped.card_design_id}
+                  onClick={isOwnProfile ? () => setPicker({ type: 'card_design' }) : undefined}
+                >
+                  <Nameplate
+                    username={profile.username}
+                    title={
+                      <TitleSlot
+                        equippedId={liveEquipped.title_id}
+                        rank={profile.rank}
+                        onClick={isOwnProfile ? () => setPicker({ type: 'title' }) : undefined}
+                      />
+                    }
+                  />
+                </CardDesignSlot>
+              </div>
               <div style={{ height: 10 }} />
             </div>
 
@@ -867,7 +772,7 @@ function WallPage({ profile, onClose, hideNav }: { profile: PublicProfile; onClo
                 ))}
               </svg>
             </div>
-          </CardDesignSlot>
+          </BackgroundSlot>
         </div>
 
         {/* ── Stats ──────────────────────────────────────────────────────── */}
@@ -877,23 +782,17 @@ function WallPage({ profile, onClose, hideNav }: { profile: PublicProfile; onClo
           ))}
         </div>
 
-        <ScreenAnimationSlot equippedId={profile.equipped.screen_anim_id} />
+        <ScreenAnimationSlot equippedId={liveEquipped.screen_anim_id} />
 
       </div>
 
-      {/* ── Badge picker ──────────────────────────────────────────────────── */}
-      <AnimatePresence>
-        {pickerSlot !== null && (
-          <BadgePicker
-            key="picker"
-            achievements={profile.achievements}
-            currentBadges={localFeatured}
-            slotIndex={pickerSlot}
-            onSelect={handleSelectBadge}
-            onClose={() => setPickerSlot(null)}
-          />
-        )}
-      </AnimatePresence>
+      {/* ── Picker unifié (badges + cosmétiques) ──────────────────────────── */}
+      <ItemPicker
+        open={picker !== null}
+        type={picker?.type ?? 'emblem'}
+        slotIndex={picker?.type === 'badge' ? (picker.slotIndex ?? firstFreeBadgeSlot()) : undefined}
+        onClose={() => setPicker(null)}
+      />
     </div>
   )
 }

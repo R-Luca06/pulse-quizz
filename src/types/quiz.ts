@@ -75,6 +75,8 @@ export type ItemType =
   | 'card_design'
   | 'screen_animation'
 
+export type CosmeticType = Exclude<ItemType, 'badge'>
+
 export interface InventoryItem {
   item_type:   ItemType
   item_id:     string

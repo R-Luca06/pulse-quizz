@@ -1,0 +1,615 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Hero Badge — previews</title>
+<style>
+  :root {
+    --bg: #0a0e17;
+    --bg-card: #11161f;
+    --bg-card-2: #161c28;
+    --fg: #e5e7eb;
+    --muted: #9ca3af;
+    --border: #1f2937;
+    --gold-1: #fde68a;
+    --gold-2: #fcd34d;
+    --gold-3: #fbbf24;
+    --gold-4: #f59e0b;
+    --gold-deep: #b45309;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--fg); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+  body { padding: 32px 24px 64px; }
+
+  h1 {
+    font-size: 22px;
+    font-weight: 700;
+    margin: 0 0 4px;
+    letter-spacing: -0.01em;
+  }
+  .subtitle { color: var(--muted); font-size: 13px; margin: 0 0 24px; max-width: 680px; line-height: 1.5; }
+
+  /* Mini row — all variants at 16px to check leaderboard scale */
+  .mini-row {
+    display: flex; gap: 18px; align-items: center; flex-wrap: wrap;
+    padding: 14px 16px; background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: 10px; margin-bottom: 28px;
+  }
+  .mini-row .label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.12em; margin-right: 6px; }
+  .mini-row .mini-item { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 11px; }
+
+  /* Grid — previews at 100px */
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 20px;
+  }
+  .card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 28px 20px 22px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+    overflow: hidden;
+    position: relative;
+  }
+  .card .stage {
+    width: 180px; height: 180px;
+    display: flex; align-items: center; justify-content: center;
+    position: relative;
+  }
+  .card .meta {
+    text-align: center;
+    width: 100%;
+  }
+  .card .name {
+    font-size: 14px; font-weight: 700; margin: 0 0 3px;
+  }
+  .card .desc {
+    font-size: 11.5px; color: var(--muted); line-height: 1.45; margin: 0;
+  }
+  .card .tag {
+    display: inline-block;
+    font-size: 9.5px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--gold-3); background: rgba(251,191,36,0.1); border: 1px solid rgba(251,191,36,0.25);
+    padding: 3px 8px; border-radius: 999px; margin-bottom: 8px;
+  }
+  .card.baseline .tag { color: var(--muted); background: rgba(156,163,175,0.1); border-color: rgba(156,163,175,0.2); }
+
+  /* ═══════════════════════════════════════════════════════════════════════
+     BADGE BASE — commun à toutes les variantes
+     Hex path: M32 2 L62 20 L62 52 L32 70 L2 52 L2 20 Z  (viewBox 64×72, périmètre ≈ 204)
+     ═══════════════════════════════════════════════════════════════════════ */
+  .badge {
+    position: relative;
+    width: 100px;
+    height: 112.5px;  /* 100 * 1.125 */
+    display: flex; align-items: center; justify-content: center;
+  }
+  .badge .glass {
+    position: absolute; inset: 0;
+    clip-path: polygon(50% 2.8%, 96.9% 27.8%, 96.9% 72.2%, 50% 97.2%, 3.1% 72.2%, 3.1% 27.8%);
+    background: linear-gradient(160deg, rgba(255,255,255,0.09) 0%, rgba(255,255,255,0.03) 55%, rgba(255,255,255,0.01) 100%);
+  }
+  .badge .svg-main {
+    position: absolute; inset: 0;
+    width: 100%; height: 100%;
+  }
+  .badge .icon {
+    position: relative; z-index: 5;
+    font-size: 45px; line-height: 1;
+    user-select: none;
+  }
+
+  /* Mini version (16px) — for the top row */
+  .badge.mini {
+    width: 22px;
+    height: 24.75px;
+  }
+  .badge.mini .icon { font-size: 10px; }
+
+  /* ═══════════════════════════════════════════════════════════════════════
+     KEYFRAMES SHARED
+     ═══════════════════════════════════════════════════════════════════════ */
+  @keyframes stroke-flow {
+    from { stroke-dashoffset: 0; }
+    to   { stroke-dashoffset: -204; }
+  }
+  @keyframes stroke-flow-b {
+    from { stroke-dashoffset: -102; }
+    to   { stroke-dashoffset: -306; }
+  }
+  @keyframes stroke-flow-rev {
+    from { stroke-dashoffset: -68; }
+    to   { stroke-dashoffset: 136; }
+  }
+
+  /* Legendary base pulse (copie du projet) */
+  @keyframes badge-gold {
+    0%, 100% { filter: drop-shadow(0 0 4px #f59e0b80) drop-shadow(0 0 8px #eab30840); }
+    50%       { filter: drop-shadow(0 0 8px #fbbf24cc) drop-shadow(0 0 18px #eab30860) drop-shadow(0 0 28px #f59e0b30); }
+  }
+
+  /* ═══════════════════════════════════════════════════════════════════════
+     V0 — LEGENDARY BASELINE (référence, pas d'override)
+     ═══════════════════════════════════════════════════════════════════════ */
+  .v0 .badge { animation: badge-gold 2.5s ease-in-out infinite; }
+
+  /* ═══════════════════════════════════════════════════════════════════════
+     V1 — MOLTEN CORE
+     Un cœur d'or liquide respire à l'intérieur. Le hex semble contenir du
+     métal en fusion. Pulse gold existant + radial-gradient animé inside.
+     ═══════════════════════════════════════════════════════════════════════ */
+  @keyframes molten-breath {
+    0%, 100% { opacity: 0.55; transform: scale(1); }
+    50%       { opacity: 1;    transform: scale(1.08); }
+  }
+  .v1 .badge { animation: badge-gold 2.5s ease-in-out infinite; }
+  .v1 .molten {
+    position: absolute; inset: 0;
+    clip-path: polygon(50% 2.8%, 96.9% 27.8%, 96.9% 72.2%, 50% 97.2%, 3.1% 72.2%, 3.1% 27.8%);
+    background: radial-gradient(ellipse 60% 50% at 50% 55%, rgba(253,230,138,0.85) 0%, rgba(245,158,11,0.5) 25%, rgba(180,83,9,0.2) 55%, transparent 80%);
+    mix-blend-mode: screen;
+    animation: molten-breath 2.5s ease-in-out infinite;
+    pointer-events: none;
+    z-index: 2;
+  }
+
+  /* ═══════════════════════════════════════════════════════════════════════
+     V2 — SOLAR CORONA
+     Rayons de soleil dorés qui tournent en arrière-plan. Le badge flotte dessus.
+     Évoque une icône divine / soleil levant.
+     ═══════════════════════════════════════════════════════════════════════ */
+  @keyframes corona-rotate {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
+  }
+  @keyframes corona-breath {
+    0%, 100% { opacity: 0.45; }
+    50%       { opacity: 0.85; }
+  }
+  .v2 .badge { animation: badge-gold 2.5s ease-in-out infinite; z-index: 2; }
+  .v2 .corona {
+    position: absolute;
+    left: 50%; top: 50%;
+    width: 240px; height: 240px;
+    margin: -120px 0 0 -120px;
+    z-index: 1;
+    pointer-events: none;
+  }
+  .v2 .corona .rays {
+    width: 100%; height: 100%;
+    animation: corona-rotate 18s linear infinite, corona-breath 3s ease-in-out infinite;
+  }
+
+  /* ═══════════════════════════════════════════════════════════════════════
+     V3 — DOUBLE RIM (contre-phase)
+     Deux contours hexagonaux concentriques qui pulsent en opposition.
+     Quand l'extérieur est fort, l'intérieur est faible, et inversement.
+     Effet "cadre d'or doublé" premium.
+     ═══════════════════════════════════════════════════════════════════════ */
+  @keyframes rim-pulse-a {
+    0%, 100% { opacity: 1; stroke-width: 2.5; }
+    50%       { opacity: 0.4; stroke-width: 1.5; }
+  }
+  @keyframes rim-pulse-b {
+    0%, 100% { opacity: 0.3; stroke-width: 1; }
+    50%       { opacity: 0.95; stroke-width: 2; }
+  }
+  .v3 .badge { animation: badge-gold 2.5s ease-in-out infinite; }
+  .v3 .rim-a { animation: rim-pulse-a 2.2s ease-in-out infinite; }
+  .v3 .rim-b { animation: rim-pulse-b 2.2s ease-in-out infinite; }
+
+  /* ═══════════════════════════════════════════════════════════════════════
+     V4 — ORBITAL SPARKLES
+     3 points lumineux or qui orbitent autour du badge à rayons différents.
+     Très "game-y", immédiatement lisible.
+     ═══════════════════════════════════════════════════════════════════════ */
+  @keyframes orbit-a {
+    from { transform: rotate(0deg) translateX(68px); }
+    to   { transform: rotate(360deg) translateX(68px); }
+  }
+  @keyframes orbit-b {
+    from { transform: rotate(120deg) translateX(78px); }
+    to   { transform: rotate(480deg) translateX(78px); }
+  }
+  @keyframes orbit-c {
+    from { transform: rotate(240deg) translateX(60px); }
+    to   { transform: rotate(600deg) translateX(60px); }
+  }
+  @keyframes sparkle-pulse {
+    0%, 100% { opacity: 0.5; box-shadow: 0 0 4px var(--gold-2); }
+    50%       { opacity: 1;   box-shadow: 0 0 10px var(--gold-1), 0 0 16px var(--gold-3); }
+  }
+  .v4 .badge { animation: badge-gold 2.5s ease-in-out infinite; z-index: 2; }
+  .v4 .orbit-stage {
+    position: absolute; left: 50%; top: 50%;
+    width: 0; height: 0;
+    z-index: 1;
+  }
+  .v4 .sparkle {
+    position: absolute;
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--gold-1);
+    margin: -3.5px 0 0 -3.5px;
+    animation: sparkle-pulse 1.2s ease-in-out infinite;
+  }
+  .v4 .sparkle-a { animation: orbit-a 4.5s linear infinite, sparkle-pulse 1.2s ease-in-out infinite; }
+  .v4 .sparkle-b { animation: orbit-b 5.5s linear infinite, sparkle-pulse 1.2s ease-in-out infinite; animation-delay: -0.4s, -0.4s; }
+  .v4 .sparkle-c { animation: orbit-c 6.2s linear infinite reverse, sparkle-pulse 1.2s ease-in-out infinite; animation-delay: -0.8s, -0.8s; }
+
+  /* ═══════════════════════════════════════════════════════════════════════
+     V5 — SHOCKWAVE PING
+     Périodiquement, un contour hex s'envole du badge, grossit et se dissout.
+     Comme un sonar. Unique parce qu'hexagonal (pas un cercle).
+     ═══════════════════════════════════════════════════════════════════════ */
+  @keyframes shockwave {
+    0%   { transform: scale(1);    opacity: 0.9; stroke-width: 2.5; }
+    80%  { transform: scale(1.55); opacity: 0;   stroke-width: 0.8; }
+    100% { transform: scale(1.55); opacity: 0;   stroke-width: 0.8; }
+  }
+  .v5 .badge { animation: badge-gold 2.5s ease-in-out infinite; }
+  .v5 .shockwave {
+    position: absolute; inset: 0;
+    width: 100%; height: 100%;
+    animation: shockwave 2.2s cubic-bezier(0.22, 0.61, 0.36, 1) infinite;
+    pointer-events: none;
+    transform-origin: center;
+  }
+  .v5 .shockwave-2 {
+    animation-delay: -1.1s;
+  }
+
+  /* ═══════════════════════════════════════════════════════════════════════
+     V6 — RISING EMBERS
+     Petites particules d'or qui montent depuis le bas du badge et se dissipent.
+     Évoque le feu sacré, une flamme qui s'élève.
+     ═══════════════════════════════════════════════════════════════════════ */
+  @keyframes ember-rise {
+    0%   { transform: translate(0, 40px) scale(0.8); opacity: 0; }
+    15%  { opacity: 1; }
+    90%  { opacity: 0; }
+    100% { transform: translate(var(--drift), -80px) scale(0.3); opacity: 0; }
+  }
+  .v6 .badge { animation: badge-gold 2.5s ease-in-out infinite; z-index: 2; }
+  .v6 .embers {
+    position: absolute; left: 50%; top: 50%;
+    width: 0; height: 0;
+    z-index: 1;
+    pointer-events: none;
+  }
+  .v6 .ember {
+    position: absolute;
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    background: var(--gold-1);
+    box-shadow: 0 0 6px var(--gold-2), 0 0 12px var(--gold-3);
+    animation: ember-rise 3s ease-out infinite;
+  }
+  .v6 .ember-1 { left: -30px; --drift: -15px; animation-delay: 0s; }
+  .v6 .ember-2 { left: -10px; --drift: 8px;   animation-delay: -0.5s; }
+  .v6 .ember-3 { left: 10px;  --drift: -6px;  animation-delay: -1.2s; }
+  .v6 .ember-4 { left: 30px;  --drift: 12px;  animation-delay: -1.8s; }
+  .v6 .ember-5 { left: 0;     --drift: 3px;   animation-delay: -2.4s; }
+
+  /* ═══════════════════════════════════════════════════════════════════════
+     V7 — SWEEPING BEAM (scanner)
+     Une bande de lumière VERTICALE balaye le badge de gauche à droite en
+     ~2.5s (pas de blanc diagonal — c'est un vrai beam or épais et lisible).
+     ═══════════════════════════════════════════════════════════════════════ */
+  @keyframes beam-sweep {
+    0%   { transform: translateX(-70px) skewX(-12deg); opacity: 0; }
+    15%  { opacity: 1; }
+    45%  { opacity: 1; }
+    60%  { transform: translateX(70px)  skewX(-12deg); opacity: 0; }
+    100% { transform: translateX(70px)  skewX(-12deg); opacity: 0; }
+  }
+  .v7 .badge { animation: badge-gold 2.5s ease-in-out infinite; }
+  .v7 .beam-mask {
+    position: absolute; inset: 0;
+    clip-path: polygon(50% 2.8%, 96.9% 27.8%, 96.9% 72.2%, 50% 97.2%, 3.1% 72.2%, 3.1% 27.8%);
+    overflow: hidden;
+    z-index: 3;
+    pointer-events: none;
+  }
+  .v7 .beam {
+    position: absolute;
+    top: -20%; bottom: -20%;
+    left: 50%;
+    width: 18px;
+    margin-left: -9px;
+    background: linear-gradient(90deg,
+      transparent 0%,
+      rgba(253,230,138,0.15) 20%,
+      rgba(252,211,77,0.9) 50%,
+      rgba(253,230,138,0.15) 80%,
+      transparent 100%);
+    filter: blur(1px);
+    animation: beam-sweep 3.5s ease-in-out infinite;
+  }
+
+  /* ═══════════════════════════════════════════════════════════════════════
+     V8 — CROWN HALO (combo : corona subtil + molten + rim burst)
+     Le "deluxe" : empile 3 effets fins — rayons tournants doux + cœur
+     liquide + rim qui flash au peak. Pour le Roi Absolu.
+     ═══════════════════════════════════════════════════════════════════════ */
+  @keyframes rim-flash {
+    0%, 100% { opacity: 0; stroke-width: 0.5; }
+    45%       { opacity: 0; }
+    50%       { opacity: 1; stroke-width: 3; }
+    55%       { opacity: 0; }
+  }
+  .v8 .badge { animation: badge-gold 2.2s ease-in-out infinite; z-index: 2; }
+  .v8 .corona {
+    position: absolute;
+    left: 50%; top: 50%;
+    width: 210px; height: 210px;
+    margin: -105px 0 0 -105px;
+    z-index: 1;
+    pointer-events: none;
+  }
+  .v8 .corona .rays {
+    width: 100%; height: 100%;
+    animation: corona-rotate 22s linear infinite;
+    opacity: 0.55;
+  }
+  .v8 .molten {
+    position: absolute; inset: 0;
+    clip-path: polygon(50% 2.8%, 96.9% 27.8%, 96.9% 72.2%, 50% 97.2%, 3.1% 72.2%, 3.1% 27.8%);
+    background: radial-gradient(ellipse 55% 45% at 50% 55%, rgba(253,230,138,0.6) 0%, rgba(245,158,11,0.3) 30%, transparent 70%);
+    mix-blend-mode: screen;
+    animation: molten-breath 2.2s ease-in-out infinite;
+    pointer-events: none;
+    z-index: 2;
+  }
+  .v8 .rim-flash { animation: rim-flash 2.2s ease-in-out infinite; }
+
+</style>
+</head>
+<body>
+
+  <h1>Hero Badge — previews d'animations</h1>
+  <p class="subtitle">
+    Objectif : une animation <b>plus « wow »</b> que le legendary de base (V0),
+    réservée aux deux badges #1 — <code>daily_roi_du_jour</code> et <code>sans_rival</code>.
+    Tous les previews conservent le pulse doré de base et empilent un effet distinctif.
+  </p>
+
+  <!-- ═══ MINI ROW — leaderboard scale (16px) ═══ -->
+  <div class="mini-row">
+    <span class="label">Leaderboard 16px →</span>
+    <div class="mini-item v0"><span class="badge mini" data-variant="v0"></span><span>V0 base</span></div>
+    <div class="mini-item v1"><span class="badge mini" data-variant="v1"></span><span>V1 molten</span></div>
+    <div class="mini-item v2"><span class="badge mini" data-variant="v2"></span><span>V2 corona</span></div>
+    <div class="mini-item v3"><span class="badge mini" data-variant="v3"></span><span>V3 rim</span></div>
+    <div class="mini-item v4"><span class="badge mini" data-variant="v4"></span><span>V4 orbit</span></div>
+    <div class="mini-item v5"><span class="badge mini" data-variant="v5"></span><span>V5 ping</span></div>
+    <div class="mini-item v6"><span class="badge mini" data-variant="v6"></span><span>V6 embers</span></div>
+    <div class="mini-item v7"><span class="badge mini" data-variant="v7"></span><span>V7 beam</span></div>
+    <div class="mini-item v8"><span class="badge mini" data-variant="v8"></span><span>V8 halo</span></div>
+  </div>
+
+  <!-- ═══ MAIN GRID ═══ -->
+  <div class="grid">
+
+    <!-- V0 — Baseline legendary -->
+    <div class="card baseline v0">
+      <div class="stage"><div class="badge" data-variant="v0"></div></div>
+      <div class="meta">
+        <span class="tag">V0 — référence</span>
+        <p class="name">Legendary (actuel)</p>
+        <p class="desc">Pulse doré + 2 points qui parcourent le contour. C'est la base de comparaison.</p>
+      </div>
+    </div>
+
+    <!-- V1 — Molten Core -->
+    <div class="card v1">
+      <div class="stage"><div class="badge" data-variant="v1"></div></div>
+      <div class="meta">
+        <span class="tag">V1</span>
+        <p class="name">Molten Core</p>
+        <p class="desc">Cœur d'or liquide qui respire à l'intérieur — le badge semble contenir du métal en fusion.</p>
+      </div>
+    </div>
+
+    <!-- V2 — Solar Corona -->
+    <div class="card v2">
+      <div class="stage"><div class="badge" data-variant="v2"></div></div>
+      <div class="meta">
+        <span class="tag">V2</span>
+        <p class="name">Solar Corona</p>
+        <p class="desc">Rayons dorés qui tournent en arrière-plan. Très « divin », lisible de loin.</p>
+      </div>
+    </div>
+
+    <!-- V3 — Double Rim -->
+    <div class="card v3">
+      <div class="stage"><div class="badge" data-variant="v3"></div></div>
+      <div class="meta">
+        <span class="tag">V3</span>
+        <p class="name">Double Rim</p>
+        <p class="desc">Deux contours concentriques en contre-phase — cadre d'or doublé qui respire.</p>
+      </div>
+    </div>
+
+    <!-- V4 — Orbital Sparkles -->
+    <div class="card v4">
+      <div class="stage"><div class="badge" data-variant="v4"></div></div>
+      <div class="meta">
+        <span class="tag">V4</span>
+        <p class="name">Orbital Sparkles</p>
+        <p class="desc">3 étincelles qui orbitent autour à rayons différents. Game-y, immédiatement reconnaissable.</p>
+      </div>
+    </div>
+
+    <!-- V5 — Shockwave Ping -->
+    <div class="card v5">
+      <div class="stage"><div class="badge" data-variant="v5"></div></div>
+      <div class="meta">
+        <span class="tag">V5</span>
+        <p class="name">Shockwave</p>
+        <p class="desc">Un contour hex s'envole du badge et se dissout toutes les 2.2s. Sonar hexagonal.</p>
+      </div>
+    </div>
+
+    <!-- V6 — Rising Embers -->
+    <div class="card v6">
+      <div class="stage"><div class="badge" data-variant="v6"></div></div>
+      <div class="meta">
+        <span class="tag">V6</span>
+        <p class="name">Rising Embers</p>
+        <p class="desc">Particules d'or qui montent du bas et se dissipent. Flamme sacrée.</p>
+      </div>
+    </div>
+
+    <!-- V7 — Sweeping Beam -->
+    <div class="card v7">
+      <div class="stage"><div class="badge" data-variant="v7"></div></div>
+      <div class="meta">
+        <span class="tag">V7</span>
+        <p class="name">Sweeping Beam</p>
+        <p class="desc">Un rayon d'or vertical balaye le badge de gauche à droite. Scanner royal.</p>
+      </div>
+    </div>
+
+    <!-- V8 — Crown Halo (combo) -->
+    <div class="card v8">
+      <div class="stage"><div class="badge" data-variant="v8"></div></div>
+      <div class="meta">
+        <span class="tag">V8 — deluxe</span>
+        <p class="name">Crown Halo</p>
+        <p class="desc">Combo : corona subtil + cœur liquide + flash du contour au peak. Le grand jeu.</p>
+      </div>
+    </div>
+
+  </div>
+
+<!--
+  ═══════════════════════════════════════════════════════════════════════════════
+  Les badges SVG sont générés en JS pour éviter ~2000 lignes de dup HTML.
+  Chaque .badge[data-variant=...] reçoit son contenu SVG + overlays adaptés.
+  ═══════════════════════════════════════════════════════════════════════════════
+-->
+<script>
+  const HEX_PATH = 'M32 2 L62 20 L62 52 L32 70 L2 52 L2 20 Z';
+  const HEX_PATH_INNER = 'M32 8 L56 24 L56 48 L32 64 L8 48 L8 24 Z'; // inset par ~6 units
+  const ICON = '\u{1F451}'; // 👑
+  const STROKE_LEGENDARY = '#f59e0b';
+
+  // Rayons sunburst pour corona — 12 rayons répartis sur 360°
+  function buildCoronaRays() {
+    const rays = [];
+    for (let i = 0; i < 12; i++) {
+      const angle = i * 30;
+      rays.push(`
+        <g transform="rotate(${angle} 120 120)">
+          <path d="M 120 10 L 116 65 L 124 65 Z" fill="url(#ray-grad)" opacity="${i % 2 === 0 ? 0.9 : 0.5}" />
+        </g>`);
+    }
+    return `
+      <svg viewBox="0 0 240 240" class="rays">
+        <defs>
+          <linearGradient id="ray-grad" x1="50%" y1="0%" x2="50%" y2="100%">
+            <stop offset="0%" stop-color="#fde68a" stop-opacity="0" />
+            <stop offset="50%" stop-color="#fbbf24" stop-opacity="0.8" />
+            <stop offset="100%" stop-color="#f59e0b" stop-opacity="0.2" />
+          </linearGradient>
+        </defs>
+        ${rays.join('')}
+      </svg>`;
+  }
+
+  function buildBadge(variant) {
+    // SVG principal commun : glass + stroke + 2 running lights legendary
+    const baseSvg = `
+      <svg viewBox="0 0 64 72" class="svg-main" fill="none">
+        <defs>
+          <linearGradient id="grad-${variant}" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="rgba(255,255,255,0.28)" />
+            <stop offset="100%" stop-color="rgba(0,0,0,0.18)" />
+          </linearGradient>
+        </defs>
+        <path d="${HEX_PATH}" fill="#111827" stroke="${STROKE_LEGENDARY}" stroke-width="2.5" />
+        <path d="${HEX_PATH}" fill="url(#grad-${variant})" />
+        <!-- legendary running lights -->
+        <path d="${HEX_PATH}" stroke="#fcd34d" stroke-width="2.5" fill="none"
+              stroke-dasharray="28 176" stroke-linecap="round"
+              style="animation: stroke-flow 3.5s linear infinite" />
+        <path d="${HEX_PATH}" stroke="#fbbf24" stroke-width="2.5" fill="none"
+              stroke-dasharray="28 176" stroke-linecap="round"
+              style="animation: stroke-flow-b 3.5s linear infinite" />
+        ${variant === 'v3' ? `
+          <!-- V3 double rim : deux contours qui pulsent en contre-phase -->
+          <path class="rim-a" d="${HEX_PATH}" stroke="#fde68a" stroke-width="2.5" fill="none" />
+          <path class="rim-b" d="${HEX_PATH_INNER}" stroke="#fbbf24" stroke-width="1.5" fill="none" />
+        ` : ''}
+        ${variant === 'v8' ? `
+          <path class="rim-flash" d="${HEX_PATH}" stroke="#fef3c7" stroke-width="3" fill="none" stroke-linejoin="round" />
+        ` : ''}
+      </svg>
+    `;
+
+    // Glass layer
+    const glass = '<div class="glass"></div>';
+
+    // Overlays spécifiques
+    let extras = '';
+
+    if (variant === 'v1') {
+      extras = '<div class="molten"></div>';
+    }
+    if (variant === 'v2') {
+      extras = `<div class="corona">${buildCoronaRays()}</div>`;
+    }
+    if (variant === 'v4') {
+      extras = `
+        <div class="orbit-stage">
+          <span class="sparkle sparkle-a"></span>
+          <span class="sparkle sparkle-b"></span>
+          <span class="sparkle sparkle-c"></span>
+        </div>`;
+    }
+    if (variant === 'v5') {
+      extras = `
+        <svg viewBox="0 0 64 72" class="shockwave" fill="none">
+          <path d="${HEX_PATH}" stroke="#fde68a" stroke-width="2.5" stroke-linejoin="round" />
+        </svg>
+        <svg viewBox="0 0 64 72" class="shockwave shockwave-2" fill="none">
+          <path d="${HEX_PATH}" stroke="#fde68a" stroke-width="2.5" stroke-linejoin="round" />
+        </svg>`;
+    }
+    if (variant === 'v6') {
+      extras = `
+        <div class="embers">
+          <span class="ember ember-1"></span>
+          <span class="ember ember-2"></span>
+          <span class="ember ember-3"></span>
+          <span class="ember ember-4"></span>
+          <span class="ember ember-5"></span>
+        </div>`;
+    }
+    if (variant === 'v7') {
+      extras = `<div class="beam-mask"><div class="beam"></div></div>`;
+    }
+    if (variant === 'v8') {
+      extras = `
+        <div class="corona">${buildCoronaRays()}</div>
+        <div class="molten"></div>`;
+    }
+
+    return glass + baseSvg + extras + `<span class="icon">${ICON}</span>`;
+  }
+
+  document.querySelectorAll('.badge[data-variant]').forEach(el => {
+    const v = el.getAttribute('data-variant');
+    el.innerHTML = buildBadge(v);
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pulse Quizz — Preview Equip Picker</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+
+  :root {
+    --game-bg:      #0A0A0F;
+    --game-card:    #13131F;
+    --game-border:  #1E1E2E;
+    --neon-violet:  #8B5CF6;
+    --neon-blue:    #3B82F6;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Inter', system-ui, sans-serif;
+    background: #050508;
+    color: rgba(255,255,255,0.88);
+    min-height: 100vh;
+    padding: 24px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .preview-label {
+    max-width: 920px;
+    margin: 0 auto 16px;
+    padding: 10px 14px;
+    background: rgba(139,92,246,0.08);
+    border: 1px solid rgba(139,92,246,0.25);
+    border-radius: 10px;
+    color: rgba(196,181,253,0.8);
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .preview-label b { color: rgba(255,255,255,0.85); }
+
+  .stage-wrap {
+    max-width: 920px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+  }
+
+  .stage {
+    position: relative;
+    background: var(--game-bg);
+    border-radius: 14px;
+    overflow: hidden;
+    height: 680px;
+    border: 1px solid var(--game-border);
+    box-shadow: 0 32px 80px rgba(0,0,0,0.5);
+  }
+  .stage-label {
+    padding: 8px 14px;
+    font-size: 11px; font-weight: 700;
+    letter-spacing: 0.12em; text-transform: uppercase;
+    color: rgba(196,181,253,0.6);
+    text-align: center;
+  }
+
+  /* ── Background blurred page (behind sheet) ───────────────────────── */
+  .bg-page {
+    position: absolute; inset: 0;
+    filter: blur(3px) brightness(0.55);
+    background:
+      linear-gradient(180deg, rgba(19,19,31,0.5), rgba(10,10,15,0.9)),
+      radial-gradient(circle at 30% 20%, rgba(139,92,246,0.25), transparent 55%),
+      radial-gradient(circle at 70% 75%, rgba(59,130,246,0.18), transparent 55%);
+  }
+
+  /* Backdrop + sheet */
+  .backdrop {
+    position: absolute; inset: 0;
+    background: rgba(0,0,0,0.7);
+    backdrop-filter: blur(8px);
+  }
+
+  .sheet {
+    position: absolute;
+    left: 10px; right: 10px; bottom: 10px;
+    max-height: 86%;
+    background: var(--game-card);
+    border-radius: 16px 16px 10px 10px;
+    border: 1px solid var(--game-border);
+    border-bottom: none;
+    overflow: hidden;
+    display: flex; flex-direction: column;
+  }
+  .sheet .handle {
+    display: flex; justify-content: center;
+    padding: 10px 0 4px;
+  }
+  .sheet .handle-bar {
+    width: 40px; height: 4px; border-radius: 999px;
+    background: rgba(255,255,255,0.1);
+  }
+  .sheet .header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 20px 12px;
+    border-bottom: 1px solid var(--game-border);
+  }
+  .sheet .header h3 {
+    font-size: 14px; font-weight: 700;
+    color: rgba(255,255,255,0.85);
+  }
+  .sheet .header p {
+    margin-top: 2px;
+    font-size: 11px; color: rgba(255,255,255,0.35);
+  }
+  .sheet .header .close {
+    width: 30px; height: 30px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 8px;
+    color: rgba(255,255,255,0.3);
+    cursor: pointer;
+  }
+  .sheet .header .close:hover { background: rgba(255,255,255,0.05); }
+
+  /* Preview live */
+  .live {
+    padding: 16px 16px 4px;
+    border-bottom: 1px solid var(--game-border);
+    display: flex; gap: 14px; align-items: center;
+  }
+  .live-preview {
+    width: 92px; height: 106px;
+    border-radius: 12px;
+    background: linear-gradient(180deg, rgba(251,191,36,0.06), rgba(10,10,15,0.95));
+    border: 1px solid rgba(251,191,36,0.2);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    box-shadow: 0 0 24px rgba(251,191,36,0.15), inset 0 0 18px rgba(251,191,36,0.04);
+  }
+  .live-info {
+    flex: 1; min-width: 0;
+  }
+  .live-info .kicker {
+    font-size: 9px; font-weight: 700; letter-spacing: 0.16em;
+    text-transform: uppercase; color: #fbbf24;
+  }
+  .live-info h2 {
+    margin-top: 4px;
+    font-size: 18px; font-weight: 800; color: #fff;
+  }
+  .live-info p {
+    margin-top: 4px;
+    font-size: 11px; color: rgba(255,255,255,0.4);
+    line-height: 1.45;
+  }
+  .live-info .meta {
+    margin-top: 10px;
+    display: flex; gap: 6px; flex-wrap: wrap;
+  }
+  .tag {
+    padding: 3px 8px;
+    border-radius: 999px;
+    font-size: 9px; font-weight: 700;
+    letter-spacing: 0.08em; text-transform: uppercase;
+  }
+  .tag.legendary { background: rgba(245,158,11,0.12); color: #fbbf24; border: 1px solid rgba(245,158,11,0.3); }
+  .tag.shop { background: rgba(234,179,8,0.1); color: rgba(234,179,8,0.85); border: 1px solid rgba(234,179,8,0.2); }
+  .tag.obtained { background: rgba(255,255,255,0.04); color: rgba(255,255,255,0.45); border: 1px solid rgba(255,255,255,0.08); }
+
+  .equip-bar {
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--game-border);
+    display: flex; gap: 10px;
+  }
+  .btn {
+    flex: 1;
+    padding: 10px;
+    border-radius: 10px;
+    font-size: 12px; font-weight: 700;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .btn-primary {
+    background: linear-gradient(135deg, #8b5cf6, #3b82f6);
+    color: #fff;
+    box-shadow: 0 4px 16px rgba(139,92,246,0.35);
+  }
+  .btn-primary:hover { filter: brightness(1.1); }
+  .btn-secondary {
+    background: rgba(255,255,255,0.04);
+    color: rgba(255,255,255,0.5);
+    border: 1px solid var(--game-border);
+  }
+  .btn-secondary:hover { background: rgba(255,255,255,0.07); color: #fff; }
+  .btn-danger {
+    background: rgba(239,68,68,0.08);
+    color: rgba(248,113,113,0.9);
+    border: 1px solid rgba(239,68,68,0.2);
+    flex: 0 0 auto;
+    padding: 10px 14px;
+  }
+
+  /* Grid items */
+  .picker-grid {
+    flex: 1;
+    overflow-y: auto;
+    padding: 14px 16px 18px;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+  }
+  .pick-card {
+    position: relative;
+    padding: 10px;
+    border-radius: 12px;
+    background: rgba(255,255,255,0.02);
+    border: 1px solid var(--game-border);
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+    cursor: pointer;
+    transition: all 0.12s;
+    min-height: 128px;
+  }
+  .pick-card:hover { border-color: rgba(139,92,246,0.35); background: rgba(139,92,246,0.04); }
+  .pick-card.selected {
+    border-color: rgba(251,191,36,0.6);
+    background: rgba(251,191,36,0.05);
+    box-shadow: 0 0 18px rgba(251,191,36,0.1);
+  }
+  .pick-card.locked {
+    opacity: 0.35; filter: grayscale(1);
+    cursor: not-allowed;
+  }
+  .pick-card.locked .pick-lock {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(0,0,0,0.2);
+    border-radius: 12px;
+  }
+  .pick-card .pick-tier-dot {
+    position: absolute; top: 6px; left: 6px;
+    width: 5px; height: 5px; border-radius: 50%;
+  }
+  .pick-card .tier-legendary { background: #f59e0b; box-shadow: 0 0 4px #f59e0b; }
+  .pick-card .tier-epic      { background: #a78bfa; }
+  .pick-card .tier-rare      { background: #60a5fa; }
+  .pick-card .tier-common    { background: rgba(255,255,255,0.3); }
+
+  .pick-card .pick-check {
+    position: absolute; top: 4px; right: 4px;
+    width: 16px; height: 16px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    background: #f59e0b; color: #fff;
+  }
+
+  .pick-card .pick-equipped-pill {
+    position: absolute; bottom: 4px; left: 4px; right: 4px;
+    text-align: center;
+    padding: 3px 6px; border-radius: 999px;
+    font-size: 8px; font-weight: 800; letter-spacing: 0.08em;
+    text-transform: uppercase;
+    background: rgba(34,197,94,0.15);
+    color: #86efac;
+    border: 1px solid rgba(34,197,94,0.25);
+  }
+
+  .pick-card .pick-preview {
+    display: flex; align-items: center; justify-content: center;
+    margin-top: 10px; margin-bottom: 6px;
+    height: 56px;
+  }
+  .pick-card .pick-name {
+    font-size: 10px; font-weight: 700;
+    color: rgba(255,255,255,0.78);
+    text-align: center;
+    line-height: 1.2;
+  }
+
+  /* ── Mini card design ─────────────────────────────────────────────── */
+  .mini-card {
+    width: 56px; height: 44px;
+    border-radius: 6px;
+    position: relative;
+    overflow: hidden;
+  }
+  .mini-card.default { background: linear-gradient(180deg, rgba(20,14,38,0.75), rgba(10,7,20,0.92)); border: 1px solid rgba(255,255,255,0.08); }
+  .mini-card.holo    { background: linear-gradient(135deg, rgba(236,72,153,0.22), rgba(6,182,212,0.22), rgba(234,179,8,0.2)); border: 1px solid rgba(236,72,153,0.4); }
+  .mini-card.frost   { background: linear-gradient(135deg, rgba(103,232,249,0.18), rgba(59,130,246,0.12)); border: 1px solid rgba(103,232,249,0.4); }
+  .mini-card.arcane  { background: radial-gradient(circle at 30% 30%, rgba(167,139,250,0.3), rgba(10,10,15,0.9)); border: 1px solid rgba(167,139,250,0.45); }
+
+  /* ── Mini background ──────────────────────────────────────────────── */
+  .mini-bg {
+    width: 64px; height: 44px;
+    border-radius: 6px;
+    position: relative;
+    overflow: hidden;
+    border: 1px solid var(--game-border);
+  }
+  .mini-bg.none { background: #0a0a15; }
+  .mini-bg.aurora { background: radial-gradient(circle at 20% 30%, rgba(139,92,246,0.55), transparent 60%), radial-gradient(circle at 80% 70%, rgba(59,130,246,0.45), transparent 60%), #0a0a15; }
+  .mini-bg.constellation { background: radial-gradient(circle at 25% 30%, #fff 1px, transparent 2px), radial-gradient(circle at 70% 60%, #fff 1px, transparent 2px), radial-gradient(circle at 45% 80%, #fff 1px, transparent 2px), radial-gradient(circle at 85% 25%, #fff 1px, transparent 2px), #0a0a15; }
+  .mini-bg.grid { background: linear-gradient(rgba(139,92,246,0.35) 1px, transparent 1px) 0 0 / 12px 12px, linear-gradient(90deg, rgba(139,92,246,0.35) 1px, transparent 1px) 0 0 / 12px 12px, #060610; }
+  .mini-bg.nebula { background: radial-gradient(circle at 40% 50%, rgba(234,179,8,0.55), transparent 55%), radial-gradient(circle at 70% 30%, rgba(251,146,60,0.35), transparent 60%), #140d05; }
+
+</style>
+</head>
+<body>
+
+<div class="preview-label">
+  <b>Preview 2 / 2 — Bottom-sheet d'équipement.</b>
+  Clic sur un slot du loadout → bottom-sheet (même pattern que le <b>BadgePicker</b> actuel) avec <b>preview live en haut</b>, CTA <b>Équiper</b> principal + <b>Retirer</b> si équipé, grille des items possédés (items verrouillés grisés). À gauche : exemple <b>Blason</b>, à droite : exemple <b>Fond d'écran</b>.
+</div>
+
+<div class="stage-wrap">
+
+  <!-- ───────── Stage 1 : Blason picker ───────── -->
+  <div>
+    <div class="stage-label">Picker — Blason</div>
+    <div class="stage">
+      <div class="bg-page"></div>
+      <div class="backdrop"></div>
+
+      <div class="sheet">
+        <div class="handle"><div class="handle-bar"></div></div>
+
+        <div class="header">
+          <div>
+            <h3>Blason de rang</h3>
+            <p>Choisir un blason à équiper</p>
+          </div>
+          <div class="close">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </div>
+        </div>
+
+        <!-- Preview live -->
+        <div class="live">
+          <div class="live-preview">
+            <svg width="60" height="72" viewBox="-32 -37 64 74">
+              <path d="M -24,-33 L 24,-33 L 24,4 C 24,16 9,30 0,36 C -9,30 -24,16 -24,4 Z"
+                    fill="rgba(14,10,28,0.95)" stroke="#fbbf24" stroke-width="1.5"/>
+              <path d="M 0,-18 C -7,-9 -11,1 -8,9 C -5,16 5,16 8,9 C 11,1 7,-9 0,-18 Z" fill="#fbbf24" fill-opacity="0.85"/>
+              <path d="M 0,-8 C -3,-3 -4,3 -2,7 C 0,9 3,8 3,3 C 3,-1 1,-5 0,-8 Z" fill="#fde68a"/>
+            </svg>
+          </div>
+          <div class="live-info">
+            <p class="kicker">Légendaire</p>
+            <h2>Flamme d'or</h2>
+            <p>Un blason enflammé qui scintille en permanence. Démarque-toi au classement.</p>
+            <div class="meta">
+              <span class="tag legendary">Légendaire</span>
+              <span class="tag shop">Boutique</span>
+              <span class="tag obtained">Obtenu 12 mars 2026</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- CTAs -->
+        <div class="equip-bar">
+          <div class="btn btn-primary">
+            ✓ Équiper
+          </div>
+          <div class="btn btn-secondary">Revenir au défaut</div>
+        </div>
+
+        <!-- Grid -->
+        <div class="picker-grid">
+
+          <!-- Default -->
+          <div class="pick-card">
+            <span class="pick-tier-dot tier-common"></span>
+            <div class="pick-preview">
+              <svg width="40" height="46" viewBox="-32 -37 64 74">
+                <path d="M -24,-33 L 24,-33 L 24,4 C 24,16 9,30 0,36 C -9,30 -24,16 -24,4 Z" fill="rgba(14,10,28,0.95)" stroke="#6b7280" stroke-width="1.5"/>
+                <text x="0" y="-2" text-anchor="middle" fill="#6b7280" font-size="13" font-weight="900">#42</text>
+                <text x="0" y="14" text-anchor="middle" fill="#6b7280aa" font-size="6" font-weight="700" letter-spacing="1">RANG</text>
+              </svg>
+            </div>
+            <span class="pick-name">Blason de rang</span>
+            <span class="pick-equipped-pill">Par défaut</span>
+          </div>
+
+          <!-- Flamme d'or : sélectionnée -->
+          <div class="pick-card selected">
+            <span class="pick-tier-dot tier-legendary"></span>
+            <div class="pick-check">
+              <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+            </div>
+            <div class="pick-preview">
+              <svg width="40" height="46" viewBox="-32 -37 64 74">
+                <path d="M -24,-33 L 24,-33 L 24,4 C 24,16 9,30 0,36 C -9,30 -24,16 -24,4 Z" fill="rgba(14,10,28,0.95)" stroke="#fbbf24" stroke-width="1.5"/>
+                <path d="M 0,-18 C -7,-9 -11,1 -8,9 C -5,16 5,16 8,9 C 11,1 7,-9 0,-18 Z" fill="#fbbf24" fill-opacity="0.85"/>
+                <path d="M 0,-8 C -3,-3 -4,3 -2,7 C 0,9 3,8 3,3 C 3,-1 1,-5 0,-8 Z" fill="#fde68a"/>
+              </svg>
+            </div>
+            <span class="pick-name">Flamme d'or</span>
+          </div>
+
+          <!-- Cristal de glace : possédé -->
+          <div class="pick-card">
+            <span class="pick-tier-dot tier-epic"></span>
+            <div class="pick-preview">
+              <svg width="40" height="46" viewBox="-32 -37 64 74">
+                <path d="M -24,-33 L 24,-33 L 24,4 C 24,16 9,30 0,36 C -9,30 -24,16 -24,4 Z" fill="rgba(14,10,28,0.95)" stroke="#67e8f9" stroke-width="1.5"/>
+                <path d="M 0,-16 L 11,-2 L 0,18 L -11,-2 Z" fill="none" stroke="#67e8f9" stroke-width="1.4"/>
+                <path d="M 0,-10 L 6,-2 L 0,12 L -6,-2 Z" fill="#67e8f920" stroke="#67e8f9aa" stroke-width="0.6"/>
+              </svg>
+            </div>
+            <span class="pick-name">Cristal de glace</span>
+          </div>
+
+          <!-- Éclair néon : possédé -->
+          <div class="pick-card">
+            <span class="pick-tier-dot tier-rare"></span>
+            <div class="pick-preview">
+              <svg width="40" height="46" viewBox="-32 -37 64 74">
+                <path d="M -24,-33 L 24,-33 L 24,4 C 24,16 9,30 0,36 C -9,30 -24,16 -24,4 Z" fill="rgba(14,10,28,0.95)" stroke="#a78bfa" stroke-width="1.5"/>
+                <path d="M 4,-18 L -8,2 L -1,2 L -5,18 L 8,-2 L 1,-2 Z" fill="#a78bfa" stroke="#ede9fe" stroke-width="0.6"/>
+              </svg>
+            </div>
+            <span class="pick-name">Éclair néon</span>
+          </div>
+
+          <!-- Rose cyberpunk : locked (pas encore obtenu) -->
+          <div class="pick-card locked">
+            <span class="pick-tier-dot tier-epic"></span>
+            <div class="pick-preview">
+              <svg width="40" height="46" viewBox="-32 -37 64 74">
+                <path d="M -24,-33 L 24,-33 L 24,4 C 24,16 9,30 0,36 C -9,30 -24,16 -24,4 Z" fill="rgba(14,10,28,0.95)" stroke="#ec4899" stroke-width="1.5"/>
+                <g>
+                  <path d="M 0,0 L 6,-4 L 0,-12 L -6,-4 Z" fill="#ec489933" stroke="#ec4899" stroke-width="0.8"/>
+                  <circle cx="0" cy="0" r="3" fill="#fbcfe8" stroke="#ec4899" stroke-width="0.8"/>
+                </g>
+              </svg>
+            </div>
+            <span class="pick-name">Rose cyberpunk</span>
+            <div class="pick-lock">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="rgba(255,255,255,0.7)"><path d="M12 1a5 5 0 0 0-5 5v3H6a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-9a2 2 0 0 0-2-2h-1V6a5 5 0 0 0-5-5zm-3 8V6a3 3 0 0 1 6 0v3H9z"/></svg>
+            </div>
+          </div>
+
+          <!-- Exemple placeholder -->
+          <div class="pick-card locked">
+            <span class="pick-tier-dot tier-legendary"></span>
+            <div class="pick-preview">
+              <svg width="40" height="46" viewBox="-32 -37 64 74">
+                <path d="M -24,-33 L 24,-33 L 24,4 C 24,16 9,30 0,36 C -9,30 -24,16 -24,4 Z" fill="rgba(14,10,28,0.95)" stroke="#f5a3b9" stroke-width="1.5"/>
+              </svg>
+            </div>
+            <span class="pick-name">À venir</span>
+            <div class="pick-lock">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="rgba(255,255,255,0.7)"><path d="M12 1a5 5 0 0 0-5 5v3H6a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-9a2 2 0 0 0-2-2h-1V6a5 5 0 0 0-5-5zm-3 8V6a3 3 0 0 1 6 0v3H9z"/></svg>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ───────── Stage 2 : Fond picker ───────── -->
+  <div>
+    <div class="stage-label">Picker — Fond d'écran</div>
+    <div class="stage">
+      <div class="bg-page"></div>
+      <div class="backdrop"></div>
+
+      <div class="sheet">
+        <div class="handle"><div class="handle-bar"></div></div>
+
+        <div class="header">
+          <div>
+            <h3>Fond d'écran</h3>
+            <p>Appliqué derrière ton profil public</p>
+          </div>
+          <div class="close">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </div>
+        </div>
+
+        <!-- Preview live -->
+        <div class="live" style="background: rgba(139,92,246,0.02); border-color: rgba(139,92,246,0.2);">
+          <div class="live-preview" style="width: 132px; height: 88px; background: radial-gradient(circle at 20% 30%, rgba(139,92,246,0.65), transparent 60%), radial-gradient(circle at 80% 70%, rgba(59,130,246,0.5), transparent 60%), #0a0a15; border-color: rgba(139,92,246,0.3); box-shadow: 0 0 28px rgba(139,92,246,0.2), inset 0 0 20px rgba(139,92,246,0.06);">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.6)" stroke-width="1.6" stroke-linecap="round">
+              <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5" fill="rgba(255,255,255,0.6)"/><path d="m21 15-5-5L5 21"/>
+            </svg>
+          </div>
+          <div class="live-info">
+            <p class="kicker" style="color: #c4b5fd;">Épique</p>
+            <h2>Aurore violette</h2>
+            <p>Nuages dégradés violet → bleu qui dérivent lentement derrière ton profil.</p>
+            <div class="meta">
+              <span class="tag" style="background:rgba(167,139,250,0.12); color:#c4b5fd; border:1px solid rgba(167,139,250,0.3);">Épique</span>
+              <span class="tag shop">Boutique</span>
+              <span class="tag obtained">Obtenu 4 avr. 2026</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="equip-bar">
+          <div class="btn btn-primary">✓ Équiper</div>
+          <div class="btn btn-danger">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="display:inline-block;vertical-align:-1px;margin-right:4px;">
+              <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+            </svg>
+            Retirer
+          </div>
+        </div>
+
+        <div class="picker-grid">
+          <!-- Aucun (default) -->
+          <div class="pick-card">
+            <span class="pick-tier-dot tier-common"></span>
+            <div class="pick-preview"><div class="mini-bg none" style="width:56px;height:40px;"></div></div>
+            <span class="pick-name">Aucun</span>
+            <span class="pick-equipped-pill">Par défaut</span>
+          </div>
+
+          <!-- Aurore : sélectionnée -->
+          <div class="pick-card selected">
+            <span class="pick-tier-dot tier-epic"></span>
+            <div class="pick-check">
+              <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+            </div>
+            <div class="pick-preview"><div class="mini-bg aurora" style="width:56px;height:40px;"></div></div>
+            <span class="pick-name">Aurore violette</span>
+          </div>
+
+          <!-- Constellation -->
+          <div class="pick-card">
+            <span class="pick-tier-dot tier-rare"></span>
+            <div class="pick-preview"><div class="mini-bg constellation" style="width:56px;height:40px;"></div></div>
+            <span class="pick-name">Constellation</span>
+          </div>
+
+          <!-- Grille néon -->
+          <div class="pick-card">
+            <span class="pick-tier-dot tier-epic"></span>
+            <div class="pick-preview"><div class="mini-bg grid" style="width:56px;height:40px;"></div></div>
+            <span class="pick-name">Grille néon</span>
+          </div>
+
+          <!-- Nébuleuse : locked -->
+          <div class="pick-card locked">
+            <span class="pick-tier-dot tier-legendary"></span>
+            <div class="pick-preview"><div class="mini-bg nebula" style="width:56px;height:40px;"></div></div>
+            <span class="pick-name">Nébuleuse dorée</span>
+            <div class="pick-lock">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="rgba(255,255,255,0.7)"><path d="M12 1a5 5 0 0 0-5 5v3H6a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-9a2 2 0 0 0-2-2h-1V6a5 5 0 0 0-5-5zm-3 8V6a3 3 0 0 1 6 0v3H9z"/></svg>
+            </div>
+          </div>
+
+          <!-- Placeholder -->
+          <div class="pick-card locked">
+            <span class="pick-tier-dot tier-epic"></span>
+            <div class="pick-preview">
+              <div class="mini-bg" style="width:56px;height:40px; background: linear-gradient(135deg, rgba(34,197,94,0.35), rgba(16,185,129,0.2)), #05120a; border-color: rgba(34,197,94,0.2);"></div>
+            </div>
+            <span class="pick-name">Forêt émeraude</span>
+            <div class="pick-lock">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="rgba(255,255,255,0.7)"><path d="M12 1a5 5 0 0 0-5 5v3H6a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-9a2 2 0 0 0-2-2h-1V6a5 5 0 0 0-5-5zm-3 8V6a3 3 0 0 1 6 0v3H9z"/></svg>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="preview-label" style="margin-top:20px;margin-bottom:0;">
+  <b>Logique partagée</b> : même pattern de bottom-sheet pour <b>Blason · Titre · Carte · Fond · Animation</b>. Pour les <b>Badges</b> (slots d'épinglage), on réutilise tel quel le <code style="font-family:inherit;background:rgba(0,0,0,0.3);padding:0 4px;border-radius:3px;">BadgePicker</code> existant — la mécanique est identique sauf qu'il y a 3 slots au lieu d'un équipement unique.
+</div>
+
+</body>
+</html>

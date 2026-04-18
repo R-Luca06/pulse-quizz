@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <title>Daily Recap — Previews</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: { extend: {
+        fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] },
+        colors: {
+          neon:  { violet:'#8B5CF6', blue:'#3B82F6', cyan:'#06B6D4', gold:'#EAB308' },
+          game:  { bg:'#0A0A0F', card:'#13131F', border:'#1E1E2E', warning:'#F97316' },
+        },
+      }}
+    }
+  </script>
+  <style>
+    body { background:#0A0A0F; color:#fff; font-family: Inter, system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+  </style>
+</head>
+<body class="min-h-screen">
+  <main class="mx-auto max-w-5xl px-6 py-12">
+    <header class="mb-10">
+      <div class="mb-3 inline-flex items-center gap-2 rounded-full border border-neon-violet/25 bg-neon-violet/[0.08] px-3 py-1">
+        <span class="h-1.5 w-1.5 animate-pulse rounded-full bg-neon-violet"></span>
+        <span class="text-[10px] font-bold uppercase tracking-wider text-neon-violet/80">Previews — feature "Daily Recap"</span>
+      </div>
+      <h1 class="mb-2 text-3xl font-black tracking-tight text-white">3 directions pour la page « Pendant votre absence »</h1>
+      <p class="max-w-2xl text-sm text-white/50 leading-relaxed">
+        Affichée à la reconnexion quand l'utilisateur a joué au défi quotidien de la veille — une seule fois, gatée par un flag <code class="rounded bg-white/5 px-1 text-[12px] text-white/70">recap_seen</code> sur <code class="rounded bg-white/5 px-1 text-[12px] text-white/70">daily_challenge_entries</code>.
+        Les trois previews partagent les mêmes données (thème, score, classement, 10 questions avec anecdotes, achievements, XP + Pulses + niveau). Choisis la direction qui te parle.
+      </p>
+    </header>
+
+    <div class="grid gap-5 lg:grid-cols-3">
+
+      <!-- Preview 1 -->
+      <a href="1-cinematic.html" class="group relative flex flex-col overflow-hidden rounded-2xl border border-white/[0.06] bg-game-card transition-all hover:border-neon-violet/40 hover:shadow-[0_0_32px_rgba(139,92,246,0.18)]">
+        <div class="relative h-44 overflow-hidden" style="background: radial-gradient(ellipse at 50% 20%, rgba(139,92,246,0.35) 0%, transparent 60%), radial-gradient(ellipse at 70% 80%, rgba(59,130,246,0.2) 0%, transparent 60%), #0A0A0F">
+          <div class="absolute inset-0 flex items-center justify-center">
+            <span class="text-6xl" style="filter: drop-shadow(0 0 24px rgba(139,92,246,0.65))">🎸</span>
+          </div>
+          <div class="absolute left-0 right-0 top-3 mx-auto flex items-center justify-center gap-1.5">
+            <span class="h-1 w-6 rounded-full bg-neon-violet"></span>
+            <span class="h-1 w-4 rounded-full bg-white/15"></span>
+            <span class="h-1 w-4 rounded-full bg-white/15"></span>
+            <span class="h-1 w-4 rounded-full bg-white/15"></span>
+            <span class="h-1 w-4 rounded-full bg-white/15"></span>
+            <span class="h-1 w-4 rounded-full bg-white/15"></span>
+          </div>
+          <div class="absolute bottom-3 left-3 text-[10px] font-bold uppercase tracking-widest text-white/50">Pendant votre absence…</div>
+        </div>
+
+        <div class="flex flex-1 flex-col gap-3 p-5">
+          <div class="flex items-start justify-between">
+            <div>
+              <div class="text-[10px] font-bold uppercase tracking-widest text-neon-violet/70">#1</div>
+              <h2 class="mt-0.5 text-lg font-black text-white">Cinématique</h2>
+            </div>
+            <span class="rounded-full bg-neon-violet/15 px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-neon-violet">Impact max</span>
+          </div>
+          <p class="text-xs leading-relaxed text-white/50">
+            Reveal plein écran multi-phases. L'utilisateur enchaîne Thème → Score → Rang → Questions (carrousel + anecdotes) → Achievements → Total XP/Pulses, chaque phase avec sa propre mise en scène façon <em>AchievementUnlockOverlay</em>.
+          </p>
+          <ul class="flex flex-col gap-1 text-[11px] text-white/40">
+            <li>+ Sensation « cinéma », chaque info a son moment</li>
+            <li>+ Parfait pour les jours avec gros gain (top 10, level up)</li>
+            <li>− Plus long, demande 30-40s d'attention</li>
+          </ul>
+          <span class="mt-auto inline-flex items-center gap-1 text-[11px] font-bold text-neon-violet group-hover:gap-2 transition-all">
+            Ouvrir
+            <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M4 2l4 4-4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </span>
+        </div>
+      </a>
+
+      <!-- Preview 2 -->
+      <a href="2-stacked.html" class="group relative flex flex-col overflow-hidden rounded-2xl border border-white/[0.06] bg-game-card transition-all hover:border-neon-blue/40 hover:shadow-[0_0_32px_rgba(59,130,246,0.18)]">
+        <div class="relative h-44 overflow-hidden" style="background: radial-gradient(ellipse at 50% 0%, rgba(139,92,246,0.2) 0%, transparent 65%), #0A0A0F">
+          <!-- Mini mock of stacked cards -->
+          <div class="absolute left-4 right-4 top-6 flex flex-col gap-1.5">
+            <div class="h-6 rounded-lg bg-white/[0.06] border border-white/[0.08]"></div>
+            <div class="h-14 rounded-lg bg-neon-violet/[0.10] border border-neon-violet/20 flex items-center justify-center">
+              <span class="text-xl">🎸</span>
+            </div>
+            <div class="grid grid-cols-2 gap-1">
+              <div class="h-10 rounded-lg border border-neon-violet/20 bg-neon-violet/[0.08]"></div>
+              <div class="h-10 rounded-lg border border-cyan-400/20 bg-cyan-400/[0.08]"></div>
+            </div>
+            <div class="h-6 rounded-lg bg-white/[0.04] border border-white/[0.06]"></div>
+            <div class="h-6 rounded-lg bg-white/[0.04] border border-white/[0.06]"></div>
+          </div>
+        </div>
+
+        <div class="flex flex-1 flex-col gap-3 p-5">
+          <div class="flex items-start justify-between">
+            <div>
+              <div class="text-[10px] font-bold uppercase tracking-widest text-neon-blue/70">#2</div>
+              <h2 class="mt-0.5 text-lg font-black text-white">Stacked native</h2>
+            </div>
+            <span class="rounded-full bg-neon-blue/15 px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-neon-blue">Safe &amp; familier</span>
+          </div>
+          <p class="text-xs leading-relaxed text-white/50">
+            Une page scrollable qui prolonge le style <em>CompletedState</em> du DailyChallengePage actuel. Hero + score + rang à gauche, achievements + récompenses à droite, puis liste des 10 questions avec anecdotes en dessous.
+          </p>
+          <ul class="flex flex-col gap-1 text-[11px] text-white/40">
+            <li>+ S'intègre parfaitement à l'app (look homogène)</li>
+            <li>+ Tout visible d'un coup, l'utilisateur scrolle à son rythme</li>
+            <li>− Moins « wow » que la cinématique</li>
+          </ul>
+          <span class="mt-auto inline-flex items-center gap-1 text-[11px] font-bold text-neon-blue group-hover:gap-2 transition-all">
+            Ouvrir
+            <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M4 2l4 4-4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </span>
+        </div>
+      </a>
+
+      <!-- Preview 3 -->
+      <a href="3-stories.html" class="group relative flex flex-col overflow-hidden rounded-2xl border border-white/[0.06] bg-game-card transition-all hover:border-neon-pink/40 hover:shadow-[0_0_32px_rgba(236,72,153,0.18)]">
+        <div class="relative h-44 overflow-hidden" style="background: radial-gradient(ellipse at 50% 30%, rgba(236,72,153,0.22) 0%, transparent 60%), radial-gradient(ellipse at 20% 80%, rgba(139,92,246,0.15) 0%, transparent 60%), #0A0A0F">
+          <div class="absolute left-1/2 top-1/2 h-32 w-[86px] -translate-x-1/2 -translate-y-1/2 rounded-xl border border-white/10 bg-game-bg" style="box-shadow: 0 16px 40px rgba(0,0,0,0.5)">
+            <div class="mt-1.5 flex gap-0.5 px-1.5">
+              <span class="h-0.5 flex-1 rounded-full bg-white/60"></span>
+              <span class="h-0.5 flex-1 rounded-full bg-white/25"></span>
+              <span class="h-0.5 flex-1 rounded-full bg-white/15"></span>
+              <span class="h-0.5 flex-1 rounded-full bg-white/15"></span>
+              <span class="h-0.5 flex-1 rounded-full bg-white/15"></span>
+            </div>
+            <div class="mt-4 flex flex-col items-center gap-1">
+              <span class="text-2xl">🎸</span>
+              <span class="text-[8px] font-black text-white">Rétro 80s</span>
+              <span class="text-[7px] text-white/30">1 847 pts</span>
+            </div>
+          </div>
+          <div class="absolute bottom-3 left-3 text-[10px] font-bold uppercase tracking-widest text-white/50">Story format</div>
+        </div>
+
+        <div class="flex flex-1 flex-col gap-3 p-5">
+          <div class="flex items-start justify-between">
+            <div>
+              <div class="text-[10px] font-bold uppercase tracking-widest text-neon-pink/70">#3</div>
+              <h2 class="mt-0.5 text-lg font-black text-white">Stories</h2>
+            </div>
+            <span class="rounded-full bg-neon-pink/15 px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-neon-pink">Moderne</span>
+          </div>
+          <p class="text-xs leading-relaxed text-white/50">
+            Format BeReal/IG : stories verticales qui s'enchaînent avec progress bars en haut. Une info par écran (thème, score, rang, 3 questions marquantes avec anecdotes, chaque achievement, total), auto-advance avec tap-and-hold pour pause.
+          </p>
+          <ul class="flex flex-col gap-1 text-[11px] text-white/40">
+            <li>+ Langage UI familier pour une jeune audience</li>
+            <li>+ Mobile-first, rythmé, addictif</li>
+            <li>− Écran par écran : pas de vue d'ensemble</li>
+          </ul>
+          <span class="mt-auto inline-flex items-center gap-1 text-[11px] font-bold text-neon-pink group-hover:gap-2 transition-all">
+            Ouvrir
+            <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M4 2l4 4-4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </span>
+        </div>
+      </a>
+
+    </div>
+
+    <section class="mt-10 rounded-2xl border border-white/[0.06] bg-game-card p-5">
+      <p class="mb-3 text-[10px] font-bold uppercase tracking-widest text-white/30">Points à décider après avoir regardé les previews</p>
+      <ul class="flex flex-col gap-2 text-xs text-white/60">
+        <li>→ Direction visuelle préférée (on peut aussi en mixer deux : par ex. #2 Stacked avec une intro courte type #1)</li>
+        <li>→ Toutes les questions ou seulement 3-5 marquantes (celles avec les meilleures anecdotes) ?</li>
+        <li>→ Skip possible dès la première frame, ou imposé jusqu'à la fin ?</li>
+        <li>→ Déclenchement : overlay au-dessus de la landing, ou écran à part avant ?</li>
+      </ul>
+    </section>
+  </main>
+</body>
+</html>

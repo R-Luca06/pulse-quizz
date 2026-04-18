@@ -165,7 +165,7 @@ describe('GuestLanding CTA auth (Story 6.2)', () => {
 
 describe('ConnectedHeader via ConnectedLanding (Story 5.4)', () => {
   // Le header expose un bouton "Navigation" (icône grille) qui ouvre un dropdown
-  // contenant Classement / Statistiques / Achievements / Collections.
+  // contenant Classement / Statistiques / Achievements / Inventaire.
   function openNavDropdown() {
     fireEvent.click(screen.getByRole('button', { name: /^navigation$/i }))
   }

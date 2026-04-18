@@ -17,7 +17,7 @@ interface Props {
   onOpenSettings?: () => void
   onShowSocial?: () => void
   onShowDaily?: () => void
-  onShowCollection?: () => void
+  onShowInventory?: () => void
 }
 
 export default function ConnectedLanding({
@@ -32,7 +32,7 @@ export default function ConnectedLanding({
   onOpenSettings,
   onShowSocial,
   onShowDaily,
-  onShowCollection,
+  onShowInventory,
 }: Props) {
   return (
     <>
@@ -45,7 +45,7 @@ export default function ConnectedLanding({
         onViewProfile={onViewProfile ?? noop}
         onShowSocial={onShowSocial}
         onShowDaily={onShowDaily}
-        onShowCollection={onShowCollection}
+        onShowInventory={onShowInventory}
       />
 
       <div className="absolute inset-0 z-0">

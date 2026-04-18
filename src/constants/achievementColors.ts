@@ -84,6 +84,6 @@ export const BADGE_TIER: Record<AchievementId, AchievementTier> = {
   daily_score_parfait:   'common',
   daily_sniper:          'rare',
   daily_infaillible:     'epic',
-  daily_podium:          'rare',
+  daily_podium:          'legendary',
   daily_roi_du_jour:     'legendary',
 }

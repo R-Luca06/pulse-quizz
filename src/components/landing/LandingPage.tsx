@@ -25,7 +25,7 @@ interface Props {
   onShowSocial?: () => void
   onViewProfile: (username: string) => void
   onShowDaily?: () => void
-  onShowCollection?: () => void
+  onShowInventory?: () => void
 }
 
 export default function LandingPage({
@@ -41,7 +41,7 @@ export default function LandingPage({
   onShowSocial,
   onViewProfile,
   onShowDaily,
-  onShowCollection,
+  onShowInventory,
 }: Props) {
   const { user, profile, loading, signOut } = useAuth()
   const toast = useToast()
@@ -93,7 +93,7 @@ export default function LandingPage({
             onShowSocial={onShowSocial}
             onViewProfile={onViewProfile}
             onShowDaily={onShowDaily}
-            onShowCollection={onShowCollection}
+            onShowInventory={onShowInventory}
           />
         </motion.div>
       ) : (
@@ -211,7 +211,7 @@ interface ConnectedBranchProps {
   onShowSocial?: () => void
   onViewProfile: (username: string) => void
   onShowDaily?: () => void
-  onShowCollection?: () => void
+  onShowInventory?: () => void
 }
 
 function ConnectedBranch({
@@ -230,7 +230,7 @@ function ConnectedBranch({
   onShowSocial,
   onViewProfile,
   onShowDaily,
-  onShowCollection,
+  onShowInventory,
 }: ConnectedBranchProps) {
   function handleLaunch() {
     setOpenSettings(false)
@@ -252,7 +252,7 @@ function ConnectedBranch({
           onOpenSettings={() => setOpenSettings(true)}
           onShowSocial={onShowSocial}
           onShowDaily={onShowDaily}
-          onShowCollection={onShowCollection}
+          onShowInventory={onShowInventory}
         />
       </Suspense>
 
