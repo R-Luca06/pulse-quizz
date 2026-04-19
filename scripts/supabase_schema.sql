@@ -34,6 +34,9 @@
 --   14. wallet_transactions         — ledger immuable des gains de Pulses
 --   15. shop_items                  — catalogue de la Boutique (lecture publique)
 --   16. shop_purchases              — ledger immuable des achats en Boutique
+--   17. shop_bundles                — bundles (packs d'items vendus ensemble)
+--   18. shop_bundle_items           — junction bundle ↔ shop_items
+--   19. shop_bundle_purchases       — ledger immuable des achats de bundle
 --
 -- Fonctions RPC :
 --   - get_random_questions          — sélection aléatoire via pivot UUID
@@ -43,6 +46,7 @@
 --   - add_xp                        — crédit ponctuel d'XP
 --   - add_pulses                    — ledger + wallet upsert atomique
 --   - purchase_item                 — achat atomique Boutique (wallet + inventory)
+--   - purchase_bundle               — achat atomique d'un bundle (N pièces, 1 débit)
 --   - submit_daily_entry            — insert + calcul de série (UNIQUE user/date)
 --   - mark_daily_recap_seen         — flag recap_seen=true pour une entrée journalière
 --   - get_daily_leaderboard         — classement journalier paginé
@@ -543,6 +547,81 @@ ALTER TABLE shop_purchases ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "shop_purchases_select_own" ON shop_purchases FOR SELECT USING (auth.uid() = user_id);
 
 
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 17. shop_bundles
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Bundles de la Boutique : plusieurs `shop_items` vendus ensemble à un prix
+-- global réduit. Même ergonomie que shop_items (featured, is_new, is_limited,
+-- fenêtre de disponibilité). Lecture ouverte ; écritures : service_role.
+
+CREATE TABLE IF NOT EXISTS shop_bundles (
+  id              uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+  slug            text        NOT NULL UNIQUE,
+  name            text        NOT NULL,
+  description     text,
+  tier            text        NOT NULL CHECK (tier IN ('common','rare','epic','legendary')),
+  price           int         NOT NULL CHECK (price > 0),
+  is_new          boolean     NOT NULL DEFAULT false,
+  is_limited      boolean     NOT NULL DEFAULT false,
+  available_from  timestamptz,
+  available_until timestamptz,
+  featured        boolean     NOT NULL DEFAULT false,
+  sort_order      int         NOT NULL DEFAULT 0,
+  created_at      timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_shop_bundles_featured        ON shop_bundles (featured);
+CREATE INDEX IF NOT EXISTS idx_shop_bundles_available_until ON shop_bundles (available_until);
+
+ALTER TABLE shop_bundles ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "shop_bundles_select_all" ON shop_bundles;
+CREATE POLICY "shop_bundles_select_all" ON shop_bundles FOR SELECT USING (true);
+
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 18. shop_bundle_items
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Junction bundle ↔ shop_items. `sort_order` fixe l'ordre d'affichage des
+-- pièces dans la modale d'achat.
+
+CREATE TABLE IF NOT EXISTS shop_bundle_items (
+  bundle_id    uuid NOT NULL REFERENCES shop_bundles (id) ON DELETE CASCADE,
+  shop_item_id uuid NOT NULL REFERENCES shop_items   (id) ON DELETE CASCADE,
+  sort_order   int  NOT NULL DEFAULT 0,
+  PRIMARY KEY (bundle_id, shop_item_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_shop_bundle_items_bundle ON shop_bundle_items (bundle_id, sort_order);
+
+ALTER TABLE shop_bundle_items ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "shop_bundle_items_select_all" ON shop_bundle_items;
+CREATE POLICY "shop_bundle_items_select_all" ON shop_bundle_items FOR SELECT USING (true);
+
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 19. shop_bundle_purchases
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Ledger immuable des achats de bundle. Séparé de shop_purchases pour éviter
+-- de rendre shop_purchases.shop_item_id nullable. Alimenté exclusivement par
+-- le RPC purchase_bundle (SECURITY DEFINER).
+
+CREATE TABLE IF NOT EXISTS shop_bundle_purchases (
+  id         uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id    uuid        NOT NULL REFERENCES auth.users (id) ON DELETE CASCADE,
+  bundle_id  uuid        NOT NULL REFERENCES shop_bundles (id),
+  price_paid int         NOT NULL CHECK (price_paid > 0),
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_shop_bundle_purchases_user_created
+  ON shop_bundle_purchases (user_id, created_at DESC);
+
+ALTER TABLE shop_bundle_purchases ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "shop_bundle_purchases_select_own" ON shop_bundle_purchases;
+CREATE POLICY "shop_bundle_purchases_select_own"
+  ON shop_bundle_purchases FOR SELECT USING (auth.uid() = user_id);
+
+
 -- ═══════════════════════════════════════════════════════════════════════════════
 -- Fonctions RPC
 -- ═══════════════════════════════════════════════════════════════════════════════
@@ -956,6 +1035,96 @@ $func$;
 
 REVOKE ALL ON FUNCTION purchase_item(uuid) FROM public, anon;
 GRANT EXECUTE ON FUNCTION purchase_item(uuid) TO authenticated;
+
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- purchase_bundle
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Achat atomique d'un bundle :
+--   1. Vérifie auth (sinon 'not_authenticated').
+--   2. Charge shop_bundles (sinon 'bundle_not_found').
+--   3. Fenêtre de disponibilité : 'not_yet_available' / 'no_longer_available'.
+--   4. Balance suffisante (check + UPDATE gardé par `balance >= price`).
+--   5. INSERT shop_bundle_purchases (1 seule ligne ledger).
+--   6. INSERT user_inventory pour chaque pièce du bundle
+--      (ON CONFLICT DO NOTHING → pièces déjà possédées ignorées).
+-- Retourne { balance, bundle_id, items_added } (items_added < size(bundle) si
+-- l'utilisateur possédait déjà certaines pièces, mais il paie le prix plein).
+--
+-- Mêmes workarounds plpgsql que purchase_item (pas de SELECT … INTO multi-col,
+-- pas de UPDATE … RETURNING INTO).
+
+CREATE OR REPLACE FUNCTION purchase_bundle(p_bundle_id uuid)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $func$
+DECLARE
+  caller_uid uuid;
+  bun_price  int;
+  bun_from   timestamptz;
+  bun_until  timestamptz;
+  wallet_bal int;
+  updated_n  int;
+  new_bal    int;
+  added_n    int := 0;
+  rec        record;
+BEGIN
+  caller_uid := auth.uid();
+  IF caller_uid IS NULL THEN RAISE EXCEPTION 'not_authenticated'; END IF;
+
+  bun_price := (SELECT price           FROM shop_bundles WHERE id = p_bundle_id);
+  IF bun_price IS NULL THEN RAISE EXCEPTION 'bundle_not_found'; END IF;
+
+  bun_from  := (SELECT available_from  FROM shop_bundles WHERE id = p_bundle_id);
+  bun_until := (SELECT available_until FROM shop_bundles WHERE id = p_bundle_id);
+
+  IF bun_from  IS NOT NULL AND now() < bun_from  THEN RAISE EXCEPTION 'not_yet_available';  END IF;
+  IF bun_until IS NOT NULL AND now() > bun_until THEN RAISE EXCEPTION 'no_longer_available'; END IF;
+
+  wallet_bal := (SELECT balance FROM user_wallet WHERE user_id = caller_uid);
+  IF wallet_bal IS NULL OR wallet_bal < bun_price THEN
+    RAISE EXCEPTION 'insufficient_balance';
+  END IF;
+
+  UPDATE user_wallet
+     SET balance    = balance - bun_price,
+         updated_at = now()
+   WHERE user_id = caller_uid
+     AND balance >= bun_price;
+  GET DIAGNOSTICS updated_n = ROW_COUNT;
+  IF updated_n = 0 THEN RAISE EXCEPTION 'insufficient_balance'; END IF;
+
+  new_bal := (SELECT balance FROM user_wallet WHERE user_id = caller_uid);
+
+  INSERT INTO shop_bundle_purchases (user_id, bundle_id, price_paid)
+    VALUES (caller_uid, p_bundle_id, bun_price);
+
+  FOR rec IN
+    SELECT si.item_type, si.item_id
+      FROM shop_bundle_items sbi
+      JOIN shop_items si ON si.id = sbi.shop_item_id
+     WHERE sbi.bundle_id = p_bundle_id
+     ORDER BY sbi.sort_order
+  LOOP
+    INSERT INTO user_inventory (user_id, item_type, item_id, source)
+      VALUES (caller_uid, rec.item_type, rec.item_id, 'shop')
+    ON CONFLICT (user_id, item_type, item_id) DO NOTHING;
+    GET DIAGNOSTICS updated_n = ROW_COUNT;
+    added_n := added_n + updated_n;
+  END LOOP;
+
+  RETURN jsonb_build_object(
+    'balance',     new_bal,
+    'bundle_id',   p_bundle_id,
+    'items_added', added_n
+  );
+END;
+$func$;
+
+REVOKE ALL ON FUNCTION purchase_bundle(uuid) FROM public, anon;
+GRANT EXECUTE ON FUNCTION purchase_bundle(uuid) TO authenticated;
 
 
 -- ─────────────────────────────────────────────────────────────────────────────

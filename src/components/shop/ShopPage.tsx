@@ -2,15 +2,16 @@ import { useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import { useAuth } from '../../hooks/useAuth'
 import { useToast } from '../../contexts/ToastContext'
-import { fetchShopItems } from '../../services/shop'
+import { fetchShopItems, fetchShopBundles } from '../../services/shop'
 import { getUserInventory } from '../../services/inventory'
-import type { AchievementTier, InventoryItem, PurchaseResult, ShopItem } from '../../types/quiz'
+import type { AchievementTier, BundlePurchaseResult, InventoryItem, PurchaseResult, ShopBundle, ShopItem } from '../../types/quiz'
 import ShopHero from './ShopHero'
 import FeaturedSection from './FeaturedSection'
 import ShopFilters, { type RarityFilter, type StateFilter, type SortFilter } from './ShopFilters'
 import ShopTypeTabs, { type TypeFilter } from './ShopTypeTabs'
 import ShopGrid from './ShopGrid'
 import ShopItemModal from './ShopItemModal'
+import BundleModal from './BundleModal'
 
 const TIER_ORDER: Record<AchievementTier, number> = { legendary: 0, epic: 1, rare: 2, common: 3 }
 
@@ -24,10 +25,12 @@ export default function ShopPage({ onBack, onGoToInventory }: Props) {
   const toast = useToast()
 
   const [items, setItems]     = useState<ShopItem[] | null>(null)
+  const [bundles, setBundles] = useState<ShopBundle[] | null>(null)
   const [loading, setLoading] = useState(true)
   const [ownedFromFetch, setOwnedFromFetch] = useState<InventoryItem[] | null>(null)
-  const [selectedItem, setSelectedItem] = useState<ShopItem | null>(null)
-  const [locallyOwned, setLocallyOwned] = useState<Set<string>>(new Set())
+  const [selectedItem, setSelectedItem]     = useState<ShopItem | null>(null)
+  const [selectedBundle, setSelectedBundle] = useState<ShopBundle | null>(null)
+  const [locallyOwned, setLocallyOwned]     = useState<Set<string>>(new Set())
 
   const [typeFilter,   setTypeFilter]   = useState<TypeFilter>('all')
   const [rarityFilter, setRarityFilter] = useState<RarityFilter>('all')
@@ -41,14 +44,14 @@ export default function ShopPage({ onBack, onGoToInventory }: Props) {
     const invPromise = user
       ? getUserInventory(user.id).catch(() => [] as InventoryItem[])
       : Promise.resolve([] as InventoryItem[])
-    Promise.all([fetchShopItems(), invPromise])
-      .then(([shop, inv]) => {
+    Promise.all([fetchShopItems(), fetchShopBundles(), invPromise])
+      .then(([shop, bundlesRes, inv]) => {
         if (cancelled) return
         setItems(shop)
+        setBundles(bundlesRes)
         setOwnedFromFetch(inv)
       })
-      .catch(err => {
-        console.error(err)
+      .catch(() => {
         if (!cancelled) toast.error('Impossible de charger la boutique')
       })
       .finally(() => { if (!cancelled) setLoading(false) })
@@ -67,10 +70,22 @@ export default function ShopPage({ onBack, onGoToInventory }: Props) {
     setSelectedItem(item)
   }
 
+  function handleOpenBundle(bundle: ShopBundle) {
+    setSelectedBundle(bundle)
+  }
+
   function handlePurchased(result: PurchaseResult) {
     setLocallyOwned(prev => {
       const next = new Set(prev)
       next.add(`${result.item_type}::${result.item_id}`)
+      return next
+    })
+  }
+
+  function handleBundlePurchased(_result: BundlePurchaseResult, bundle: ShopBundle) {
+    setLocallyOwned(prev => {
+      const next = new Set(prev)
+      for (const it of bundle.items) next.add(`${it.item_type}::${it.item_id}`)
       return next
     })
   }
@@ -140,6 +155,7 @@ export default function ShopPage({ onBack, onGoToInventory }: Props) {
 
   const nbNew = useMemo(() => safeItems.filter(it => it.is_new).length, [safeItems])
   const featured = useMemo(() => safeItems.filter(it => it.featured), [safeItems])
+  const featuredBundles = useMemo(() => (bundles ?? []).filter(b => b.featured), [bundles])
 
   return (
     <motion.div
@@ -167,7 +183,13 @@ export default function ShopPage({ onBack, onGoToInventory }: Props) {
       <ShopHero total={safeItems.length} nbNew={nbNew} pulsesBalance={pulsesBalance} />
 
       {/* Featured */}
-      <FeaturedSection items={featured} onOpenItem={handleOpenItem} />
+      <FeaturedSection
+        items={featured}
+        bundles={featuredBundles}
+        ownedSet={ownedSet}
+        onOpenItem={handleOpenItem}
+        onOpenBundle={handleOpenBundle}
+      />
 
       {/* Body */}
       <div className="flex flex-1 overflow-hidden">
@@ -238,6 +260,15 @@ export default function ShopPage({ onBack, onGoToInventory }: Props) {
         balance={pulsesBalance}
         onClose={() => setSelectedItem(null)}
         onPurchased={handlePurchased}
+        onGoToInventory={onGoToInventory}
+      />
+
+      <BundleModal
+        bundle={selectedBundle}
+        ownedIds={ownedSet}
+        balance={pulsesBalance}
+        onClose={() => setSelectedBundle(null)}
+        onPurchased={(result) => selectedBundle && handleBundlePurchased(result, selectedBundle)}
         onGoToInventory={onGoToInventory}
       />
     </motion.div>

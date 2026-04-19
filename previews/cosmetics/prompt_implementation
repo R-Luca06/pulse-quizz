@@ -1,0 +1,868 @@
+Phase 1 — Fondations : tokens tailwind + support glyphe SVG dans les badges
+
+Implémente la couche fondation pour accueillir le Set Solaire « Héliarque » (Vol. 01). Cette phase ne touche PAS à la DB et n'ajoute AUCUN contenu au registry — elle prépare le terrain.
+
+## Contexte
+
+Le projet a déjà :
+- `src/components/shared/MiniBadge.tsx` : composant hexagonal universel. Pour `tier: 'legendary'` il applique `animate-badge-gold` (drop-shadow pulsant or) + deux « running lights » via `stroke-flow` + `stroke-flow-b`. Il rend l'`icon` (emoji) au centre.
+- `src/constants/shopBadges.ts` : `ShopBadgeMeta { id, name, icon, tier, description }` — `icon` est un emoji string.
+- `src/constants/achievements.ts` : `ACHIEVEMENT_MAP` avec des entries badges achievements, même shape (`icon` emoji).
+- `src/constants/cosmetics/registry.ts` : `getBadgeMeta(id)` dispatch vers ACHIEVEMENT_MAP puis SHOP_BADGE_REGISTRY, retourne `BadgeMeta { id, name, icon, tier, description }`.
+- `src/constants/cosmetics/titles.ts` : `TitleEntry { id, name, tier?, description?, resolve(props) → string }` — les titres sont des chaînes pures, rendues par l'inventaire / card design.
+- `src/constants/cosmetics/emblems.tsx`, `cardDesigns.tsx`, `backgrounds.tsx`, `screenAnimations.tsx` : registries de composants React. Chaque entry expose un `Component` (ou `render()`).
+- `tailwind.config.js` : palette `neon-*`, `game-*`, keyframes `badge-gold`, `badge-electric`, `pulse-ring`, `glow-pulse`. PAS de `stroke-flow` ni `stroke-flow-b` dans keyframes Tailwind — ce sont des classes utilitaires avec `style={{ animation: 'stroke-flow 3.5s linear infinite' }}`. L'animation `stroke-flow` est déjà déclarée via un `@keyframes` global (chercher où).
+
+Le handoff design se trouve dans `previews/cosmetics/handoff-set-solaire/` :
+- `src/constants/cosmetics/solarSet.tsx` — composants React livrés (badges avec coquille hex interne HexBadge, emblem, OrEnFusionCard, HorizonIncandescentBg, BraisesAscendantesAnim, HELIARQUE_TITLE_STYLE).
+- `patches/tailwind.config.patch.js` — palette `solar-*` + keyframes `ember-rise`, `ember-flicker`, `phoenix-float`, `horizon-pulse`, `heat-shimmer`, `solar-shine`, `card-shine-sweep`, `solar-pulse`, `solar-spin-slow`, `solar-spin-rev`, `sun-rays`.
+- `INTEGRATION.md` — ordre préconisé (NE PAS suivre tel quel pour les badges : voir instructions ci-dessous).
+- `README.md` — vue d'ensemble.
+
+## Décision d'architecture
+
+Le handoff enferme chaque badge dans son propre `HexBadge` avec des `stroke-flow 3.5s` perso. C'est **incohérent** avec les autres légendaires du jeu — on ne garde QUE les glyphes internes et on les injecte dans la coquille existante de `MiniBadge`. Seul le glyphe interne est unique, le shell (halo or pulsant + running lights) reste exactement comme les autres légendaires.
+
+## Ce qu'il faut faire
+
+### 1. Merge du patch Tailwind
+
+Ouvrir `tailwind.config.js` et merger le contenu de `previews/cosmetics/handoff-set-solaire/patches/tailwind.config.patch.js` dans `theme.extend` :
+
+- Ajouter `colors.solar` (scale 50→900 + `ember: '#ea580c'` + `deep: '#431407'`).
+- Ajouter aux `keyframes` : `ember-rise`, `ember-flicker`, `phoenix-float`, `horizon-pulse`, `heat-shimmer`, `solar-shine`, `card-shine-sweep`, `solar-pulse`, `solar-spin-slow`, `solar-spin-rev`, `sun-rays`.
+- **NE PAS** ajouter `stroke-flow` (déjà définie globalement, la dupliquer casserait le build).
+- Ajouter aux `animation` : alias courts pour `ember-rise`, `ember-flicker`, `sun-rays`, `heat-shimmer`, `solar-shine`, `phoenix-float`, `horizon-pulse`, `solar-pulse`.
+
+### 2. Étendre `BadgeMeta` pour supporter un glyphe React
+
+Dans `src/constants/cosmetics/registry.ts` — étendre `BadgeMeta` :
+
+```ts
+import type { ComponentType } from 'react'
+
+export interface BadgeMeta {
+  id:          string
+  name:        string
+  icon:        string                                 // emoji fallback (toujours requis)
+  tier:        AchievementTier
+  description: string
+  glyph?:      ComponentType<{ size?: number }>      // ← NOUVEAU. SVG inner glyph, prend le pas sur icon.
+}
+```
+
+Même ajout dans `src/constants/shopBadges.ts` → `ShopBadgeMeta` (ajouter `glyph?: ComponentType<{size?: number}>`), et propager dans `getBadgeMeta(id)` (spread `glyph` depuis la source).
+
+`ACHIEVEMENT_MAP` ne fournit pas de `glyph` (ok, reste optionnel). Le dispatch doit préserver `glyph` quand il vient de `SHOP_BADGE_REGISTRY`.
+
+### 3. Refactor `MiniBadge.tsx` pour rendre `glyph` si présent
+
+Dans `src/components/shared/MiniBadge.tsx`, remplacer le bloc « Icône » (le `<span>` qui rend `meta.icon`) par :
+
+```tsx
+{meta.glyph ? (
+  <div
+    className={['relative z-10 flex items-center justify-center', !unlocked ? 'opacity-25 grayscale' : ''].join(' ')}
+    style={{ width: Math.round(size * 0.7), height: Math.round(size * 0.7) }}
+  >
+    <meta.glyph size={Math.round(size * 0.7)} />
+  </div>
+) : (
+  <span
+    className={['relative z-10 select-none leading-none', !unlocked ? 'opacity-25 grayscale' : ''].join(' ')}
+    style={{ fontSize: Math.round(size * 0.45) }}
+  >
+    {meta.icon}
+  </span>
+)}
+```
+
+La coquille hex, les running lights `stroke-flow` et le glow `badge-gold` restent inchangés — le glyphe SVG hérite donc automatiquement du shell legendary standard. C'est le point critique de cette phase.
+
+### 4. Étendre `TitleEntry` pour supporter un style inline
+
+Dans `src/constants/cosmetics/titles.ts`, ajouter au type :
+
+```ts
+interface TitleEntry {
+  id: string
+  name: string
+  tier?: AchievementTier
+  description?: string
+  resolve: (props: TitleProps) => string
+  style?: React.CSSProperties      // ← NOUVEAU. Pour gradient text-fill, shadow, etc.
+}
+```
+
+**NE PAS** ajouter d'entry `heliarque` ici — c'est la phase 2. Mettre à jour aussi les endroits qui rendent le label du titre pour spreader `entry.style` sur le `<span>`/`<div>` qui affiche le label (grep `resolveTitle` et les composants qui rendent un titre pour repérer les call sites).
+
+### 5. Ajouter le champ `setId?` aux types de cosmétiques (optionnel, non-destructif)
+
+Dans chacun des fichiers registry, ajouter `setId?: string` à l'interface de l'entry :
+- `src/constants/cosmetics/emblems.tsx` → `EmblemEntry`
+- `src/constants/cosmetics/titles.ts` → `TitleEntry`
+- `src/constants/cosmetics/cardDesigns.tsx` → (entry interface)
+- `src/constants/cosmetics/backgrounds.tsx` → (entry interface)
+- `src/constants/cosmetics/screenAnimations.tsx` → (entry interface)
+- `src/constants/shopBadges.ts` → `ShopBadgeMeta`
+
+Aucune entry existante n'est modifiée. Ce champ sera peuplé à la phase 2 pour les nouvelles entries Héliarque uniquement.
+
+## Validation
+
+```bash
+npx tsc --noEmit
+npm run lint
+```
+
+Doivent passer. Aucune régression visuelle attendue (aucun badge ne définit encore de `glyph`, aucun titre de `style`).
+
+N'implémente PAS le Set Solaire (registry entries, composants) ni la DB bundles. Stop ici.
+
+────────────────────────────────────────────────────────────────────────────────
+
+Phase 2 — Set Solaire Héliarque : composants + registry entries + seed items
+
+Implémente le contenu du Set Solaire Vol. 01 — les 8 pièces (3 badges, 1 blason, 1 titre, 1 card design, 1 fond, 1 screen animation), leur enregistrement dans les registries, et leur seed en DB comme items unitaires.
+
+## Contexte
+
+Phase 1 complétée :
+- Palette `solar-*` + keyframes solaires disponibles dans Tailwind.
+- `BadgeMeta.glyph` et `ShopBadgeMeta.glyph` acceptent un `ComponentType<{size?:number}>`.
+- `MiniBadge` rend le glyphe React si présent, sinon l'emoji.
+- `TitleEntry.style?: React.CSSProperties` disponible et spread sur le label.
+- Champ `setId?: string` présent dans tous les types d'entry cosmétique.
+
+Sources livrées :
+- `previews/cosmetics/handoff-set-solaire/src/constants/cosmetics/solarSet.tsx` — **à adapter** (voir ci-dessous).
+- `previews/cosmetics/handoff-set-solaire/patches/{emblems,titles,cardDesigns,backgrounds,screenAnimations,shopBadges}.patch.tsx` — modèles de patches à appliquer.
+
+## Décisions d'adaptation vs handoff
+
+- **Badges** : on **ne copie PAS** le wrapper `HexBadge` du handoff. On ne garde que le **contenu `<svg viewBox="-24 -24 48 48">...</svg>`** de chaque badge. La coquille hex vient de `MiniBadge` (phase 1).
+- **Emblem `HeliarqueEmblem`** : on copie tel quel (il utilise son propre `<svg>` avec forme de blason, pas d'hex). Adapter la signature à `EmblemEntry.Component` : `(props: EmblemProps)` — ignorer `rank`, retourner le composant livré.
+- **Titre `HELIARQUE_TITLE_STYLE`** : on le fournit dans l'entry via le champ `style` ajouté en phase 1.
+- **Card design `OrEnFusionCard`** : HOC-style, on le rend via un `render({ children, width }) → <OrEnFusionCard>{children}</OrEnFusionCard>`. Vérifier la shape actuelle des entries de `cardDesigns.tsx` pour aligner la signature.
+- **Background `HorizonIncandescentBg`** + **screen animation `BraisesAscendantesAnim`** : copie tel quel.
+
+## Ce qu'il faut faire
+
+### 1. Créer `src/constants/cosmetics/solarSet.tsx`
+
+Copier `previews/cosmetics/handoff-set-solaire/src/constants/cosmetics/solarSet.tsx` vers ce chemin, puis :
+
+- **Supprimer** le composant `HexBadge` (il n'est plus utilisé — la coquille vient de `MiniBadge`).
+- Réécrire `EruptionBadge`, `CouronneSolaireBadge`, `PhenixBadge` pour qu'ils retournent **uniquement le `<svg>` interne**, pas le wrapper. Signature : `({ size = 40 }: { size?: number })`. Renommer ces exports en `EruptionGlyph`, `CouronneSolaireGlyph`, `PhenixGlyph` pour clarifier que ce sont les glyphes internes.
+- Conserver `HeliarqueEmblem`, `OrEnFusionCard`, `HorizonIncandescentBg`, `BraisesAscendantesAnim`, `HELIARQUE_TITLE_STYLE` tels quels (signatures identiques au handoff).
+- Garder les commentaires d'en-tête.
+
+### 2. Enregistrer les 3 badges dans `src/constants/shopBadges.ts`
+
+Ajouter au `SHOP_BADGE_REGISTRY` (garder les entries existantes `shop_badge_crown` et `shop_badge_diamond`) :
+
+```ts
+import { EruptionGlyph, CouronneSolaireGlyph, PhenixGlyph } from './cosmetics/solarSet'
+
+// dans SHOP_BADGE_REGISTRY :
+heliarque_eruption: {
+  id: 'heliarque_eruption',
+  name: 'Éruption',
+  icon: '🔥',                            // fallback emoji
+  tier: 'legendary',
+  setId: 'solaire_v1',
+  description: 'Flamme de forge en éruption. Set Héliarque · Vol. 01.',
+  glyph: EruptionGlyph,
+},
+heliarque_couronne_solaire: {
+  id: 'heliarque_couronne_solaire',
+  name: 'Couronne Solaire',
+  icon: '☀️',
+  tier: 'legendary',
+  setId: 'solaire_v1',
+  description: 'Soleil couronné à douze rayons. Set Héliarque · Vol. 01.',
+  glyph: CouronneSolaireGlyph,
+},
+heliarque_phenix: {
+  id: 'heliarque_phenix',
+  name: 'Phénix',
+  icon: '🔆',
+  tier: 'legendary',
+  setId: 'solaire_v1',
+  description: 'Phénix de braise, ailes déployées. Set Héliarque · Vol. 01.',
+  glyph: PhenixGlyph,
+},
+```
+
+### 3. Ajouter l'entry `heliarque` dans `emblems.tsx`
+
+```ts
+import { HeliarqueEmblem } from './solarSet'
+
+// dans EMBLEM_REGISTRY :
+heliarque: {
+  id:          'heliarque',
+  name:        'Héliarque',
+  tier:        'legendary',
+  setId:       'solaire_v1',
+  description: 'Blason solaire couronné. Set Héliarque · Vol. 01.',
+  Component:   () => <HeliarqueEmblem />,
+},
+```
+
+(`HeliarqueEmblem` n'utilise pas `rank`, on passe un composant wrapper qui ignore les props.)
+
+### 4. Ajouter l'entry `heliarque` dans `titles.ts`
+
+```ts
+import { HELIARQUE_TITLE_STYLE } from './solarSet'
+
+// dans TITLE_REGISTRY :
+heliarque: {
+  id:          'heliarque',
+  name:        'Héliarque',
+  tier:        'legendary',
+  setId:       'solaire_v1',
+  description: 'Titre doré scintillant. Set Héliarque · Vol. 01.',
+  resolve:     () => 'Héliarque',
+  style:       HELIARQUE_TITLE_STYLE,
+},
+```
+
+### 5. Ajouter l'entry `or_en_fusion` dans `cardDesigns.tsx`
+
+Vérifier d'abord la shape des entries existantes (probablement `Component` ou `render`). Si c'est un HOC wrapping `children` :
+
+```ts
+import { OrEnFusionCard } from './solarSet'
+
+or_en_fusion: {
+  id:          'or_en_fusion',
+  name:        'Or en Fusion',
+  tier:        'legendary',
+  setId:       'solaire_v1',
+  description: 'Cartouche doré aux bordures fluides. Set Héliarque · Vol. 01.',
+  // adapter la clé (Component/render) à la convention du fichier :
+  Component: ({ children, width }: { children: React.ReactNode; width?: number }) => (
+    <OrEnFusionCard width={width}>{children}</OrEnFusionCard>
+  ),
+},
+```
+
+### 6. Ajouter l'entry `horizon_incandescent` dans `backgrounds.tsx`
+
+```ts
+import { HorizonIncandescentBg } from './solarSet'
+
+horizon_incandescent: {
+  id:          'horizon_incandescent',
+  name:        'Horizon Incandescent',
+  tier:        'legendary',
+  setId:       'solaire_v1',
+  description: 'Aube solaire et braises ascendantes. Set Héliarque · Vol. 01.',
+  Component:   HorizonIncandescentBg,
+},
+```
+
+### 7. Ajouter l'entry `braises_ascendantes` dans `screenAnimations.tsx`
+
+```ts
+import { BraisesAscendantesAnim } from './solarSet'
+
+braises_ascendantes: {
+  id:          'braises_ascendantes',
+  name:        'Braises Ascendantes',
+  tier:        'legendary',
+  setId:       'solaire_v1',
+  description: 'Overlay de braises dorées ascendantes. Set Héliarque · Vol. 01.',
+  Component:   BraisesAscendantesAnim,
+},
+```
+
+### 8. Ajouter les mini-previews dans `src/components/inventory/previews.tsx`
+
+Pour que les 6 pièces apparaissent correctement dans l'inventaire et la boutique :
+- `MiniEmblem` → ajouter une branche `meta.id === 'heliarque'` qui rend un glyphe solaire dans le shield.
+- `MiniCardDesign` → ajouter une clé `or_en_fusion` dans `CARD_STYLE` (gradient or + bordure or).
+- `MiniBackground` → ajouter une clé `horizon_incandescent` dans `BG_STYLE`.
+- `MiniScreenAnim` → ajouter une clé `braises_ascendantes` dans `ANIM_COLOR` (dot/glow or chaud).
+
+Voir les couleurs du handoff pour cohérence : `#fbbf24`, `#f59e0b`, `#ea580c`.
+
+### 9. Seed des 8 items unitaires — nouvelle migration
+
+Créer `scripts/migrations/007_shop_solaire_items.sql` :
+
+```sql
+BEGIN;
+
+INSERT INTO shop_items (item_type, item_id, name, description, tier, price, is_new, featured, sort_order) VALUES
+  ('emblem',           'heliarque',                 'Blason Héliarque',          'Blason solaire couronné.',               'legendary', 1800, true, true, 10),
+  ('title',            'heliarque',                 'Titre Héliarque',           'Titre doré scintillant.',                'legendary', 1200, true, false, 11),
+  ('card_design',      'or_en_fusion',              'Carte Or en Fusion',        'Cartouche doré.',                        'legendary', 1500, true, false, 12),
+  ('background',       'horizon_incandescent',      'Horizon Incandescent',      'Aube solaire, braises.',                 'legendary', 1000, true, false, 13),
+  ('screen_animation', 'braises_ascendantes',       'Braises Ascendantes',       'Overlay de braises dorées.',             'legendary', 1000, true, false, 14),
+  ('badge',            'heliarque_eruption',        'Badge Éruption',            'Flamme de forge en éruption.',           'legendary',  400, true, false, 15),
+  ('badge',            'heliarque_couronne_solaire','Badge Couronne Solaire',    'Soleil couronné à douze rayons.',        'legendary',  400, true, false, 16),
+  ('badge',            'heliarque_phenix',          'Badge Phénix',              'Phénix de braise.',                      'legendary',  200, true, false, 17)
+ON CONFLICT (item_type, item_id) DO NOTHING;
+
+COMMIT;
+```
+
+Total : 1800 + 1200 + 1500 + 1000 + 1000 + 400 + 400 + 200 = 7 500 ◈ (cohérent avec le bundle à 6 000 ◈ en phase 3 → −20%). Seul le blason est `featured=true` (il fera office d'accroche dans la section existante « Nouveautés »).
+
+### 10. Mettre à jour `scripts/supabase_schema.sql`
+
+Rien à changer dans le schéma (pas de nouvelles tables en phase 2). Ajouter un commentaire en haut des inserts de démo si un tel bloc existe, sinon rien à faire.
+
+## Validation
+
+```bash
+npx tsc --noEmit
+npm run lint
+npm run dev
+```
+
+Après exécution manuelle de la migration 007 côté Supabase, vérifier dans la boutique :
+- Les 5 cosmétiques + 3 badges Héliarque apparaissent dans la grille (filtre type = Tous, tri = Nouveautés).
+- Le blason apparaît en section featured.
+- Clic sur un badge Héliarque → la modale d'achat affiche le glyphe SVG animé dans la coquille hex legendary standard (stroke-flow or + halo pulsant).
+- Les animations internes (ember-flicker pour Éruption, phoenix-float pour Phénix, solar-spin-slow pour Couronne) tournent correctement.
+- Le titre Héliarque affiche le gradient text-fill dans l'inventaire.
+
+N'implémente PAS le système de bundles (DB + UI). Stop ici.
+
+────────────────────────────────────────────────────────────────────────────────
+
+Phase 3 — Système de bundles : DB (tables + RPC) + types + service
+
+Implémente la couche bundle côté backend + service. Aucune UI dans cette phase.
+
+## Contexte
+
+Phases 1 & 2 complétées : les 8 pièces du Set Solaire existent en `shop_items` et sont achetables individuellement (prix cumulé 7 500 ◈). Il faut maintenant permettre de les acheter groupées à 6 000 ◈ (−20%), en une seule transaction.
+
+Tables/RPC existants pertinents (voir `scripts/supabase_schema.sql`) :
+- `shop_items (id uuid PK, item_type, item_id, name, description, tier, price, is_new, is_limited, available_from, available_until, featured, sort_order, created_at)` — unitaire seulement.
+- `shop_purchases (id, user_id, shop_item_id, price_paid, created_at)` — ledger par item unitaire.
+- `user_wallet (user_id, balance, lifetime_earned, updated_at)`.
+- `user_inventory (user_id, item_type, item_id, source, obtained_at)` UNIQUE(user_id, item_type, item_id).
+- RPC `purchase_item(p_shop_item_id uuid) RETURNS jsonb` — modèle à suivre (contraintes `SELECT INTO` multi-colonnes cassées dans l'env Supabase : voir `005_shop_rpc.sql`).
+
+## Décisions
+
+- Deux nouvelles tables : `shop_bundles` + `shop_bundle_items` (junction).
+- Une table de ledger séparée : `shop_bundle_purchases` (n'impacte pas `shop_purchases` existant → évite de rendre `shop_item_id` nullable).
+- Une RPC atomique `purchase_bundle(p_bundle_id uuid)` qui :
+  - insère toutes les pièces manquantes dans `user_inventory` (ON CONFLICT DO NOTHING — si l'utilisateur possède déjà certaines pièces, il paie quand même le prix plein mais les pièces manquantes sont débloquées).
+  - debite le wallet une seule fois.
+  - log une seule ligne dans `shop_bundle_purchases`.
+- Un bundle peut être `featured`, `is_new`, `is_limited`, avec `available_from/until` — même ergonomie que `shop_items`.
+
+## Ce qu'il faut faire
+
+### 1. Créer `scripts/migrations/008_shop_bundles.sql`
+
+```sql
+BEGIN;
+
+-- ─── shop_bundles ────────────────────────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS shop_bundles (
+  id              uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+  slug            text        NOT NULL UNIQUE,                 -- ex: 'solaire_v1'
+  name            text        NOT NULL,
+  description     text,
+  tier            text        NOT NULL CHECK (tier IN ('common','rare','epic','legendary')),
+  price           int         NOT NULL CHECK (price > 0),
+  is_new          boolean     NOT NULL DEFAULT false,
+  is_limited      boolean     NOT NULL DEFAULT false,
+  available_from  timestamptz,
+  available_until timestamptz,
+  featured        boolean     NOT NULL DEFAULT false,
+  sort_order      int         NOT NULL DEFAULT 0,
+  created_at      timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_shop_bundles_featured        ON shop_bundles (featured);
+CREATE INDEX IF NOT EXISTS idx_shop_bundles_available_until ON shop_bundles (available_until);
+
+ALTER TABLE shop_bundles ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "shop_bundles_select_all" ON shop_bundles;
+CREATE POLICY "shop_bundles_select_all" ON shop_bundles FOR SELECT USING (true);
+
+-- ─── shop_bundle_items (junction) ────────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS shop_bundle_items (
+  bundle_id    uuid NOT NULL REFERENCES shop_bundles (id) ON DELETE CASCADE,
+  shop_item_id uuid NOT NULL REFERENCES shop_items   (id) ON DELETE CASCADE,
+  sort_order   int  NOT NULL DEFAULT 0,
+  PRIMARY KEY (bundle_id, shop_item_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_shop_bundle_items_bundle ON shop_bundle_items (bundle_id, sort_order);
+
+ALTER TABLE shop_bundle_items ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "shop_bundle_items_select_all" ON shop_bundle_items;
+CREATE POLICY "shop_bundle_items_select_all" ON shop_bundle_items FOR SELECT USING (true);
+
+-- ─── shop_bundle_purchases (ledger) ──────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS shop_bundle_purchases (
+  id         uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id    uuid        NOT NULL REFERENCES auth.users (id) ON DELETE CASCADE,
+  bundle_id  uuid        NOT NULL REFERENCES shop_bundles (id),
+  price_paid int         NOT NULL CHECK (price_paid > 0),
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_shop_bundle_purchases_user_created
+  ON shop_bundle_purchases (user_id, created_at DESC);
+
+ALTER TABLE shop_bundle_purchases ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "shop_bundle_purchases_select_own" ON shop_bundle_purchases;
+CREATE POLICY "shop_bundle_purchases_select_own"
+  ON shop_bundle_purchases FOR SELECT USING (auth.uid() = user_id);
+
+-- ─── RPC purchase_bundle ─────────────────────────────────────────────────────
+--
+-- IMPORTANT — contraintes spécifiques à l'env Supabase de ce projet :
+--   • `SELECT c1, c2 INTO v1, v2 FROM table` → cassé.
+--   • `UPDATE … RETURNING col INTO var` → cassé.
+-- → Assignation scalaire `var := (SELECT col FROM t WHERE …);` + GET DIAGNOSTICS.
+
+DROP FUNCTION IF EXISTS purchase_bundle(uuid);
+
+CREATE FUNCTION purchase_bundle(p_bundle_id uuid)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $func$
+DECLARE
+  caller_uid uuid;
+  bun_price  int;
+  bun_from   timestamptz;
+  bun_until  timestamptz;
+  wallet_bal int;
+  updated_n  int;
+  new_bal    int;
+  added_n    int := 0;
+  rec        record;
+BEGIN
+  caller_uid := auth.uid();
+  IF caller_uid IS NULL THEN RAISE EXCEPTION 'not_authenticated'; END IF;
+
+  bun_price := (SELECT price           FROM shop_bundles WHERE id = p_bundle_id);
+  IF bun_price IS NULL THEN RAISE EXCEPTION 'bundle_not_found'; END IF;
+
+  bun_from  := (SELECT available_from  FROM shop_bundles WHERE id = p_bundle_id);
+  bun_until := (SELECT available_until FROM shop_bundles WHERE id = p_bundle_id);
+
+  IF bun_from  IS NOT NULL AND now() < bun_from  THEN RAISE EXCEPTION 'not_yet_available';  END IF;
+  IF bun_until IS NOT NULL AND now() > bun_until THEN RAISE EXCEPTION 'no_longer_available'; END IF;
+
+  wallet_bal := (SELECT balance FROM user_wallet WHERE user_id = caller_uid);
+  IF wallet_bal IS NULL OR wallet_bal < bun_price THEN
+    RAISE EXCEPTION 'insufficient_balance';
+  END IF;
+
+  -- Debit atomique (guard >= price → race-safe contre add_pulses concurrents).
+  UPDATE user_wallet
+     SET balance    = balance - bun_price,
+         updated_at = now()
+   WHERE user_id = caller_uid
+     AND balance >= bun_price;
+  GET DIAGNOSTICS updated_n = ROW_COUNT;
+  IF updated_n = 0 THEN RAISE EXCEPTION 'insufficient_balance'; END IF;
+
+  new_bal := (SELECT balance FROM user_wallet WHERE user_id = caller_uid);
+
+  -- Log ledger bundle.
+  INSERT INTO shop_bundle_purchases (user_id, bundle_id, price_paid)
+    VALUES (caller_uid, p_bundle_id, bun_price);
+
+  -- Insérer chaque pièce du bundle dans l'inventaire (skip déjà possédé).
+  FOR rec IN
+    SELECT si.item_type, si.item_id
+      FROM shop_bundle_items sbi
+      JOIN shop_items si ON si.id = sbi.shop_item_id
+     WHERE sbi.bundle_id = p_bundle_id
+     ORDER BY sbi.sort_order
+  LOOP
+    INSERT INTO user_inventory (user_id, item_type, item_id, source)
+      VALUES (caller_uid, rec.item_type, rec.item_id, 'shop')
+    ON CONFLICT (user_id, item_type, item_id) DO NOTHING;
+    GET DIAGNOSTICS updated_n = ROW_COUNT;
+    added_n := added_n + updated_n;
+  END LOOP;
+
+  RETURN jsonb_build_object(
+    'balance',     new_bal,
+    'bundle_id',   p_bundle_id,
+    'items_added', added_n
+  );
+END;
+$func$;
+
+REVOKE ALL ON FUNCTION purchase_bundle(uuid) FROM public, anon;
+GRANT EXECUTE ON FUNCTION purchase_bundle(uuid) TO authenticated;
+
+-- ─── Seed bundle Héliarque ───────────────────────────────────────────────────
+
+INSERT INTO shop_bundles (slug, name, description, tier, price, is_new, featured, sort_order) VALUES
+  ('solaire_v1',
+   'Set Solaire — Héliarque',
+   'Forge solaire, or en fusion, braises ascendantes. 8 pièces légendaires (−20%).',
+   'legendary',
+   6000,
+   true,
+   true,
+   10)
+ON CONFLICT (slug) DO NOTHING;
+
+-- Lier les 8 pièces (supposent qu'elles ont été insérées via migration 007).
+INSERT INTO shop_bundle_items (bundle_id, shop_item_id, sort_order)
+SELECT b.id, si.id, n.sort_order
+  FROM shop_bundles b
+  JOIN (
+    VALUES
+      ('emblem',           'heliarque',                  1),
+      ('title',            'heliarque',                  2),
+      ('card_design',      'or_en_fusion',               3),
+      ('background',       'horizon_incandescent',       4),
+      ('screen_animation', 'braises_ascendantes',        5),
+      ('badge',            'heliarque_eruption',         6),
+      ('badge',            'heliarque_couronne_solaire', 7),
+      ('badge',            'heliarque_phenix',           8)
+  ) AS n(item_type, item_id, sort_order) ON true
+  JOIN shop_items si ON si.item_type = n.item_type AND si.item_id = n.item_id
+ WHERE b.slug = 'solaire_v1'
+ON CONFLICT (bundle_id, shop_item_id) DO NOTHING;
+
+COMMIT;
+```
+
+### 2. Mettre à jour `scripts/supabase_schema.sql`
+
+Ajouter les trois nouvelles tables + la RPC dans la section appropriée. Mettre à jour le sommaire en haut du fichier.
+
+### 3. Types — `src/types/quiz.ts`
+
+Ajouter au bloc « Boutique » :
+
+```ts
+export interface ShopBundle {
+  id:              string
+  slug:            string
+  name:            string
+  description:     string | null
+  tier:            AchievementTier
+  price:           number
+  is_new:          boolean
+  is_limited:      boolean
+  featured:        boolean
+  available_from:  string | null
+  available_until: string | null
+  sort_order:      number
+  items:           ShopItem[]       // pièces résolues (jointure côté service)
+}
+
+export interface BundlePurchaseResult {
+  balance:     number
+  bundle_id:   string
+  items_added: number
+}
+
+// Étendre PurchaseErrorCode pour les cas bundle
+export type PurchaseErrorCode =
+  | 'not_authenticated'
+  | 'item_not_found'
+  | 'bundle_not_found'             // ← NOUVEAU
+  | 'not_yet_available'
+  | 'no_longer_available'
+  | 'already_owned'
+  | 'insufficient_balance'
+  | 'unknown'
+```
+
+### 4. Service — `src/services/shop.ts`
+
+Ajouter deux fonctions :
+
+```ts
+export async function fetchShopBundles(): Promise<ShopBundle[]> {
+  const { data, error } = await supabase
+    .from('shop_bundles')
+    .select(`
+      id, slug, name, description, tier, price, is_new, is_limited, featured,
+      available_from, available_until, sort_order,
+      shop_bundle_items (
+        sort_order,
+        shop_items ( id, item_type, item_id, name, description, tier, price, is_new, is_limited, featured, available_from, available_until, sort_order )
+      )
+    `)
+    .order('featured', { ascending: false })
+    .order('sort_order', { ascending: true })
+
+  if (error) throw new AppError('db_error', error.message)
+
+  return (data ?? []).map(row => ({
+    id:              row.id,
+    slug:            row.slug,
+    name:            row.name,
+    description:     row.description,
+    tier:            row.tier as AchievementTier,
+    price:           row.price,
+    is_new:          row.is_new,
+    is_limited:      row.is_limited,
+    featured:        row.featured,
+    available_from:  row.available_from,
+    available_until: row.available_until,
+    sort_order:      row.sort_order,
+    items: (row.shop_bundle_items ?? [])
+      .sort((a, b) => a.sort_order - b.sort_order)
+      .map(sbi => {
+        const si = sbi.shop_items as any
+        return {
+          id:              si.id,
+          item_type:       si.item_type as ItemType,
+          item_id:         si.item_id,
+          name:            si.name,
+          description:     si.description,
+          tier:            si.tier as AchievementTier,
+          price:           si.price,
+          is_new:          si.is_new,
+          is_limited:      si.is_limited,
+          featured:        si.featured,
+          available_from:  si.available_from,
+          available_until: si.available_until,
+          sort_order:      si.sort_order,
+        }
+      }),
+  }))
+}
+
+export async function purchaseBundle(bundleId: string): Promise<BundlePurchaseResult> {
+  const { data, error } = await supabase.rpc('purchase_bundle', { p_bundle_id: bundleId })
+  if (error) {
+    const code = parsePurchaseError(error.message)
+    throw new AppError(code, error.message)
+  }
+  return data as BundlePurchaseResult
+}
+```
+
+Étendre `parsePurchaseError` pour reconnaître `'bundle_not_found'`.
+
+### 5. Vérifier `AppError` accepte le nouveau code
+
+Dans `src/services/errors.ts`, si l'union des codes est explicite, ajouter `'bundle_not_found'`.
+
+## Validation
+
+```bash
+npx tsc --noEmit
+npm run lint
+```
+
+Tester manuellement la RPC côté Supabase SQL Editor :
+```sql
+-- doit renvoyer un JSON avec items_added = 8 pour un user neuf
+SELECT purchase_bundle((SELECT id FROM shop_bundles WHERE slug = 'solaire_v1'));
+```
+
+N'implémente AUCUNE UI. Stop ici.
+
+────────────────────────────────────────────────────────────────────────────────
+
+Phase 4 — UI bundles : section mise en avant + modale d'achat bundle
+
+Implémente l'UI boutique pour afficher et acheter les bundles.
+
+## Contexte
+
+Phases 1 à 3 complétées :
+- 8 pièces Héliarque seed individuellement dans `shop_items`.
+- Bundle `solaire_v1` à 6 000 ◈ seed dans `shop_bundles` + liens via `shop_bundle_items`.
+- `fetchShopBundles()` et `purchaseBundle(bundleId)` dans `src/services/shop.ts`.
+- Types `ShopBundle`, `BundlePurchaseResult`.
+- `MiniBadge` rend les glyphes SVG correctement.
+- Les previews d'inventaire gèrent les nouvelles entries.
+
+UI existante boutique (`src/components/shop/`) :
+- `ShopPage.tsx` — container, charge `fetchShopItems` + inventory, gère filtres + modale item.
+- `FeaturedSection.tsx` — rangée 3 colonnes d'items `featured=true`. **On va la repenser** pour accueillir les bundles en priorité.
+- `ShopItemCard.tsx`, `ShopItemModal.tsx`, `LargeItemPreview.tsx` — restent intacts.
+
+Preview design : `previews/cosmetics/handoff-set-solaire/README.md` mentionne un rendu visuel dans le projet de design (non fourni dans ce dossier). Inspirer du style `ShopItemCard` + modale ; le bundle est un item spécial avec tag « PACK » doré et grille de 8 mini-previews.
+
+## Ce qu'il faut faire
+
+### 1. Charger les bundles dans `ShopPage.tsx`
+
+- Ajouter un `useState<ShopBundle[] | null>(null)` pour `bundles`.
+- Ajouter `fetchShopBundles()` dans le `Promise.all` du mount.
+- Passer `bundles` à la section featured (voir étape suivante).
+- Ajouter un state `selectedBundle: ShopBundle | null` et un handler `handleOpenBundle(bundle)`.
+- Ajouter un handler `handleBundlePurchased(result: BundlePurchaseResult)` qui ajoute toutes les pièces du bundle au `locallyOwned` set :
+
+```ts
+function handleBundlePurchased(result: BundlePurchaseResult, bundle: ShopBundle) {
+  setLocallyOwned(prev => {
+    const next = new Set(prev)
+    for (const it of bundle.items) next.add(`${it.item_type}::${it.item_id}`)
+    return next
+  })
+}
+```
+
+### 2. Refactor `FeaturedSection.tsx`
+
+Nouveau comportement : afficher en priorité les bundles `featured=true`, puis les items `featured=true` qui ne sont PAS déjà dans un bundle featured.
+
+Props :
+```ts
+interface Props {
+  items:          ShopItem[]      // items featured (fallback)
+  bundles:        ShopBundle[]    // bundles featured (priorité)
+  onOpenItem:     (item: ShopItem) => void
+  onOpenBundle:   (bundle: ShopBundle) => void
+}
+```
+
+Layout :
+- Si `bundles.length > 0` : afficher une rangée « BUNDLES » au-dessus avec les cards bundle (pleine largeur, 1 ou 2 colonnes selon count), puis une rangée « NOUVEAUTÉS » avec les items unitaires restants.
+- Si `bundles.length === 0` : comportement actuel.
+
+### 3. Nouveau `src/components/shop/BundleCard.tsx`
+
+Card large format (full width sur mobile, 2/3 de ligne sur desktop). Affiche :
+- Tag « PACK » doré top-left (bg `rgba(245,158,11,0.15)` border `rgba(245,158,11,0.4)` text `#fde68a`).
+- Tag « ✦ Édition limitée » si `is_limited`, « Nouveau » si `is_new`.
+- Nom du bundle en titre (18px bold blanc).
+- Description (12px `white/55`).
+- Grille de mini-previews des 8 pièces (réutiliser `CosmeticPreview` pour les cosmétiques, `MiniBadge` pour les badges) — 4 colonnes.
+- Prix bundle à droite avec prix barré cumulé : `<s class="line-through opacity-40">◈ 7 500</s> ◈ 6 000 <span class="badge-green">−20%</span>`.
+  - Calcul : `const unitTotal = bundle.items.reduce((s, it) => s + it.price, 0)`.
+  - Afficher le bandeau discount si `unitTotal > bundle.price`.
+- CTA pleine largeur bas « Voir le pack » (doré).
+
+État `owned` (l'utilisateur possède TOUTES les pièces du bundle) : CTA désactivé « Pack complet » vert. Le calcul se fait côté parent via `ownedSet`, passe un prop `ownedCount` / `totalCount`.
+
+Animation d'entrée : motion `initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}` avec `delay: 0.05 * index`.
+
+### 4. Nouveau `src/components/shop/BundleModal.tsx`
+
+Structure proche de `ShopItemModal.tsx` mais adaptée :
+
+Props :
+```ts
+interface Props {
+  bundle:          ShopBundle | null
+  ownedIds:        Set<string>       // keys `${item_type}::${item_id}`
+  balance:         number
+  onClose:         () => void
+  onPurchased:     (result: BundlePurchaseResult) => void
+  onGoToInventory?: () => void
+}
+```
+
+États : `'detail' | 'loading' | 'success'`.
+
+**État `detail`** :
+- Header : nom, tier pill, « PACK » tag, description.
+- Preview : grille 4 colonnes des 8 pièces avec overlay « ✓ Possédé » sur celles déjà dans `ownedSet`.
+- Récap prix :
+  - `Prix à l'unité : ◈ {unitTotal}` (barré)
+  - `Prix du pack   : ◈ {bundle.price}`
+  - `Économie      : −◈ {unitTotal - bundle.price} (−{pct}%)`
+  - `Solde actuel  : ◈ {balance}`
+  - `Solde après   : ◈ {balance - bundle.price}`
+- Si `ownedCount > 0` : bloc d'avertissement orange « Tu possèdes déjà X/8 pièces. L'achat du pack te donnera les {total - owned} pièces manquantes, pour le prix plein du pack. »
+- Si `ownedCount === totalCount` : CTA désactivé « Pack complet ».
+- Si `balance < price` : CTA désactivé « Solde insuffisant ».
+- Sinon : bouton « Acheter le pack — ◈ {price} » doré.
+
+**État `loading`** : spinner sur le CTA, disabled.
+
+**État `success`** :
+- Icône check vert + « Pack débloqué ! » + `items_added` pièces ajoutées.
+- Grille des 8 pièces avec check vert sur celles désormais possédées.
+- Nouveau solde avec transition old → new.
+- Boutons : « Équiper le set » (équipe les 5 cosmétiques — emblem, title, card_design, background, screen_animation — appelle `equipCosmetic` sur chacun, les badges doivent être choisis manuellement par le user) + « Fermer ».
+
+Flux confirmer :
+1. `setState('loading')`
+2. `await purchaseBundle(bundle.id)` → succès : `bumpPulses(-bundle.price)`, setState('success'), appeler `onPurchased(result)`.
+3. Erreur : toast mappé (`insufficient_balance` → « Solde insuffisant », `no_longer_available` → « Ce pack n'est plus disponible », `bundle_not_found` → « Pack introuvable », autre → « Une erreur est survenue »). Retour à `'detail'`.
+
+Animation : même pattern que `ShopItemModal` — backdrop fade + spring scale-in. Sparkle effect doré sur la preview zone.
+
+### 5. Wire dans `ShopPage.tsx`
+
+- Rendre `<BundleModal />` à côté de `<ShopItemModal />`.
+- `onOpenBundle={handleOpenBundle}`.
+
+### 6. Équipement groupé depuis `BundleModal` (état success)
+
+Handler « Équiper le set » :
+```ts
+async function handleEquipSet() {
+  if (!user || !bundle) return
+  const cosmeticSlots = bundle.items.filter(it =>
+    it.item_type !== 'badge'
+  )
+  try {
+    await Promise.all(
+      cosmeticSlots.map(it => equipCosmetic(user.id, it.item_type as CosmeticType, it.item_id))
+    )
+    toast.success('Set équipé')
+    onClose()
+    void refreshStats()
+  } catch (e) {
+    toast.error("Impossible d'équiper le set")
+  }
+}
+```
+
+### 7. Analytics
+
+Ajouter dans `src/services/analytics.ts` :
+```ts
+export function trackBundleViewed(bundle: ShopBundle): void { /* PostHog capture */ }
+export function trackBundlePurchased(bundle: ShopBundle, newBalance: number): void { /* PostHog capture */ }
+```
+
+Appeler `trackBundleViewed` à l'ouverture de `BundleModal`, `trackBundlePurchased` au succès.
+
+### 8. CTA bundle visible dans la grille principale
+
+**Décision** : les 8 items du Set Héliarque restent visibles dans la grille principale (achat unitaire possible, plus cher), le bundle n'apparaît QUE dans `FeaturedSection` — c'est le point de différenciation. NE PAS ajouter les bundles dans `ShopGrid.tsx`.
+
+## Validation
+
+```bash
+npx tsc --noEmit
+npm run lint
+npm run dev
+```
+
+Scénarios à tester manuellement :
+- **Boutique ouverte** : section featured affiche d'abord le pack Solaire Héliarque (full width), puis la rangée d'items featured unitaires en dessous.
+- **Ouverture modale bundle** : les 8 pièces s'affichent en grille, prix barré cumulé + prix pack + économie, CTA « Acheter le pack ».
+- **Achat nominal** : solde suffisant → confirmer → loading → success → 8 pièces ajoutées à l'inventaire → solde décrementé côté hero.
+- **Achat partiel** : si user possède déjà 2 pièces sur 8 → modale avertissement, achat réussit, ajoute seulement les 6 manquantes (items_added = 6), débite le plein tarif.
+- **Possède tout** : modale affiche « Pack complet », CTA disabled.
+- **Équiper le set** : depuis état success, clic « Équiper le set » équipe les 5 cosmétiques en parallèle, toast succès.
+- **Achats unitaires toujours possibles** : dans la grille filtrée (type=badge ou blason etc.), les 8 items Héliarque sont achetables individuellement au prix unitaire (plus cher que le bundle).
+- **Pixel-fidélité badges** : les 3 badges Héliarque ont le même shell hexagonal que les autres légendaires (stroke-flow or + glow pulsant badge-gold), seul le glyphe interne diffère (flamme animée, soleil tournant, phénix flottant).
+
+## Nettoyage final
+
+- Aucun `console.log` laissé.
+- Documentation `CLAUDE.md` : ajouter une ligne dans la section « Badges » mentionnant le support du champ `glyph` pour les badges SVG, et une nouvelle sous-section « Bundles » après « Badges » listant les tables `shop_bundles` + `shop_bundle_items` + RPC `purchase_bundle`.
+
+Stop ici. Tout doit être fonctionnel après cette phase.

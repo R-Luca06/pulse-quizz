@@ -174,6 +174,15 @@ Pulses are **earned only** (games / achievements / daily streak bonuses). They c
 - `user_badges` unifies badge ownership across sources (`achievement` / `shop` / `season` / `rank`).
 - Trigger `sync_achievement_to_badge` copies every insert into `user_achievements` into `user_badges` automatically.
 - Featured badges (up to 3) displayed on the leaderboard / public profile via `profiles.featured_badges` (denormalized array of ids).
+- Badge meta (`constants/cosmetics/registry.ts`) supports an optional `glyph` field — a React component that renders an SVG glyph. When present, `MiniBadge` uses it instead of the emoji `icon` for crisp scaling across sizes. Used by the Héliarque set (flamme animée, soleil tournant, phénix flottant) sharing the same hex shell as other legendaries.
+
+## Bundles
+
+- Table `shop_bundles` — packs groupés (ex. Set Héliarque) avec `price` global < somme des pièces.
+- Table `shop_bundle_items` — liens N-à-N vers `shop_items` + `sort_order`.
+- RPC `purchase_bundle(p_bundle_id)` — achat atomique : débit du prix pack, insert des pièces manquantes dans `user_inventory`/`user_badges`, retourne `{ balance, bundle_id, items_added }`. Si l'utilisateur possède déjà des pièces, seules les manquantes sont ajoutées, mais le plein tarif pack est débité.
+- Service : `fetchShopBundles()` (jointure côté client) + `purchaseBundle(id)` dans `src/services/shop.ts`.
+- UI : `FeaturedSection` affiche les bundles `featured=true` en priorité (rangée dédiée), puis les items unitaires featured en dessous. `BundleCard` + `BundleModal` gèrent l'affichage et l'achat. Les pièces individuelles restent achetables dans la grille principale.
 
 ## Data flow (settings → API)
 

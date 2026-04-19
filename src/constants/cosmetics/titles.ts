@@ -1,4 +1,6 @@
+import type { CSSProperties } from 'react'
 import type { AchievementTier } from '../../types/quiz'
+import { HELIARQUE_TITLE_STYLE } from './solarSet'
 
 export interface TitleProps {
   rank: number | null
@@ -10,6 +12,8 @@ interface TitleEntry {
   tier?: AchievementTier
   description?: string
   resolve: (props: TitleProps) => string
+  style?: CSSProperties
+  setId?: string
 }
 
 function dynamicRankTitle({ rank }: TitleProps): string {
@@ -31,37 +35,23 @@ export const TITLE_REGISTRY: Record<string, TitleEntry> = {
     description: 'Se met à jour automatiquement selon ton rang mondial.',
     resolve:     dynamicRankTitle,
   },
-  erudit: {
-    id:          'erudit',
-    name:        'Érudit',
-    tier:        'common',
-    description: 'Pour ceux qui cumulent les bonnes réponses dans toutes les catégories.',
-    resolve:     () => 'Érudit',
-  },
-  maitre_des_categories: {
-    id:          'maitre_des_categories',
-    name:        'Maître des Catégories',
-    tier:        'rare',
-    description: "Réservé à ceux qui dominent toutes les catégories.",
-    resolve:     () => 'Maître des Catégories',
-  },
-  foudre_mentale: {
-    id:          'foudre_mentale',
-    name:        'Foudre Mentale',
-    tier:        'epic',
-    description: "Pour les joueurs dont la vitesse de réponse défie l'humain.",
-    resolve:     () => 'Foudre Mentale',
-  },
-  legende_quotidienne: {
-    id:          'legende_quotidienne',
-    name:        'Légende Quotidienne',
+  heliarque: {
+    id:          'heliarque',
+    name:        'Héliarque',
     tier:        'legendary',
-    description: 'Streak légendaire au Défi Journalier.',
-    resolve:     () => 'Légende Quotidienne',
+    setId:       'solaire_v1',
+    description: 'Titre doré scintillant. Set Héliarque · Vol. 01.',
+    resolve:     () => 'Héliarque',
+    style:       HELIARQUE_TITLE_STYLE,
   },
 }
 
 export function resolveTitle(id: string | null | undefined, props: TitleProps): string {
   const entry = (id && TITLE_REGISTRY[id]) || TITLE_REGISTRY[DEFAULT_TITLE_ID]
   return entry.resolve(props)
+}
+
+export function resolveTitleStyle(id: string | null | undefined): CSSProperties | undefined {
+  const entry = (id && TITLE_REGISTRY[id]) || TITLE_REGISTRY[DEFAULT_TITLE_ID]
+  return entry.style
 }

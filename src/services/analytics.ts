@@ -1,5 +1,5 @@
 import type posthogJs from 'posthog-js'
-import type { GameMode, Difficulty, Category, Language, ShopItem } from '../types/quiz'
+import type { GameMode, Difficulty, Category, Language, ShopItem, ShopBundle } from '../types/quiz'
 
 const KEY = import.meta.env.VITE_POSTHOG_KEY as string | undefined
 
@@ -88,5 +88,26 @@ export function trackShopItemPurchased(item: ShopItem, newBalance: number): void
     tier:         item.tier,
     price:        item.price,
     new_balance:  newBalance,
+  })
+}
+
+export function trackBundleViewed(bundle: ShopBundle): void {
+  ph?.capture('shop_bundle_viewed', {
+    bundle_id:   bundle.id,
+    bundle_slug: bundle.slug,
+    tier:        bundle.tier,
+    price:       bundle.price,
+    item_count:  bundle.items.length,
+  })
+}
+
+export function trackBundlePurchased(bundle: ShopBundle, newBalance: number): void {
+  ph?.capture('shop_bundle_purchased', {
+    bundle_id:   bundle.id,
+    bundle_slug: bundle.slug,
+    tier:        bundle.tier,
+    price:       bundle.price,
+    item_count:  bundle.items.length,
+    new_balance: newBalance,
   })
 }

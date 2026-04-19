@@ -95,12 +95,21 @@ export default function MiniBadge({ achievementId, size = 16, unlocked = true }:
       </svg>
 
       {/* ── Icône ──────────────────────────────────────────────────────────── */}
-      <span
-        className={['relative z-10 select-none leading-none', !unlocked ? 'opacity-25 grayscale' : ''].join(' ')}
-        style={{ fontSize: Math.round(size * 0.45) }}
-      >
-        {meta.icon}
-      </span>
+      {meta.glyph ? (
+        <div
+          className={['relative z-10 flex items-center justify-center', !unlocked ? 'opacity-25 grayscale' : ''].join(' ')}
+          style={{ width: Math.round(size * 0.7), height: Math.round(size * 0.7) }}
+        >
+          <meta.glyph size={Math.round(size * 0.7)} />
+        </div>
+      ) : (
+        <span
+          className={['relative z-10 select-none leading-none', !unlocked ? 'opacity-25 grayscale' : ''].join(' ')}
+          style={{ fontSize: Math.round(size * 0.45) }}
+        >
+          {meta.icon}
+        </span>
+      )}
     </div>
   )
 }

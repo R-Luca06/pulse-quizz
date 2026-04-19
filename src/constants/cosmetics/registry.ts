@@ -1,3 +1,4 @@
+import type { ComponentType } from 'react'
 import type { AchievementTier, CosmeticType } from '../../types/quiz'
 import { ACHIEVEMENT_MAP }                       from '../achievements'
 import { SHOP_BADGE_REGISTRY }                   from '../shopBadges'
@@ -85,12 +86,14 @@ export interface BadgeMeta {
   icon:        string
   tier:        AchievementTier
   description: string
+  glyph?:      ComponentType<{ size?: number }>
+  setId?:      string
 }
 
 export function getBadgeMeta(id: string): BadgeMeta | null {
   const ach = ACHIEVEMENT_MAP[id as keyof typeof ACHIEVEMENT_MAP]
   if (ach) return { id: ach.id, name: ach.name, icon: ach.icon, tier: ach.tier, description: ach.description }
   const shop = SHOP_BADGE_REGISTRY[id]
-  if (shop) return { id: shop.id, name: shop.name, icon: shop.icon, tier: shop.tier, description: shop.description }
+  if (shop) return { id: shop.id, name: shop.name, icon: shop.icon, tier: shop.tier, description: shop.description, glyph: shop.glyph, setId: shop.setId }
   return null
 }

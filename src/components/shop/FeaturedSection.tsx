@@ -1,7 +1,8 @@
 import { motion } from 'framer-motion'
-import type { AchievementTier, CosmeticType, ShopItem } from '../../types/quiz'
+import type { AchievementTier, CosmeticType, ShopBundle, ShopItem } from '../../types/quiz'
 import { CosmeticPreview } from '../inventory/previews'
 import { getBadgeMeta } from '../../constants/cosmetics/registry'
+import BundleCard from './BundleCard'
 
 const TIER_FRAME: Record<AchievementTier, { bg: string; border: string; shadow: string }> = {
   legendary: {
@@ -45,33 +46,85 @@ function formatFr(n: number): string {
 }
 
 interface Props {
-  items:   ShopItem[]
-  onOpenItem: (item: ShopItem) => void
+  items:        ShopItem[]
+  bundles:      ShopBundle[]
+  ownedSet:     Set<string>
+  onOpenItem:   (item: ShopItem) => void
+  onOpenBundle: (bundle: ShopBundle) => void
 }
 
-export default function FeaturedSection({ items, onOpenItem }: Props) {
-  if (items.length === 0) return null
+export default function FeaturedSection({ items, bundles, ownedSet, onOpenItem, onOpenBundle }: Props) {
+  if (items.length === 0 && bundles.length === 0) return null
+
+  // Items already represented inside a featured bundle — excluded from the "Nouveautés" row
+  const bundledItemKeys = new Set<string>()
+  for (const b of bundles) {
+    for (const it of b.items) bundledItemKeys.add(`${it.item_type}::${it.item_id}`)
+  }
+  const standaloneItems = items.filter(it => !bundledItemKeys.has(`${it.item_type}::${it.item_id}`))
 
   return (
     <div className="border-b border-game-border bg-black/[0.25] px-5 py-5">
-      <div className="mb-3.5 flex items-center gap-2">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style={{ color: 'rgba(234,179,8,0.7)' }}>
-          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
-        </svg>
-        <span
-          className="text-[9px] font-bold uppercase tracking-[0.16em]"
-          style={{ color: 'rgba(234,179,8,0.65)' }}
-        >
-          Nouveautés
-        </span>
-        <span className="ml-1 text-[10px] text-white/[0.28]">Objets mis en avant cette semaine</span>
-      </div>
+      {bundles.length > 0 && (
+        <>
+          <div className="mb-3.5 flex items-center gap-2">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style={{ color: 'rgba(245,158,11,0.75)' }}>
+              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+            </svg>
+            <span
+              className="text-[9px] font-bold uppercase tracking-[0.16em]"
+              style={{ color: 'rgba(245,158,11,0.75)' }}
+            >
+              Bundles
+            </span>
+            <span className="ml-1 text-[10px] text-white/[0.35]">Packs en édition limitée</span>
+          </div>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {items.slice(0, 3).map((item, i) => (
-          <FeaturedCard key={item.id} item={item} onOpenItem={onOpenItem} index={i} />
-        ))}
-      </div>
+          <div className={[
+            'grid gap-3',
+            bundles.length === 1 ? 'grid-cols-1' : 'grid-cols-1 lg:grid-cols-2',
+          ].join(' ')}>
+            {bundles.map((bundle, i) => {
+              const total = bundle.items.length
+              let owned = 0
+              for (const it of bundle.items) if (ownedSet.has(`${it.item_type}::${it.item_id}`)) owned++
+              return (
+                <BundleCard
+                  key={bundle.id}
+                  bundle={bundle}
+                  ownedCount={owned}
+                  totalCount={total}
+                  onOpen={onOpenBundle}
+                  index={i}
+                />
+              )
+            })}
+          </div>
+        </>
+      )}
+
+      {standaloneItems.length > 0 && (
+        <>
+          <div className={[bundles.length > 0 ? 'mt-6' : '', 'mb-3.5 flex items-center gap-2'].join(' ')}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style={{ color: 'rgba(234,179,8,0.7)' }}>
+              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+            </svg>
+            <span
+              className="text-[9px] font-bold uppercase tracking-[0.16em]"
+              style={{ color: 'rgba(234,179,8,0.65)' }}
+            >
+              Nouveautés
+            </span>
+            <span className="ml-1 text-[10px] text-white/[0.28]">Objets mis en avant cette semaine</span>
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {standaloneItems.slice(0, 3).map((item, i) => (
+              <FeaturedCard key={item.id} item={item} onOpenItem={onOpenItem} index={i} />
+            ))}
+          </div>
+        </>
+      )}
     </div>
   )
 }

@@ -1,20 +1,8 @@
 import type { AchievementTier, ItemType, CosmeticType } from '../../types/quiz'
 import { CosmeticPreview } from '../inventory/previews'
-import { getBadgeMeta } from '../../constants/cosmetics/registry'
-
-const TIER_STROKE: Record<AchievementTier, string> = {
-  legendary: '#fbbf24',
-  epic:      '#a78bfa',
-  rare:      '#60a5fa',
-  common:    'rgba(255,255,255,0.45)',
-}
-
-const TIER_GLOW: Record<AchievementTier, string> = {
-  legendary: 'drop-shadow(0 0 20px rgba(245,158,11,0.45))',
-  epic:      'drop-shadow(0 0 20px rgba(167,139,250,0.4))',
-  rare:      'drop-shadow(0 0 18px rgba(96,165,250,0.3))',
-  common:    'drop-shadow(0 0 10px rgba(255,255,255,0.15))',
-}
+import MiniBadge from '../shared/MiniBadge'
+import { BACKGROUND_REGISTRY } from '../../constants/cosmetics/backgrounds'
+import { ANIMATION_REGISTRY }  from '../../constants/cosmetics/screenAnimations'
 
 interface Props {
   itemType: ItemType
@@ -23,48 +11,57 @@ interface Props {
   variant?: 'lg' | 'md'
 }
 
-export default function LargeItemPreview({ itemType, itemId, tier, variant = 'lg' }: Props) {
-  if (itemType === 'badge') return <BadgeHex itemId={itemId} tier={tier} variant={variant} />
+export default function LargeItemPreview({ itemType, itemId, variant = 'lg' }: Props) {
+  if (itemType === 'badge') {
+    return <MiniBadge achievementId={itemId} size={variant === 'lg' ? 92 : 52} />
+  }
+  if (itemType === 'background' && variant === 'lg') {
+    return <LiveBackgroundPreview itemId={itemId} />
+  }
+  if (itemType === 'screen_animation' && variant === 'lg') {
+    return <LiveAnimationPreview itemId={itemId} />
+  }
   return <CosmeticPreview type={itemType as CosmeticType} id={itemId} size={variant === 'lg' ? 'lg' : 'md'} />
 }
 
-function BadgeHex({ itemId, tier, variant }: { itemId: string; tier: AchievementTier; variant: 'lg' | 'md' }) {
-  const meta = getBadgeMeta(itemId)
-  const icon = meta?.icon ?? '✦'
-  const stroke = TIER_STROKE[tier]
-  const glow   = TIER_GLOW[tier]
-  const w = variant === 'lg' ? 92 : 52
-  const h = variant === 'lg' ? 104 : 58
-  const fontSize = variant === 'lg' ? 44 : 24
-
+function LiveBackgroundPreview({ itemId }: { itemId: string }) {
+  const entry = BACKGROUND_REGISTRY[itemId]
+  const Comp  = entry?.Component
   return (
     <div
-      style={{ position: 'relative', width: w, height: h, filter: glow }}
+      style={{
+        position:     'relative',
+        width:        160,
+        height:       110,
+        borderRadius: 10,
+        overflow:     'hidden',
+        border:       '1px solid rgba(255,255,255,0.08)',
+        background:   '#0a0a15',
+      }}
       aria-hidden
     >
-      <svg viewBox="0 0 64 72" width={w} height={h} fill="none">
-        <defs>
-          <linearGradient id={`lip-grad-${itemId}-${variant}`} x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%"   stopColor="rgba(255,255,255,0.25)" />
-            <stop offset="100%" stopColor="rgba(0,0,0,0.18)" />
-          </linearGradient>
-        </defs>
-        <path d="M32 2 L62 20 L62 52 L32 70 L2 52 L2 20 Z" fill="rgba(14,10,28,0.95)" stroke={stroke} strokeWidth="1.8" />
-        <path d="M32 2 L62 20 L62 52 L32 70 L2 52 L2 20 Z" fill={`url(#lip-grad-${itemId}-${variant})`} />
-      </svg>
-      <span
-        style={{
-          position:       'absolute',
-          inset:          0,
-          display:        'flex',
-          alignItems:     'center',
-          justifyContent: 'center',
-          fontSize,
-          userSelect:     'none',
-        }}
-      >
-        {icon}
-      </span>
+      {Comp && <Comp />}
+    </div>
+  )
+}
+
+function LiveAnimationPreview({ itemId }: { itemId: string }) {
+  const entry = ANIMATION_REGISTRY[itemId]
+  const Comp  = entry?.Component
+  return (
+    <div
+      style={{
+        position:     'relative',
+        width:        160,
+        height:       110,
+        borderRadius: 10,
+        overflow:     'hidden',
+        border:       '1px solid rgba(255,255,255,0.08)',
+        background:   'rgba(10,7,20,0.85)',
+      }}
+      aria-hidden
+    >
+      {Comp && <Comp />}
     </div>
   )
 }

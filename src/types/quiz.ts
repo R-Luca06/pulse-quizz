@@ -118,9 +118,32 @@ export interface PurchaseResult {
   item_id:   string
 }
 
+export interface ShopBundle {
+  id:              string
+  slug:            string
+  name:            string
+  description:     string | null
+  tier:            AchievementTier
+  price:           number
+  is_new:          boolean
+  is_limited:      boolean
+  featured:        boolean
+  available_from:  string | null
+  available_until: string | null
+  sort_order:      number
+  items:           ShopItem[]       // pièces résolues (jointure côté service)
+}
+
+export interface BundlePurchaseResult {
+  balance:     number
+  bundle_id:   string
+  items_added: number
+}
+
 export type PurchaseErrorCode =
   | 'not_authenticated'
   | 'item_not_found'
+  | 'bundle_not_found'
   | 'not_yet_available'
   | 'no_longer_available'
   | 'already_owned'

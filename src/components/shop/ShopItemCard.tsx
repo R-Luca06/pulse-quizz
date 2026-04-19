@@ -1,7 +1,7 @@
 import { motion } from 'framer-motion'
 import type { AchievementTier, CosmeticType, ShopItem } from '../../types/quiz'
 import { CosmeticPreview } from '../inventory/previews'
-import { getBadgeMeta } from '../../constants/cosmetics/registry'
+import MiniBadge from '../shared/MiniBadge'
 import { TYPE_ICON } from './icons'
 
 const TIER_LABEL: Record<AchievementTier, string> = {
@@ -16,20 +16,6 @@ const TIER_DOT_COLOR: Record<AchievementTier, string> = {
   epic:      '#a78bfa',
   rare:      '#60a5fa',
   common:    'rgba(255,255,255,0.30)',
-}
-
-const TIER_BADGE_BG: Record<AchievementTier, string> = {
-  legendary: 'linear-gradient(180deg, rgba(245,158,11,0.55), rgba(245,158,11,0.1))',
-  epic:      'linear-gradient(180deg, rgba(167,139,250,0.55), rgba(167,139,250,0.1))',
-  rare:      'linear-gradient(180deg, rgba(96,165,250,0.5), rgba(96,165,250,0.08))',
-  common:    'linear-gradient(180deg, rgba(255,255,255,0.2), rgba(255,255,255,0.05))',
-}
-
-const TIER_BADGE_GLOW: Record<AchievementTier, string> = {
-  legendary: 'drop-shadow(0 0 6px rgba(245,158,11,0.45))',
-  epic:      'drop-shadow(0 0 6px rgba(167,139,250,0.4))',
-  rare:      'drop-shadow(0 0 5px rgba(96,165,250,0.3))',
-  common:    'none',
 }
 
 const TYPE_LABEL_FR: Record<string, string> = {
@@ -116,7 +102,7 @@ export default function ShopItemCard({ item, owned, balance, onClick, index = 0 
         style={{ filter: unaffordable ? 'saturate(0.6)' : undefined }}
       >
         {item.item_type === 'badge'
-          ? <BadgePreview itemId={item.item_id} tier={item.tier} />
+          ? <MiniBadge achievementId={item.item_id} size={48} />
           : <CosmeticPreview type={item.item_type as CosmeticType} id={item.item_id} size="md" />}
       </div>
 
@@ -185,25 +171,3 @@ export default function ShopItemCard({ item, owned, balance, onClick, index = 0 
   )
 }
 
-// ─── Badge hex preview (for shop badges) ──────────────────────────────────────
-
-function BadgePreview({ itemId, tier }: { itemId: string; tier: AchievementTier }) {
-  const meta = getBadgeMeta(itemId)
-  const icon = meta?.icon ?? '✦'
-  return (
-    <div
-      className="flex items-center justify-center"
-      style={{
-        width:     48,
-        height:    54,
-        clipPath:  'polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%)',
-        background: TIER_BADGE_BG[tier],
-        filter:     TIER_BADGE_GLOW[tier],
-        fontSize:   20,
-      }}
-      aria-hidden
-    >
-      <span>{icon}</span>
-    </div>
-  )
-}

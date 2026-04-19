@@ -5,11 +5,8 @@ import { getCosmetic } from '../../constants/cosmetics/registry'
 // ─── Emblem (mini SVG shield) ────────────────────────────────────────────────
 
 const EMBLEM_COLOR: Record<string, string> = {
-  default_rank:     '#6b7280',
-  flamme_dor:       '#fbbf24',
-  cristal_de_glace: '#67e8f9',
-  eclair_neon:      '#a78bfa',
-  rose_cyberpunk:   '#ec4899',
+  default_rank: '#6b7280',
+  heliarque:    '#f59e0b',
 }
 
 const TIER_HEX: Record<AchievementTier, string> = {
@@ -26,29 +23,14 @@ export function MiniEmblem({ id, size = 44 }: { id: string | null; size?: number
   const height = Math.round(52 * ratio)
 
   let glyph
-  if (meta.id === 'flamme_dor') {
-    glyph = (
-      <>
-        <path d="M 0,-18 C -7,-9 -11,1 -8,9 C -5,16 5,16 8,9 C 11,1 7,-9 0,-18 Z" fill={color} fillOpacity="0.85" />
-        <path d="M 0,-8 C -3,-3 -4,3 -2,7 C 0,9 3,8 3,3 C 3,-1 1,-5 0,-8 Z" fill="#fde68a" />
-      </>
-    )
-  } else if (meta.id === 'cristal_de_glace') {
-    glyph = (
-      <>
-        <path d="M 0,-16 L 11,-2 L 0,18 L -11,-2 Z" fill="none" stroke={color} strokeWidth="1.4" />
-        <path d="M 0,-10 L 6,-2 L 0,12 L -6,-2 Z" fill={color + '30'} stroke={color + 'aa'} strokeWidth="0.6" />
-      </>
-    )
-  } else if (meta.id === 'eclair_neon') {
-    glyph = <path d="M 4,-18 L -8,2 L -1,2 L -5,18 L 8,-2 L 1,-2 Z" fill={color} stroke="#ede9fe" strokeWidth="0.6" />
-  } else if (meta.id === 'rose_cyberpunk') {
+  if (meta.id === 'heliarque') {
     glyph = (
       <g>
-        {[0, 60, 120, 180, 240, 300].map(a => (
-          <path key={a} d="M 0,0 L 6,-4 L 0,-12 L -6,-4 Z" fill={color + '33'} stroke={color} strokeWidth="0.8" transform={`rotate(${a})`} />
+        {Array.from({ length: 12 }).map((_, i) => (
+          <rect key={i} x="-0.8" y="-15" width="1.6" height="5" rx="0.8" fill="#fbbf24" opacity="0.9" transform={`rotate(${i * 30})`} />
         ))}
-        <circle cx="0" cy="0" r="3.5" fill="#fbcfe8" stroke={color} strokeWidth="0.8" />
+        <circle cx="0" cy="0" r="7" fill="#fbbf24" />
+        <circle cx="0" cy="0" r="3" fill="#fef9c3" opacity="0.7" />
       </g>
     )
   } else {
@@ -99,21 +81,9 @@ const CARD_STYLE: Record<string, CSSProperties> = {
     background:   'linear-gradient(180deg, rgba(20,14,38,0.75), rgba(10,7,20,0.92))',
     borderColor:  'rgba(255,255,255,0.08)',
   },
-  holographique: {
-    background:   'linear-gradient(135deg, rgba(236,72,153,0.22), rgba(6,182,212,0.22), rgba(234,179,8,0.2))',
-    borderColor:  'rgba(236,72,153,0.4)',
-  },
-  parchemin_dor: {
-    background:   'linear-gradient(135deg, rgba(251,191,36,0.25), rgba(146,64,14,0.25))',
-    borderColor:  'rgba(251,191,36,0.5)',
-  },
-  givre: {
-    background:   'linear-gradient(135deg, rgba(103,232,249,0.18), rgba(59,130,246,0.12))',
-    borderColor:  'rgba(103,232,249,0.4)',
-  },
-  rune_arcane: {
-    background:   'radial-gradient(circle at 30% 30%, rgba(167,139,250,0.3), rgba(10,10,15,0.9))',
-    borderColor:  'rgba(167,139,250,0.45)',
+  or_en_fusion: {
+    background:   'linear-gradient(135deg, rgba(251,191,36,0.35), rgba(234,88,12,0.25))',
+    borderColor:  'rgba(251,191,36,0.6)',
   },
 }
 
@@ -155,19 +125,9 @@ const BG_STYLE: Record<string, CSSProperties> = {
   default: {
     background: '#0a0a15',
   },
-  aurore_violette: {
-    background: 'radial-gradient(circle at 20% 30%, rgba(139,92,246,0.55), transparent 60%), radial-gradient(circle at 80% 70%, rgba(59,130,246,0.45), transparent 60%), #0a0a15',
-  },
-  constellation: {
-    background: 'radial-gradient(circle at 25% 30%, #fff 1px, transparent 2px), radial-gradient(circle at 70% 60%, #fff 1px, transparent 2px), radial-gradient(circle at 45% 80%, #fff 1px, transparent 2px), radial-gradient(circle at 85% 25%, #fff 1px, transparent 2px), #0a0a15',
-  },
-  grille_neon: {
+  horizon_incandescent: {
     background:
-      'linear-gradient(rgba(139,92,246,0.35) 1px, transparent 1px) 0 0 / 10px 10px, linear-gradient(90deg, rgba(139,92,246,0.35) 1px, transparent 1px) 0 0 / 10px 10px, #060610',
-  },
-  nebuleuse_doree: {
-    background:
-      'radial-gradient(circle at 40% 50%, rgba(234,179,8,0.55), transparent 55%), radial-gradient(circle at 70% 30%, rgba(251,146,60,0.35), transparent 60%), #140d05',
+      'radial-gradient(ellipse at 50% 110%, rgba(234,88,12,0.6) 0%, rgba(245,158,11,0.25) 35%, rgba(6,4,14,0.95) 75%), #06040e',
   },
 }
 
@@ -197,11 +157,8 @@ export function MiniBackground({ id, size = 'md' }: { id: string | null; size?: 
 // ─── Screen animation (mini particle patch) ──────────────────────────────────
 
 const ANIM_COLOR: Record<string, { dot: string; glow: string }> = {
-  pluie_pulses:      { dot: '#67e8f9', glow: '#67e8f9' },
-  etincelles_dorees: { dot: '#fde68a', glow: '#fbbf24' },
-  particules_violet: { dot: '#c4b5fd', glow: '#8b5cf6' },
-  eclairs:           { dot: '#fbbf24', glow: '#fbbf24' },
-  none:              { dot: 'rgba(255,255,255,0.2)', glow: 'rgba(255,255,255,0.1)' },
+  braises_ascendantes: { dot: '#fef3c7', glow: '#ea580c' },
+  none:                { dot: 'rgba(255,255,255,0.2)', glow: 'rgba(255,255,255,0.1)' },
 }
 
 const PARTICLE_POS: { left: string; delay: string }[] = [

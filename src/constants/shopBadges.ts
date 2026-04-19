@@ -1,4 +1,6 @@
+import type { ComponentType } from 'react'
 import type { AchievementTier } from '../types/quiz'
+import { EruptionGlyph, CouronneSolaireGlyph, PhenixGlyph } from './cosmetics/solarSet'
 
 export interface ShopBadgeMeta {
   id:          string
@@ -6,11 +8,38 @@ export interface ShopBadgeMeta {
   icon:        string
   tier:        AchievementTier
   description: string
+  glyph?:      ComponentType<{ size?: number }>
+  setId?:      string
 }
 
 export const SHOP_BADGE_REGISTRY: Record<string, ShopBadgeMeta> = {
-  shop_badge_crown:   { id: 'shop_badge_crown',   name: 'Couronne de la Boutique', icon: '👑', tier: 'legendary', description: 'Badge exclusif acheté dans la Boutique.' },
-  shop_badge_diamond: { id: 'shop_badge_diamond', name: 'Diamant de la Boutique',  icon: '💎', tier: 'epic',      description: 'Badge exclusif acheté dans la Boutique.' },
+  heliarque_eruption: {
+    id:          'heliarque_eruption',
+    name:        'Éruption',
+    icon:        '🔥',
+    tier:        'legendary',
+    setId:       'solaire_v1',
+    description: 'Flamme de forge en éruption. Set Héliarque · Vol. 01.',
+    glyph:       EruptionGlyph,
+  },
+  heliarque_couronne_solaire: {
+    id:          'heliarque_couronne_solaire',
+    name:        'Couronne Solaire',
+    icon:        '☀️',
+    tier:        'legendary',
+    setId:       'solaire_v1',
+    description: 'Soleil couronné à douze rayons. Set Héliarque · Vol. 01.',
+    glyph:       CouronneSolaireGlyph,
+  },
+  heliarque_phenix: {
+    id:          'heliarque_phenix',
+    name:        'Phénix',
+    icon:        '🔆',
+    tier:        'legendary',
+    setId:       'solaire_v1',
+    description: 'Phénix de braise, ailes déployées. Set Héliarque · Vol. 01.',
+    glyph:       PhenixGlyph,
+  },
 }
 
 export function getShopBadge(id: string): ShopBadgeMeta | null {

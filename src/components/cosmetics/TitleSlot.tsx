@@ -1,4 +1,4 @@
-import { resolveTitle } from '../../constants/cosmetics/titles'
+import { resolveTitle, resolveTitleStyle } from '../../constants/cosmetics/titles'
 
 interface Props {
   equippedId: string | null
@@ -8,7 +8,8 @@ interface Props {
 
 export default function TitleSlot({ equippedId, rank, onClick }: Props) {
   const content = resolveTitle(equippedId, { rank })
-  if (!onClick) return <>{content}</>
+  const style   = resolveTitleStyle(equippedId)
+  if (!onClick) return style ? <span style={style}>{content}</span> : <>{content}</>
   return (
     <button
       type="button"
@@ -17,7 +18,7 @@ export default function TitleSlot({ equippedId, rank, onClick }: Props) {
       className="group relative inline-block focus:outline-none"
       style={{ background: 'transparent', border: 'none', padding: 0, cursor: 'pointer' }}
     >
-      <span className="transition-opacity group-hover:opacity-70">{content}</span>
+      <span className="transition-opacity group-hover:opacity-70" style={style}>{content}</span>
       <span
         aria-hidden
         className="pointer-events-none absolute -right-4 top-1/2 flex h-3.5 w-3.5 -translate-y-1/2 items-center justify-center rounded-full text-white/70 opacity-0 transition-opacity group-hover:opacity-100"

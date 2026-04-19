@@ -48,31 +48,15 @@ INSERT INTO user_inventory (user_id, item_type, item_id, source)
 SELECT p.id, t.item_type, t.item_id, 'shop'
 FROM profiles p
 CROSS JOIN (VALUES
-  -- Emblèmes
-  ('emblem',           'flamme_dor'),
-  ('emblem',           'cristal_de_glace'),
-  ('emblem',           'eclair_neon'),
-  ('emblem',           'rose_cyberpunk'),
-  -- Titres
-  ('title',            'erudit'),
-  ('title',            'maitre_des_categories'),
-  ('title',            'foudre_mentale'),
-  ('title',            'legende_quotidienne'),
-  -- Designs de carte
-  ('card_design',      'holographique'),
-  ('card_design',      'parchemin_dor'),
-  ('card_design',      'givre'),
-  ('card_design',      'rune_arcane'),
-  -- Fonds
-  ('background',       'aurore_violette'),
-  ('background',       'constellation'),
-  ('background',       'grille_neon'),
-  ('background',       'nebuleuse_doree'),
-  -- Animations d'écran
-  ('screen_animation', 'pluie_pulses'),
-  ('screen_animation', 'etincelles_dorees'),
-  ('screen_animation', 'particules_violet'),
-  ('screen_animation', 'eclairs')
+  -- Set Héliarque · Vol. 01
+  ('emblem',           'heliarque'),
+  ('title',            'heliarque'),
+  ('card_design',      'or_en_fusion'),
+  ('background',       'horizon_incandescent'),
+  ('screen_animation', 'braises_ascendantes'),
+  ('badge',            'heliarque_eruption'),
+  ('badge',            'heliarque_couronne_solaire'),
+  ('badge',            'heliarque_phenix')
 ) AS t(item_type, item_id)
 WHERE lower(p.username) = lower('MON_PSEUDO')
 ON CONFLICT (user_id, item_type, item_id) DO NOTHING;
